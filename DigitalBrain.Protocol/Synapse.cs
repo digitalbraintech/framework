@@ -80,6 +80,17 @@ public interface ISoftware20Team : ISoftwareEngineeringTeam { }
 
 public interface ISoftware10Team : ISoftwareEngineeringTeam { }
 
+// Kernel task grain contract.
+public interface IKernelTask : INeuron, IHandle<RunKernelTask>, IHandle<CancelKernelTask>
+{
+    Task<string> GetStatusAsync();
+}
+
+public interface IInoNeuron : INeuron, IHandle<InoRequest>
+{
+    Task<string> AskAsync(string prompt);
+}
+
 // Self-awareness: SystemStatus + proposals (MVP for auto diagnose + simulate fix)
 [GenerateSerializer]
 public record SystemLaunched(string SystemName, DateTimeOffset Timestamp) : Synapse(nameof(SystemLaunched), DateTimeOffset.UtcNow);
@@ -151,3 +162,39 @@ public record CommissionTaken(
     double CommissionRate, 
     double CommissionAmount
 ) : Synapse(nameof(CommissionTaken), DateTimeOffset.UtcNow);
+
+// Kernel primitives: dual journal checkpoints + branching for simulation / time travel.
+[GenerateSerializer]
+public record Checkpoint(NeuronId Source, IReadOnlyList<Synapse> Snapshot, DateTimeOffset TakenAt) : Synapse(nameof(Checkpoint), TakenAt);
+
+[GenerateSerializer]
+public record BranchCreated(NeuronId Source, string BranchId) : Synapse(nameof(BranchCreated), DateTimeOffset.UtcNow);
+
+// Kernel Tasks: first-class self-recoverable units (lifecycle via journal).
+[GenerateSerializer]
+public record KernelTaskCreated(string TaskId, string Description) : Synapse(nameof(KernelTaskCreated), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record KernelTaskStarted(string TaskId) : Synapse(nameof(KernelTaskStarted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record KernelTaskProgress(string TaskId, string Detail) : Synapse(nameof(KernelTaskProgress), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record KernelTaskCompleted(string TaskId, string? Result = null) : Synapse(nameof(KernelTaskCompleted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record KernelTaskCancelled(string TaskId) : Synapse(nameof(KernelTaskCancelled), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record RunKernelTask(string TaskId, string Description) : Synapse(nameof(RunKernelTask), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record CancelKernelTask(string TaskId) : Synapse(nameof(CancelKernelTask), DateTimeOffset.UtcNow);
+
+// INO - the personal ultra-context assistant living in the kernel.
+[GenerateSerializer]
+public record InoRequest(string Prompt, string? SessionId = null) : Synapse(nameof(InoRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);

@@ -15,16 +15,13 @@ builder.AddOllamaApiClient("qwen");
 
 builder.UseOrleans(siloBuilder =>
 {
-    // WARNING: Current journal is prototype-only (in-memory).
-    // The DurableGrain alpha + IDurableList is used for synapse timelines.
-    // Real deployments require a durable journal + IJournaledStateManager.
+    // Dual journals (in + out) prototype for kernel.
     siloBuilder.ConfigureServices(services =>
     {
-        // Minimal prototype journal (local to this host, lost on restart)
-        services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal",
+        services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal",
             (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
-
-        // Stub for the alpha journaling manager (sufficient for local dev / test cluster)
+        services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal",
+            (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
         services.AddSingleton<Orleans.Journaling.IJournaledStateManager, PrototypeJournaledStateManager>();
     });
 

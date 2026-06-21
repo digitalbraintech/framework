@@ -10,6 +10,7 @@ namespace DigitalBrain.Tests.TestSupport;
 /// These exist ONLY for fast harness + unit tests.
 /// Real DigitalBrain.Host deployments must provide durable journal + storage.
 /// </summary>
+// Dual journals support for tests (in + out)
 public sealed class InMemoryDurableList<T> : List<T>, IDurableList<T>;
 
 public sealed class TestJournaledStateManager : IJournaledStateManager

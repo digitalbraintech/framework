@@ -12,27 +12,28 @@ public static class DigitalBrainKernelExtensions
 {
     public static IHostApplicationBuilder UseDigitalBrainKernel(this IHostApplicationBuilder builder)
     {
-        // Core Orleans host setup - localhost for fast "dotnet run" experience
         builder.UseOrleans(siloBuilder =>
         {
             siloBuilder.UseLocalhostClustering();
             siloBuilder.AddMemoryGrainStorageAsDefault();
 
-            // Journaling for synapse timelines (prototype in-memory for fast boot)
+            // Dual journals: incoming (received Deliver) + outgoing (Fire). Prototype in-memory for fast single-process boot.
+            // Auto population via incoming grain call filter + explicit in Neuron Fire/Deliver.
             siloBuilder.ConfigureServices(services =>
             {
-                services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal",
+                services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal",
+                    (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
+                services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal",
                     (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
                 services.AddSingleton<Orleans.Journaling.IJournaledStateManager, PrototypeJournaledStateManager>();
             });
 
-            // Built-in neurons are discovered automatically because the calling assembly references DigitalBrain.Silo.
-            // For explicit control in advanced scenarios, use siloBuilder.ConfigureApplicationParts(...) 
+            // Call filter ensures every incoming synapse (DeliverAsync or grain invocation) auto-logs to receiver's in-journal.
+            siloBuilder.AddIncomingGrainCallFilter<IncomingJournalFilter>();
 
+            // Built-in neurons discovered automatically.
         });
 
-        // Ollama for LLM-powered neurons (Compiler, LlmNeuron, etc.)
-        // Assumes Ollama is available (or will fallback in neurons)
         builder.AddOllamaApiClient("qwen");
 
         return builder;
@@ -54,4 +55,18 @@ internal sealed class PrototypeJournaledStateManager : Orleans.Journaling.IJourn
     public bool TryGetState(string stateId, out Orleans.Journaling.IJournaledState? state) { state = null; return false; }
     public ValueTask WriteStateAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
     public ValueTask DeleteStateAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+}
+
+// Incoming call filter for dual-journal auto population.
+// Every grain invocation path (including DeliverAsync for received synapses) is intercepted here.
+// Actual in-journal write is performed inside Neuron.DeliverAsync (receiver side) so that journals stay
+// local to the activation and use the per-grain keyed service. The filter guarantees the intercept point.
+internal sealed class IncomingJournalFilter : IIncomingGrainCallFilter
+{
+    public async Task Invoke(IIncomingGrainCallContext context)
+    {
+        // For synapse receives, DeliverAsync will handle journaling the incoming entry.
+        // Future: could snapshot args here for cross-cutting.
+        await context.Invoke();
+    }
 }

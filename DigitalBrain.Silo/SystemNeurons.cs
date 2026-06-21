@@ -621,7 +621,7 @@ public class SystemStatusNeuron : Neuron, ISystemStatus
 
     private async Task RunIsolatedSimulationAsync(SystemStatusChanged bad, string proposedFix, CancellationToken ct)
     {
-        var journal = this.ServiceProvider.GetRequiredKeyedService<IDurableList<Synapse>>("journal");
+        var journal = this.ServiceProvider.GetRequiredKeyedService<IDurableList<Synapse>>("out-journal");
         var recent = journal.TakeLast(15).ToList();
         var result = ComputeSimulationResult(recent, bad, proposedFix);
         await FireAsync(result);
@@ -653,4 +653,53 @@ public class SystemStatusNeuron : Neuron, ISystemStatus
             differentAndHealthy,
             $"checkpoint replay: {checkpoint.Count} entries. before={before} after={after}. fix='{proposedFix}'. result={(differentAndHealthy ? "different+healthy" : "no improvement")}.");
     }
+}
+
+// Self-recoverable kernel task. State lives in its journal (incoming/out). On activate resumes if non-terminal.
+[GrainType("kernel.task.v1")]
+public class KernelTaskNeuron : Neuron, IKernelTask
+{
+    private string _taskId = "";
+    private string _desc = "";
+    private string _status = "created";
+
+    public KernelTaskNeuron(ILogger<KernelTaskNeuron> logger) : base(logger) { }
+
+    public override async Task OnActivateAsync(CancellationToken ct)
+    {
+        await base.OnActivateAsync(ct);
+        _taskId = this.GetPrimaryKeyString() ?? "task";
+        // Recover: inspect own journals for last known status.
+        var last = OutgoingJournal.Concat(IncomingJournal).LastOrDefault(s => s is KernelTaskStarted or KernelTaskCompleted or KernelTaskCancelled or KernelTaskProgress);
+        if (last is KernelTaskStarted) _status = "running";
+        else if (last is KernelTaskCompleted) _status = "completed";
+        else if (last is KernelTaskCancelled) _status = "cancelled";
+        else if (last is KernelTaskProgress p) _status = "running:" + p.Detail;
+        if (_status == "running")
+        {
+            // Self-recover: continue (demo: immediately mark progress; real would re-execute work spec)
+            await FireAsync(new KernelTaskProgress(_taskId, "resumed-after-restart"));
+        }
+    }
+
+    public async Task HandleAsync(RunKernelTask cmd)
+    {
+        _taskId = cmd.TaskId;
+        _desc = cmd.Description;
+        _status = "running";
+        await FireAsync(new KernelTaskCreated(cmd.TaskId, cmd.Description));
+        await FireAsync(new KernelTaskStarted(cmd.TaskId));
+        // Simulate work completing quickly for prototype; real tasks do long work and progress.
+        await Task.Delay(50);
+        _status = "completed";
+        await FireAsync(new KernelTaskCompleted(cmd.TaskId, "done:" + cmd.Description));
+    }
+
+    public async Task HandleAsync(CancelKernelTask cmd)
+    {
+        _status = "cancelled";
+        await FireAsync(new KernelTaskCancelled(cmd.TaskId));
+    }
+
+    public Task<string> GetStatusAsync() => Task.FromResult($"{_taskId}:{_status}");
 }

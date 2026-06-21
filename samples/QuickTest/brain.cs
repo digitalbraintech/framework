@@ -40,8 +40,9 @@ await app.StartAsync();
 
 var grains = app.Services.GetRequiredService<IGrainFactory>();
 
-// Bootstrap key neurons (like the old Silo Program did)
+// Bootstrap key neurons
 _ = grains.GetGrain<ISystemStatus>("status-main").GetTimelineAsync();
+_ = grains.GetGrain<IInoNeuron>("ino-main").GetTimelineAsync();
 
 if (isMcpMode)
 {
@@ -187,11 +188,71 @@ else
                     break;
 
                 case "help":
-                    Console.WriteLine("create-software '<spec or .feature for email archiver>' -> materializes runnable .csproj | run/export by name | self-improve (uses gen output to propose) | list");
+                    Console.WriteLine("create-software ... | ino 'plan my week using kernel tasks' | task 'backup files' | checkpoint | branch | timelines | list");
+                    break;
+
+                case "ino":
+                    if (parts.Length > 1)
+                    {
+                        var q = string.Join(' ', parts[1..]);
+                        var ino = grains.GetGrain<IInoNeuron>("ino-main");
+                        var resp = await ino.AskAsync(q);
+                        Console.WriteLine("INO: " + resp);
+                        var itl = await ino.GetOutgoingTimelineAsync();
+                        var lastResp = itl.OfType<InoResponse>().LastOrDefault();
+                        if (lastResp != null && lastResp.UsedTaskIds.Length > 0)
+                            Console.WriteLine("  tasks: " + string.Join(",", lastResp.UsedTaskIds));
+                    }
+                    break;
+
+                case "task":
+                    if (parts.Length > 1)
+                    {
+                        var desc = string.Join(' ', parts[1..]);
+                        var tid = "quick-" + Guid.NewGuid().ToString("N")[..6];
+                        var kt = grains.GetGrain<IKernelTask>(tid);
+                        await kt.FireAsync(new RunKernelTask(tid, desc));
+                        await Task.Delay(100);
+                        var st = await kt.GetStatusAsync();
+                        Console.WriteLine("KernelTask " + st);
+                    }
+                    break;
+
+                case "checkpoint":
+                    {
+                        var st = grains.GetGrain<ISystemStatus>("status-main");
+                        var cp = await st.CreateCheckpointAsync();
+                        Console.WriteLine($"Checkpoint at {cp.TakenAt}: {cp.Snapshot.Count} entries for {cp.Source}");
+                    }
+                    break;
+
+                case "branch":
+                    {
+                        var st = grains.GetGrain<ISystemStatus>("status-main");
+                        var cp = await st.CreateCheckpointAsync();
+                        var bid = await st.BranchAsync(cp);
+                        Console.WriteLine("Branched to " + bid.Value);
+                        // Time travel demo: interact with branch (separate journals)
+                        var branchGrain = grains.GetGrain<INeuron>(bid.Value);
+                        await branchGrain.FireAsync(new DemoMessageSynapse("time-travelled on branch"));
+                        var btl = await branchGrain.GetOutgoingTimelineAsync();
+                        Console.WriteLine("Branch timeline count now: " + btl.Count);
+                        var mainTl = await st.GetOutgoingTimelineAsync();
+                        Console.WriteLine("Main (no pollution): " + mainTl.Count);
+                    }
+                    break;
+
+                case "timelines":
+                    {
+                        var ino = grains.GetGrain<IInoNeuron>("ino-main");
+                        var inn = await ino.GetIncomingTimelineAsync();
+                        var outt = await ino.GetOutgoingTimelineAsync();
+                        Console.WriteLine($"INO in:{inn.Count} out:{outt.Count}");
+                    }
                     break;
 
                 default:
-                    Console.WriteLine("unknown. try create-software 'word counter' ; run ; help");
+                    Console.WriteLine("unknown. try create-software 'word counter' ; ino 'help' ; task 'x' ; branch ; help");
                     break;
             }
         }

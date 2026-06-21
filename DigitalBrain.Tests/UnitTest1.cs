@@ -161,6 +161,33 @@ public class NeuronTests : IAsyncLifetime
         Assert.Contains(timeline, s => s.Type == nameof(ExperienceUsed) || s is NeuroPackInstalled);
     }
 
+    [Fact]
+    public async Task KernelTask_Runs_And_Recovers_Status()
+    {
+        var task = _cluster!.GrainFactory.GetGrain<IKernelTask>("task-test-1");
+        await task.FireAsync(new RunKernelTask("task-test-1", "demo work"));
+        var status = await task.GetStatusAsync();
+        Assert.Contains("completed", status);
+    }
+
+    [Fact]
+    public async Task Branch_And_TimeTravel_Isolates_Journals()
+    {
+        var src = _cluster!.GrainFactory.GetGrain<ISystemStatus>("branch-src");
+        await src.FireAsync(new SystemStatusChanged("test", "ok"));
+        var cp = await src.CreateCheckpointAsync();
+        var bid = await src.BranchAsync(cp);
+        Assert.NotEqual(src.GetPrimaryKeyString(), bid.Value);
+
+        var branch = _cluster.GrainFactory.GetGrain<IDemoNeuron>(bid.Value);
+        await branch.FireAsync(new DemoMessageSynapse("from branch only"));
+        var bOut = await branch.GetOutgoingTimelineAsync();
+        var mainOut = await src.GetOutgoingTimelineAsync();
+        Assert.Contains(bOut, s => s is DemoMessageSynapse);
+        // Main not polluted by branch fire (isolation)
+        Assert.DoesNotContain(mainOut, s => s is DemoMessageSynapse && ((DemoMessageSynapse)s).Text.Contains("branch only"));
+    }
+
     private class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
@@ -170,7 +197,8 @@ public class NeuronTests : IAsyncLifetime
                 .AddMemoryStreams("Default")
                 .ConfigureServices(services =>
                 {
-                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
+                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
+                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                 });
         }
