@@ -155,6 +155,7 @@ else
 
                             // Auto-publish so it's immediately in the durable library and runnable by name
                             var safe = lastGeneratedDesc.Replace(" ", "").Replace("\"", "").Replace("-", "");
+                            if (string.IsNullOrWhiteSpace(safe)) safe = "Automation" + DateTime.Now.Ticks % 10000;
                             await grains.GetGrain<IMarketplaceNeuron>("market-main")
                                 .FireAsync(new PublishToMarketplace(safe, "0.1-dev", lastGeneratedCode, "local", false, 0.0, lastGeneratedDesc));
                             Console.WriteLine("Auto-published as " + safe + " (run " + safe + " or list)");
