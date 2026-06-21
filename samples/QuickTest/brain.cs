@@ -235,8 +235,8 @@ else
                         var cp = await st.CreateCheckpointAsync();
                         var bid = await st.BranchAsync(cp);
                         Console.WriteLine("Branched to " + bid.Value);
-                        // Time travel demo: interact with branch (separate journals)
-                        var branchGrain = grains.GetGrain<INeuron>(bid.Value);
+                        // Time travel demo: interact with branch (separate journals) - use concrete for activation compat
+                        var branchGrain = grains.GetGrain<IDemoNeuron>(bid.Value);
                         await branchGrain.FireAsync(new DemoMessageSynapse("time-travelled on branch"));
                         var btl = await branchGrain.GetOutgoingTimelineAsync();
                         Console.WriteLine("Branch timeline count now: " + btl.Count);
