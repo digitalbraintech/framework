@@ -4,11 +4,6 @@ using DigitalBrain.Protocol;
 
 namespace DigitalBrain.Silo;
 
-public interface IDemoNeuron : INeuron
-{
-    Task<string> GetLastMessageAsync();
-}
-
 public class DemoNeuron : Neuron, IDemoNeuron, IHandle<DemoMessageSynapse>
 {
     private string _last = string.Empty;

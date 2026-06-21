@@ -90,18 +90,3 @@ public abstract class Neuron : DurableGrain, INeuron
 
     protected virtual Task DispatchSynapse(Synapse synapse) => Task.CompletedTask;
 }
-
-public sealed class InMemoryDurableList<T> : List<T>, Orleans.Journaling.IDurableList<T>
-{
-}
-
-public sealed class TestJournaledStateManager : Orleans.Journaling.IJournaledStateManager
-{
-    // Minimal stub for alpha DurableGrain + IJournaledStateManager in tests/prototype (in-memory simulation).
-    // Real deployments should use a storage provider (e.g. Azure) that supplies a full impl.
-    public System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken ct = default) => System.Threading.Tasks.ValueTask.CompletedTask;
-    public void RegisterState(string stateId, Orleans.Journaling.IJournaledState state) { }
-    public bool TryGetState(string stateId, out Orleans.Journaling.IJournaledState? state) { state = null; return false; }
-    public System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken ct = default) => System.Threading.Tasks.ValueTask.CompletedTask;
-    public System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken ct = default) => System.Threading.Tasks.ValueTask.CompletedTask;
-}

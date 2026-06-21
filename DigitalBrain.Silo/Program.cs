@@ -1,5 +1,11 @@
 using DigitalBrain.Protocol;
 
+// Prototype silo host for DigitalBrain.
+// For real marketplace deployment:
+//   - Use proper Orleans storage provider (Azure Table / Redis / Cosmos for grain state)
+//   - Replace the journal implementation with something durable (not the alpha in-memory stubs)
+//   - Package as container image (see upcoming Dockerfile)
+
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddServiceDefaults();
@@ -9,12 +15,17 @@ builder.AddOllamaApiClient("qwen");
 
 builder.UseOrleans(siloBuilder =>
 {
-    // Orleans Journalling alpha (DurableGrain + IDurable* collections for synapse timelines)
-    // Use in-memory list for prototype (no Redis journal storage provider in current alpha; replace with proper provider for durable across restarts)
+    // WARNING: Current journal is prototype-only (in-memory).
+    // The DurableGrain alpha + IDurableList is used for synapse timelines.
+    // Real deployments require a durable journal + IJournaledStateManager.
     siloBuilder.ConfigureServices(services =>
     {
-        services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal", (_, _) => new DigitalBrain.Silo.InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
-        services.AddSingleton<Orleans.Journaling.IJournaledStateManager, DigitalBrain.Silo.TestJournaledStateManager>();
+        // Minimal prototype journal (local to this host, lost on restart)
+        services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal",
+            (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
+
+        // Stub for the alpha journaling manager (sufficient for local dev / test cluster)
+        services.AddSingleton<Orleans.Journaling.IJournaledStateManager, PrototypeJournaledStateManager>();
     });
 });
 
@@ -25,8 +36,20 @@ var grainFactory = host.Services.GetService<IGrainFactory>();
 if (grainFactory != null)
 {
     var status = grainFactory.GetGrain<ISystemStatus>("status-main");
-    // Touch to activate (it fires SystemLaunched + status in OnActivate)
     _ = status.GetTimelineAsync();
 }
 
 host.Run();
+
+// ---- Prototype-only journal support (delete/replace for production) ----
+#pragma warning disable ORLEANSEXP005
+internal sealed class InMemoryJournalForPrototype<T> : List<T>, Orleans.Journaling.IDurableList<T>;
+internal sealed class PrototypeJournaledStateManager : Orleans.Journaling.IJournaledStateManager
+{
+    public ValueTask InitializeAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+    public void RegisterState(string stateId, Orleans.Journaling.IJournaledState state) { }
+    public bool TryGetState(string stateId, out Orleans.Journaling.IJournaledState? state) { state = null; return false; }
+    public ValueTask WriteStateAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+    public ValueTask DeleteStateAsync(CancellationToken ct = default) => ValueTask.CompletedTask;
+}
+#pragma warning restore ORLEANSEXP005

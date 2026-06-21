@@ -106,3 +106,9 @@ public record FixProposal(string Issue, string ProposedFix, string From) : Synap
 public record SimulationResult(string Scenario, bool Success, string Details) : Synapse(nameof(SimulationResult), DateTimeOffset.UtcNow);
 
 public interface ISystemStatus : INeuron, IHandle<SystemStatusChanged>, IHandle<FixProposal> { }
+
+// Demo / test specific (promoted to contracts for cross-project test + sample usage)
+public interface IDemoNeuron : INeuron
+{
+    Task<string> GetLastMessageAsync();
+}

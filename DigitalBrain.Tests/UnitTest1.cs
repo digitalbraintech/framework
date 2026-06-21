@@ -1,5 +1,5 @@
 ﻿using DigitalBrain.Protocol;
-using DigitalBrain.Silo;
+using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 
@@ -102,8 +102,8 @@ public class NeuronTests : IAsyncLifetime
                 .AddMemoryStreams("Default")
                 .ConfigureServices(services =>
                 {
-                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal", (_, _) => new DigitalBrain.Silo.InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
-                    services.AddSingleton<Orleans.Journaling.IJournaledStateManager, DigitalBrain.Silo.TestJournaledStateManager>();
+                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
+                    services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                 });
         }
     }
