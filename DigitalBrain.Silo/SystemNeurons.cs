@@ -23,12 +23,14 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
     {
         Logger.LogInformation("Aspire starting app: {App}", cmd.AppName);
         await FireAsync(new DistributedAppStarted(cmd.AppName, Success: true, "started via neuro"));
+        await FireAsync(new SystemStatusChanged("aspire", "started", cmd.AppName));
     }
 
     public async Task HandleAsync(RestartResource cmd)
     {
         Logger.LogInformation("Aspire restarting resource: {Res}", cmd.ResourceName);
         await FireAsync(new DistributedAppStarted(cmd.ResourceName, Success: true, "restarted"));
+        await FireAsync(new SystemStatusChanged("aspire", "restarted", cmd.ResourceName));
     }
 }
 
