@@ -196,8 +196,6 @@ public class {pack}
 [GrainType("digitalbrain.optimizer.v1")]
 public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 {
-    private int _telemetryCount = 0;
-
     public MetaOptimizerNeuron(ILogger<MetaOptimizerNeuron> logger)
         : base(logger)
     {
@@ -205,17 +203,18 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 
     public async Task HandleAsync(NeuronTelemetry telemetry)
     {
-        _telemetryCount += telemetry.Count;
-        Logger.LogInformation("Optimizer received telemetry from {Neuron}: {Event} (total {Count})", telemetry.Neuron, telemetry.Event, _telemetryCount);
+        // Pure journal-derived count (no private state).
+        var count = IncomingJournal.Concat(OutgoingJournal).OfType<NeuronTelemetry>().Count();
+        Logger.LogInformation("Optimizer received telemetry from {Neuron}: {Event} (total {Count})", telemetry.Neuron, telemetry.Event, count);
 
-        if (_telemetryCount >= 5)
+        if (count % 5 == 0)
         {
             string proposal;
             var llm = ServiceProvider.GetService<IOllamaApiClient>();
             if (llm != null)
             {
                 llm.SelectedModel = "qwen2.5-coder:1.5b";
-                var p = $"Telemetry count reached {_telemetryCount}. Propose ONE short, actionable wiring or scaling improvement for the DigitalBrain neuron system (Orleans grains + Aspire + compiler for code gen from English).";
+                var p = $"Telemetry count reached {count}. Propose ONE short, actionable wiring or scaling improvement for the DigitalBrain neuron system (Orleans grains + Aspire + compiler for code gen from English).";
                 var acc = "";
                 await foreach (var chunk in llm.GenerateAsync(p))
                     if (chunk?.Response is string t) acc += t;
@@ -226,7 +225,6 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
                 proposal = "Add parallel compiler neurons routed via LlmNeuron for faster self-gen";
             }
             await FireAsync(new WiringOptimizationProposed(proposal, Self.Value));
-            _telemetryCount = 0;
         }
     }
 
