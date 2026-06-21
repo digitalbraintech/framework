@@ -62,9 +62,8 @@ if (isMcpMode)
 else
 {
     Console.WriteLine("=== DIGITALBRAIN BOOTED (from single command) ===");
-    Console.WriteLine("Kernel + client + REPL ready. Marketplace, LLM neuron, everything is alive.");
-    Console.WriteLine("Commands: generate <desc> | create-software <desc> | run | export | self-improve | publish | install | list | ask-llm | exit");
-    Console.WriteLine("Practical AI factory: 'create-software daily log file rotator' then 'run' or 'export' then dotnet run the project. 'self-improve' closes generate->run->feedback loop.");
+    Console.WriteLine("Kernel + REPL + Marketplace ready. Type 'help' for flows.");
+    Console.WriteLine("Example: create-software 'count lines in cs files'  |  run  |  export  |  self-improve");
 
     string? lastGeneratedCode = null;
     string? lastGeneratedDesc = null;
@@ -170,28 +169,34 @@ else
 
                 case "run":
                 case "execute":
-                    if (lastGeneratedCode != null)
                     {
-                        var result = await CodeRunner.ExecuteCode(lastGeneratedCode, parts.Length > 1 ? string.Join(' ', parts[1..]) : "");
-                        Console.WriteLine("Execution result: " + result);
-                    }
-                    else if (parts.Length > 1)
-                    {
-                        var packName = parts[1];
-                        var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                        await marketGrain.FireAsync(new ListPublished());
-                        var marketTl = await marketGrain.GetTimelineAsync();
-                        var publishedList = marketTl.LastOrDefault(s => s is PublishedList) as PublishedList;
-                        var targetPack = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(packName, StringComparison.OrdinalIgnoreCase));
-                        if (targetPack != null)
+                        string? codeToRun = null;
+                        string input = "";
+                        if (parts.Length > 1)
                         {
-                            var execResult = await CodeRunner.ExecuteCode(targetPack.Code, string.Join(' ', parts.Skip(2)));
-                            Console.WriteLine("Execution result: " + execResult);
+                            var name = parts[1];
+                            input = parts.Length > 2 ? string.Join(' ', parts[2..]) : "";
+                            var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                            await marketGrain.FireAsync(new ListPublished());
+                            var marketTl = await marketGrain.GetTimelineAsync();
+                            var publishedList = marketTl.LastOrDefault(s => s is PublishedList) as PublishedList;
+                            var target = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+                            if (target != null) codeToRun = target.Code;
                         }
-                    }
-                    else
-                    {
-                        Console.WriteLine("No code to execute. Use 'generate' or 'create-software' first.");
+                        if (codeToRun == null && lastGeneratedCode != null)
+                        {
+                            codeToRun = lastGeneratedCode;
+                            input = parts.Length > 1 ? string.Join(' ', parts[1..]) : "";
+                        }
+                        if (codeToRun != null)
+                        {
+                            var result = await CodeRunner.ExecuteCode(codeToRun, input);
+                            Console.WriteLine("Execution result: " + result);
+                        }
+                        else
+                        {
+                            Console.WriteLine("Nothing to run. Use 'create-software <desc>' then 'run', or 'run <packname>'.");
+                        }
                     }
                     break;
 
@@ -251,8 +256,14 @@ else
                     }
                     break;
 
+                case "help":
+                    Console.WriteLine("Flows: create-software 'desc'  ->  run  ->  export  ->  dotnet run the project in output/");
+                    Console.WriteLine("         self-improve (generates + runs + publishes a helper back to marketplace)");
+                    Console.WriteLine("         list | run <name> | publish | install <name> | ask-llm <p>");
+                    break;
+
                 default:
-                    Console.WriteLine("unknown command. try 'ask-llm hello' or 'help'");
+                    Console.WriteLine("unknown. try: create-software 'word counter' ; run ; help ; exit");
                     break;
             }
         }
@@ -399,6 +410,9 @@ internal static class CodeRunner
   </PropertyGroup>
 </Project>";
         File.WriteAllText(Path.Combine(baseDir, safe + ".csproj"), csproj);
+
+        var readme = "Generated by DigitalBrain.\n\nRun: dotnet run --project .\nPass args after -- if needed.\n";
+        File.WriteAllText(Path.Combine(baseDir, "README.txt"), readme);
 
         Console.WriteLine($">>> Materialized runnable project to {baseDir} . Use: dotnet run --project {baseDir}");
     }

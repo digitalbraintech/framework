@@ -165,9 +165,7 @@ public class CompilerNeuron : Neuron, ICompiler
         var llm = ServiceProvider.GetService<IOllamaApiClient>();
         if (llm != null)
         {
-            // Generalized for creating real software, automations and logic (not only internal neurons).
-            // The caller (REPL/MCP) can steer with the description: "as a standalone console automation for ...", "simple C# class for ...", or "Neuron for internal brain use".
-            var sys = "You are an expert software generator for DigitalBrain. Based on the description, output clean, minimal, self-contained C# code (a full console app, a useful class, a script-like automation, or a Neuron if specified). Respond with ONLY a ```csharp fenced block. Include necessary usings. Make it immediately useful and correct. No explanations outside the code block.";
+            var sys = "You are an expert C# generator. For software/automation/tool descriptions, output ONLY a complete, minimal, self-contained runnable console program (top-level statements or explicit Main/Run). Include usings. For internal Neuron requests, use grain style. Respond with ONLY a ```csharp block.";
             var user = $"Description: {req.Description}\nBase name hint: {packName}";
             var fullPrompt = sys + "\n\n" + user;
 
