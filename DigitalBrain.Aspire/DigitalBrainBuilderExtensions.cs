@@ -19,10 +19,10 @@ public static class DigitalBrainBuilderExtensions
         configure?.Invoke(options);
 
         var resource = new DigitalBrainResource(name);
-        return builder.AddResource(resource)
-            // Consumers call the real AddRedis/AddOrleans/AddOllama/AddProject in AppHost using options
-            // This resource acts as the anchor for .With* chaining and future custom behavior.
-            ;
+        return builder.AddResource(resource);
+        // The resource anchors the fluent API and options.
+        // Common infra (redis, orleans, ollama) + silo with replicas + cli are added by consumer
+        // (or enhanced in future versions of the SDK to return a context object with the resources).
     }
 
     public static IResourceBuilder<DigitalBrainResource> WithLLM(
