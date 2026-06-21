@@ -2,25 +2,29 @@
 
 MVP Aspire hosting resource and SDK for DigitalBrain (core + marketplace + self-aware LLM).
 
-## Usage (intended fluent API)
+## Usage
 
 ```csharp
-var db = builder.AddDigitalBrain("digitalbrain", options =>
+// The SDK's AddDigitalBrain now wires redis + orleans + ollama (model from options)
+var setup = builder.AddDigitalBrain("digitalbrain", options =>
 {
     options.LlmModel = "qwen2.5-coder:1.5b";
-    options.KernelReplicas = 3;
     options.UseLocalMarketplace = true;
-})
-.WithLLM()
-.WithTUI(explicitStart: true)
-.WithMarketplace(cfg => cfg.UseLocal = true)
-.AddExperience<SomeExperience>(cfg => { ... })
-.WithKernelReplicas(3);
+});
 
-// Then add your silo and cli projects with .WithReference to the orleans/llm resources set up by the SDK.
+// Use the returned context for references (3 replicas on kernel)
+var silo = builder.AddProject<Projects.YourKernel>("kernel")
+    .WithReference(setup.Orleans)
+    .WithReference(setup.Llm)
+    .WithReplicas(3);
+
+var tui = builder.AddProject<Projects.YourTui>("tui")
+    .WithReference(setup.Orleans.AsClient());
 ```
 
-See the main AppHost for current wiring example.
+See NeuroOSPrototype.AppHost/AppHost.cs for live example.
+
+The resource + context enable encapsulation + future fluent With* for self-aware setup.
 
 The resource enables future full encapsulation and self-awareness features (SystemStatusNeuron connects to own Aspire MCP for observability and auto-diagnosis).
 

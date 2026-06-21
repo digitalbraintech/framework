@@ -53,6 +53,16 @@ public class NeuronTests : IAsyncLifetime
         Assert.Contains(timeline, s => s.Type == nameof(SystemLaunched) || s.Type == nameof(SystemStatusChanged));
     }
 
+    [Fact]
+    public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
+    {
+        var status = _cluster!.GrainFactory.GetGrain<ISystemStatus>("status-sim");
+        await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
+        var timeline = await status.GetTimelineAsync();
+        Assert.Contains(timeline, s => s.Type == nameof(FixProposal));
+        Assert.Contains(timeline, s => s.Type == nameof(SimulationResult));
+    }
+
     private class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
