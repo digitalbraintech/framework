@@ -51,7 +51,7 @@ if (isMcpMode)
 else
 {
     Console.WriteLine("=== DIGITALBRAIN BOOTED ===");
-    Console.WriteLine("create-software 'desc' | run [name] | export [name] | self-improve | list | help");
+    Console.WriteLine("create-software 'Feature: EmailArchiver on PC - process/write last 100 emails to report.txt' | run | export | self-improve | list | help");
 
     string? lastGeneratedCode = null;
     string? lastGeneratedDesc = null;
@@ -72,16 +72,18 @@ else
                     if (parts.Length > 1)
                     {
                         var desc = string.Join(' ', parts[1..]);
+                        if (lastGeneratedCode != null)
+                            desc += "\nRefine previous code:\n" + lastGeneratedCode;
                         var compiler = grains.GetGrain<ICompiler>("compiler-main");
-                        await compiler.FireAsync(new CreateNeuronRequest("Create a complete runnable C# console automation for: " + desc));
+                        await compiler.FireAsync(new CreateNeuronRequest("Create a complete runnable C# console app fulfilling spec (may be feature text for email processing on PC): " + desc));
                         var tl = await compiler.GetTimelineAsync();
                         var genEvt = tl.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
                         if (genEvt != null)
                         {
                             lastGeneratedCode = genEvt.GeneratedCodeSnippet;
-                            lastGeneratedDesc = desc;
+                            lastGeneratedDesc = parts[1];
                             Console.WriteLine("Generated:\n" + lastGeneratedCode);
-                            CodeRunner.MaterializeAsProject(desc, lastGeneratedCode);
+                            CodeRunner.MaterializeAsProject(parts[1], lastGeneratedCode);
                         }
                     }
                     break;
@@ -185,7 +187,7 @@ else
                     break;
 
                 case "help":
-                    Console.WriteLine("create-software 'desc' | run [name] | export [name] | self-improve | list | ask-llm | exit");
+                    Console.WriteLine("create-software '<spec or .feature for email archiver>' -> materializes runnable .csproj | run/export by name | self-improve (uses gen output to propose) | list");
                     break;
 
                 default:
