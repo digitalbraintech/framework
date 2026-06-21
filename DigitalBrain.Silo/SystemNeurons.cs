@@ -1,6 +1,7 @@
 using DigitalBrain.Protocol;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OllamaSharp;
 using Orleans.Journaling;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
@@ -65,7 +66,6 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     }
 }
 
-// Compiler / Meta-neuron for English → code (Reqnroll + simulated LLM codegen per spec)
 [GrainType("neuro.compiler.v1")]
 public class CompilerNeuron : Neuron, ICompiler
 {
@@ -77,16 +77,61 @@ public class CompilerNeuron : Neuron, ICompiler
     public async Task HandleAsync(CreateNeuronRequest req)
     {
         Logger.LogInformation("Compiler generating neuron for: {Desc}", req.Description);
-        // Stub: simulate Reqnroll scenario + LLM fill → compile → grain DLL + Aspire reload
-        var packName = "Generated-" + req.Description.Replace(" ", "").Replace("\"", "").Substring(0, Math.Min(20, req.Description.Length));
-        var snippet = $"// Auto-generated from English: {req.Description}\n[GrainType(\"neuro.generated.{packName.ToLower()}\")]\npublic class {packName}Neuron : Neuron, INeuron {{ /* impl from LLM sim */ }}";
+        var packName = "Generated" + req.Description.Replace(" ", "").Replace("\"", "").Replace("-", "").Substring(0, Math.Min(18, req.Description.Length));
+        string snippet;
+
+        var llm = ServiceProvider.GetService<IOllamaApiClient>();
+        if (llm != null)
+        {
+            var sys = "You write minimal self-contained C# Neuron grains. Respond with ONLY a ```csharp fenced block containing one public class XXXNeuron : Neuron, INeuron { ... } inheriting the base. Use DigitalBrain.Protocol. Support simple Handle for its purpose. No extra usings or namespaces.";
+            var user = $"Description: {req.Description}\nClass base name: {packName}Neuron";
+            var fullPrompt = sys + "\n\n" + user;
+
+            llm.SelectedModel = "qwen2.5-coder:1.5b";
+            var acc = "";
+            await foreach (var chunk in llm.GenerateAsync(fullPrompt))
+            {
+                if (chunk?.Response is string t) acc += t;
+            }
+            snippet = ExtractCode(acc);
+            if (string.IsNullOrWhiteSpace(snippet))
+                snippet = FallbackSnippet(packName, req.Description);
+        }
+        else
+        {
+            snippet = FallbackSnippet(packName, req.Description);
+        }
+
         await FireAsync(new NeuronCodeGenerated(req.Description, snippet));
         await FireAsync(new NeuronTelemetry(Self, "code-generated"));
-        // Publish/install/use is explicit user-driven flow after create (via Marketplace + CLI TUI)
     }
+
+    static string ExtractCode(string text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return "";
+        var start = text.IndexOf("```csharp", StringComparison.OrdinalIgnoreCase);
+        if (start >= 0)
+        {
+            start += 9;
+            var end = text.IndexOf("```", start, StringComparison.Ordinal);
+            if (end > start) return text.Substring(start, end - start).Trim();
+        }
+        start = text.IndexOf("```", StringComparison.Ordinal);
+        if (start >= 0)
+        {
+            start += 3;
+            var end = text.IndexOf("```", start, StringComparison.Ordinal);
+            if (end > start) return text.Substring(start, end - start).Trim();
+        }
+        var c = text.IndexOf("public class ", StringComparison.Ordinal);
+        if (c >= 0) return text.Substring(c).Trim();
+        return text.Trim();
+    }
+
+    static string FallbackSnippet(string pack, string desc) =>
+        $"[GrainType(\"neuro.generated.{pack.ToLower()}\")]\npublic class {pack}Neuron : Neuron, INeuron {{\n    // {desc}\n}}";
 }
 
-// Self-Improvement: MetaOptimizerNeuron per spec - tracks telemetry, proposes better wiring
 [GrainType("neuro.optimizer.v1")]
 public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 {
@@ -102,11 +147,25 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
         _telemetryCount += telemetry.Count;
         Logger.LogInformation("Optimizer received telemetry from {Neuron}: {Event} (total {Count})", telemetry.Neuron, telemetry.Event, _telemetryCount);
 
-        if (_telemetryCount >= 5) // lowered threshold for prototype demo (spec says 1000)
+        if (_telemetryCount >= 5)
         {
-            var proposal = "Optimize: Add more Compiler neurons for parallel English->code tasks";
+            string proposal;
+            var llm = ServiceProvider.GetService<IOllamaApiClient>();
+            if (llm != null)
+            {
+                llm.SelectedModel = "qwen2.5-coder:1.5b";
+                var p = $"Telemetry count reached {_telemetryCount}. Propose ONE short, actionable wiring or scaling improvement for the NeuroOS neuron system (Orleans grains + Aspire + compiler for code gen from English).";
+                var acc = "";
+                await foreach (var chunk in llm.GenerateAsync(p))
+                    if (chunk?.Response is string t) acc += t;
+                proposal = acc.Length > 20 ? acc.Trim() : "Add parallel compiler neurons and route create requests through LlmNeuron";
+            }
+            else
+            {
+                proposal = "Add parallel compiler neurons routed via LlmNeuron for faster self-gen";
+            }
             await FireAsync(new WiringOptimizationProposed(proposal, Self.Value));
-            _telemetryCount = 0; // reset
+            _telemetryCount = 0;
         }
     }
 
@@ -153,4 +212,77 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
             Logger.LogInformation("Generated experience {Pack} used: {Action}", used.Pack, used.Action);
         }
     }
+}
+
+[GrainType("neuro.llm.qwen.v1")]
+public class LlmNeuron : Neuron, ILlmNeuron
+{
+    public LlmNeuron(ILogger<LlmNeuron> logger)
+        : base(logger)
+    {
+    }
+
+    public async Task HandleAsync(LlmPrompt prompt)
+    {
+        var client = ServiceProvider.GetService<IOllamaApiClient>();
+        if (client == null)
+        {
+            await FireAsync(new LlmResponse(prompt.Prompt, "[no local llm client]", "none"));
+            return;
+        }
+
+        client.SelectedModel = prompt.PreferredModel ?? "qwen2.5-coder:1.5b";
+        var acc = "";
+        await foreach (var chunk in client.GenerateAsync(prompt.Prompt))
+        {
+            if (chunk?.Response is string t) acc += t;
+        }
+        await FireAsync(new LlmResponse(prompt.Prompt, acc.Trim(), client.SelectedModel));
+    }
+}
+
+[GrainType("awesome.se.team10.v1")]
+public class Software10TeamNeuron : Neuron, ISoftware10Team
+{
+    public Software10TeamNeuron(ILogger<Software10TeamNeuron> logger) : base(logger) { }
+
+    public async Task HandleAsync(CreateSimpleApp cmd)
+    {
+        var name = "Legacy" + cmd.Description.Replace(" ", "").Substring(0, Math.Min(12, cmd.Description.Length));
+        // Old soft: rigid 2010s style template
+        var code = $"// Software10 (old) - classic style\nusing System;\npublic class {name}App {{\n  public static void Main() {{\n    Console.WriteLine(\"TODO: {cmd.Description}\");\n  }}\n}}";
+        await FireAsync(new SimpleAppCreated(cmd.Team, name, code));
+    }
+}
+
+[GrainType("awesome.se.team20.v1")]
+public class Software20TeamNeuron : Neuron, ISoftware20Team
+{
+    public Software20TeamNeuron(ILogger<Software20TeamNeuron> logger) : base(logger) { }
+
+    public async Task HandleAsync(CreateSimpleApp cmd)
+    {
+        var name = "Neuro" + cmd.Description.Replace(" ", "").Substring(0, Math.Min(12, cmd.Description.Length));
+        string code;
+
+        var llm = ServiceProvider.GetService<IOllamaApiClient>();
+        if (llm != null)
+        {
+            llm.SelectedModel = "qwen2.5-coder:1.5b";
+            var p = $"Create a clean minimal C# console or Neuron-style simple app for: {cmd.Description}. Make it modern, self-documenting, no legacy main if possible. Output only the code.";
+            var acc = "";
+            await foreach (var chunk in llm.GenerateAsync(p))
+                if (chunk?.Response is string t) acc += t;
+            code = acc.Trim().Length > 10 ? acc.Trim() : ModernTemplate(name, cmd.Description);
+        }
+        else
+        {
+            code = ModernTemplate(name, cmd.Description);
+        }
+
+        await FireAsync(new SimpleAppCreated(cmd.Team, name, code));
+    }
+
+    static string ModernTemplate(string n, string d) =>
+        $"// Software20 (new) - neuro/LLM assisted\n[GrainType(\"app.{n.ToLower()}\")]\npublic class {n}App : Neuron {{\n  // Self-improving simple app for: {d}\n  public {n}App() {{ /* modern defaults */ }}\n}}";
 }

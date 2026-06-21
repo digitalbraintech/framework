@@ -63,10 +63,30 @@ public class NeuronSteps : IAsyncDisposable
         await _currentGrain.GetTimelineAsync();
     }
 
+    [Given(@"a software10 team neuron ""(.*)""")]
+    public async Task GivenASoftware10TeamNeuron(string id)
+    {
+        _currentGrain = _cluster.GrainFactory.GetGrain<ISoftware10Team>(id);
+        await _currentGrain.GetTimelineAsync();
+    }
+
+    [Given(@"a software20 team neuron ""(.*)""")]
+    public async Task GivenASoftware20TeamNeuron(string id)
+    {
+        _currentGrain = _cluster.GrainFactory.GetGrain<ISoftware20Team>(id);
+        await _currentGrain.GetTimelineAsync();
+    }
+
     [When(@"I send create neuron request ""(.*)""")]
     public async Task WhenISendCreateNeuronRequest(string desc)
     {
         await _currentGrain!.FireAsync(new CreateNeuronRequest(desc));
+    }
+
+    [When(@"I send create simple app request ""(.*)"" for team ""(.*)""")]
+    public async Task WhenISendCreateSimpleAppRequest(string desc, string team)
+    {
+        await _currentGrain!.FireAsync(new CreateSimpleApp(team, desc));
     }
 
     [When(@"I fire multiple messages to trigger telemetry")]
@@ -162,6 +182,13 @@ public class NeuronSteps : IAsyncDisposable
     {
         _timeline = await _currentGrain!.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(NeuronCodeGenerated));
+    }
+
+    [Then(@"the timeline contains a SimpleAppCreated")]
+    public async Task ThenTheTimelineContainsASimpleAppCreated()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.Contains(_timeline, s => s.Type == nameof(SimpleAppCreated));
     }
 
     [Then(@"the timeline contains a WiringOptimizationProposed")]

@@ -3,6 +3,7 @@ using Orleans.Journaling;
 var builder = Host.CreateApplicationBuilder(args);
 
 builder.AddKeyedRedisClient("redis");
+builder.AddOllamaApiClient("qwen");
 
 builder.UseOrleans(siloBuilder =>
 {

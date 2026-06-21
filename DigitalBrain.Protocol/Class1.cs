@@ -96,3 +96,33 @@ public interface IMarketplaceNeuron : IMarketplace { }
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
 public interface IGeneratedNeuron : INeuron { }
+
+public interface ILlmModel { }
+
+public sealed class Qwen : ILlmModel { }
+
+[AttributeUsage(AttributeTargets.Interface | AttributeTargets.Class, AllowMultiple = false)]
+public sealed class LLMAttribute<T> : Attribute where T : ILlmModel { }
+
+[GenerateSerializer]
+public record LlmPrompt(string Prompt, string? PreferredModel = null) : Synapse(nameof(LlmPrompt), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LlmResponse(string Prompt, string Response, string ModelUsed) : Synapse(nameof(LlmResponse), DateTimeOffset.UtcNow);
+
+[LLM<Qwen>]
+public interface ILlmNeuron : INeuron, IHandle<LlmPrompt> { }
+
+// Awesome Software Engineering domain - testing two teams creating simple apps
+[GenerateSerializer]
+public record CreateSimpleApp(string Team, string Description, string Language = "csharp") : Synapse(nameof(CreateSimpleApp), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record SimpleAppCreated(string Team, string AppName, string GeneratedCode) : Synapse(nameof(SimpleAppCreated), DateTimeOffset.UtcNow);
+
+public interface ISoftwareEngineeringTeam : INeuron, IHandle<CreateSimpleApp> { }
+
+[LLM<Qwen>]
+public interface ISoftware20Team : ISoftwareEngineeringTeam { }
+
+public interface ISoftware10Team : ISoftwareEngineeringTeam { }
