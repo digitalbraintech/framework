@@ -174,6 +174,27 @@ else
                     }
                     break;
 
+                case "export-pack":
+                    if (parts.Length > 1)
+                    {
+                        var name = parts[1];
+                        var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                        await marketGrain.FireAsync(new ListPublished());
+                        var marketTl = await marketGrain.GetTimelineAsync();
+                        var publishedList = marketTl.LastOrDefault(s => s is PublishedList) as PublishedList;
+                        var target = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+                        if (target != null)
+                        {
+                            CodeRunner.MaterializeAsProject(target.Name, target.Code);
+                            Console.WriteLine("Exported pack " + target.Name + " as runnable project.");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Pack not found. Use 'list' to see available.");
+                        }
+                    }
+                    break;
+
                 case "run":
                 case "execute":
                     {
@@ -202,7 +223,7 @@ else
                         }
                         else
                         {
-                            Console.WriteLine("Nothing to run. Use 'create-software <desc>' then 'run', or 'run <packname>'.");
+                            Console.WriteLine("Nothing to run. Use 'create-software <desc>' (auto-published), 'run <packname>', or 'run' for last.");
                         }
                     }
                     break;
@@ -264,9 +285,9 @@ else
                     break;
 
                 case "help":
-                    Console.WriteLine("Flows: create-software 'desc'  ->  run  ->  export  ->  dotnet run the project in output/");
-                    Console.WriteLine("         self-improve (generates + runs + publishes a helper back to marketplace)");
-                    Console.WriteLine("         list | run <name> | publish | install <name> | ask-llm <p>");
+                    Console.WriteLine("Flows: create-software 'desc'  ->  run [or run <name>]  ->  export [or export-pack <name>]  ->  dotnet run output/xxx");
+                    Console.WriteLine("         self-improve (auto generates+materializes+runs+publishes analyzer)");
+                    Console.WriteLine("         list | export-pack <name> | run <name> | install <name> | ask-llm <p> | help");
                     break;
 
                 default:
