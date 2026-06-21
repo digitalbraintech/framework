@@ -12,20 +12,24 @@ public class InoNeuron : Neuron, IInoNeuron
 {
     private readonly List<string> _activeTasks = new();
     private string _focus = string.Empty;
+    private readonly List<MemorySummary> _longTermMemory = new(); // long-term summaries from journals
 
     public InoNeuron(ILogger<InoNeuron> logger) : base(logger) { }
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
         await base.OnActivateAsync(ct);
-        // Bootstrap context from own recent out journal on activate.
+        // Bootstrap: recent focus + load long-term memory summaries from journal (multi-scale).
         var recent = OutgoingJournal.TakeLast(5).OfType<InoResponse>().LastOrDefault();
         if (recent != null) _focus = recent.Prompt;
+
+        _longTermMemory.Clear();
+        _longTermMemory.AddRange(OutgoingJournal.OfType<MemorySummary>().TakeLast(10));
     }
 
     public async Task HandleAsync(InoRequest req)
     {
-        var ctx = BuildContext(req.Prompt);
+        var ctx = await BuildContextAsync(req.Prompt);
         var reply = await ReasonWithLlmAsync(req.Prompt, ctx);
 
         var taskIds = await OrchestrateActionsIfNeededAsync(req.Prompt, reply);
@@ -50,6 +54,12 @@ public class InoNeuron : Neuron, IInoNeuron
 
         await FireAsync(new InoResponse(req.Prompt, enriched, taskIds.ToArray()));
         _focus = req.Prompt;
+
+        // Occasionally compress for long-term memory (multi-scale).
+        if (OutgoingJournal.Count % 5 == 0)
+        {
+            await CreateMemorySummaryAsync();
+        }
     }
 
     public async Task<string> AskAsync(string prompt)
@@ -61,13 +71,28 @@ public class InoNeuron : Neuron, IInoNeuron
         return last?.Response ?? "processed";
     }
 
-    private string BuildContext(string prompt)
+    private async Task<string> BuildContextAsync(string prompt)
     {
-        // Multi-scale: own dual journals (recent out/in) + task results as long-term memory.
-        var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + (s as dynamic)?.ToString() ?? s.Type).ToList();
-        var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.Type).ToList();
+        // Multi-scale context:
+        // - short-term/working: recent in/out from dual journals
+        // - episodic: active tasks + recent branches
+        // - long-term: loaded MemorySummaries + cross-neuron
+        // - cross-neuron: pull recent from key system neurons (status for awareness, etc.)
+        var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
+        var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
         var taskCtx = string.Join(";", _activeTasks.Select(tid => "task:" + tid));
-        return $"focus:{_focus}\nprompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}";
+        var memCtx = _longTermMemory.Count > 0 ? string.Join(";", _longTermMemory.Select(m => m.Topic + "=" + m.Summary)) : "";
+
+        string cross = "";
+        try
+        {
+            var sys = GrainFactory.GetGrain<ISystemStatus>("status-main");
+            var sysTl = await sys.GetOutgoingTimelineAsync();
+            cross = "sys:" + string.Join(",", sysTl.TakeLast(3).Select(s => s.Type));
+        }
+        catch { }
+
+        return $"focus:{_focus}\nprompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\ncross:{cross}";
     }
 
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)
@@ -111,5 +136,33 @@ public class InoNeuron : Neuron, IInoNeuron
             created.Add("branch:" + bid.Value);
         }
         return created;
+    }
+
+    private async Task CreateMemorySummaryAsync()
+    {
+        // Long-term: compress recent journal into semantic summary using LLM, store as synapse for persistence.
+        var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
+        if (recent.Count < 5) return;
+
+        var llm = ServiceProvider.GetService<IOllamaApiClient>();
+        if (llm == null) return;
+
+        llm.SelectedModel = "qwen2.5-coder:1.5b";
+        var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + (s as object)?.ToString()));
+        var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
+        var acc = "";
+        await foreach (var ch in llm.GenerateAsync(prompt))
+            if (ch?.Response is string t) acc += t;
+
+        var summaryText = acc.Trim();
+        if (summaryText.Length > 10)
+        {
+            var topic = summaryText.Split('.')[0].Trim();
+            var mem = new MemorySummary(topic.Length > 30 ? topic.Substring(0,30) : topic, summaryText, DateTimeOffset.UtcNow);
+            await FireAsync(mem);
+            _longTermMemory.Add(mem);
+            // keep bounded
+            if (_longTermMemory.Count > 20) _longTermMemory.RemoveAt(0);
+        }
     }
 }

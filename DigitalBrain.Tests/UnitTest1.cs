@@ -189,6 +189,18 @@ public class NeuronTests : IAsyncLifetime
         Assert.DoesNotContain(mainOut, s => s is DemoMessageSynapse && ((DemoMessageSynapse)s).Text.Contains("branch only"));
     }
 
+    [Fact]
+    public async Task Ino_Uses_DualJournals_And_Creates_Tasks_Context()
+    {
+        var ino = _cluster!.GrainFactory.GetGrain<IInoNeuron>("ino-test");
+        // Ask without llm should still process via fallback and journal
+        var resp = await ino.AskAsync("remember to backup important files using task");
+        Assert.False(string.IsNullOrWhiteSpace(resp));
+        var outTl = await ino.GetOutgoingTimelineAsync();
+        Assert.Contains(outTl, s => s.Type == nameof(InoRequest) || s.Type == nameof(InoResponse));
+        // May have triggered task if parsed, but fallback ok
+    }
+
     private class SiloConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)

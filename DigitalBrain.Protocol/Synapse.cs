@@ -206,3 +206,7 @@ public record InoRequest(string Prompt, string? SessionId = null) : Synapse(name
 
 [GenerateSerializer]
 public record InoResponse(string Prompt, string Response, string[] UsedTaskIds) : Synapse(nameof(InoResponse), DateTimeOffset.UtcNow);
+
+// For INO excellent long-term/multi-scale context (summaries from journals).
+[GenerateSerializer]
+public record MemorySummary(string Topic, string Summary, DateTimeOffset At) : Synapse(nameof(MemorySummary), At);

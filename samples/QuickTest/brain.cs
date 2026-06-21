@@ -202,6 +202,9 @@ else
                         var lastResp = itl.OfType<InoResponse>().LastOrDefault();
                         if (lastResp != null && lastResp.UsedTaskIds.Length > 0)
                             Console.WriteLine("  tasks: " + string.Join(",", lastResp.UsedTaskIds));
+                        var mems = itl.OfType<MemorySummary>().TakeLast(2).ToList();
+                        if (mems.Count > 0)
+                            Console.WriteLine("  mem: " + string.Join(" | ", mems.Select(m => m.Topic)));
                     }
                     break;
 
