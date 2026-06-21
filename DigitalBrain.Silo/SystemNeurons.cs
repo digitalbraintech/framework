@@ -4,7 +4,9 @@ using ModelContextProtocol.Protocol;
 using OllamaSharp;
 using Orleans.Journaling;
 using Orleans.Runtime;
+using System.IO;
 using System.Reflection;
+using System.Text.Json;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -41,10 +43,46 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
 public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 {
     private readonly List<NeuroPack> _published = new();
+    private static readonly string DataPath = Path.Combine("data", "marketplace.json");
 
     public MarketplaceNeuron(ILogger<MarketplaceNeuron> logger)
         : base(logger)
     {
+    }
+
+    public override async Task OnActivateAsync(CancellationToken ct)
+    {
+        await base.OnActivateAsync(ct);
+        LoadFromDisk();
+    }
+
+    private void LoadFromDisk()
+    {
+        try
+        {
+            if (File.Exists(DataPath))
+            {
+                var json = File.ReadAllText(DataPath);
+                var loaded = JsonSerializer.Deserialize<List<NeuroPack>>(json);
+                if (loaded != null)
+                {
+                    _published.Clear();
+                    _published.AddRange(loaded);
+                }
+            }
+        }
+        catch { }
+    }
+
+    private void SaveToDisk()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(DataPath)!);
+            var json = JsonSerializer.Serialize(_published);
+            File.WriteAllText(DataPath, json);
+        }
+        catch { }
     }
 
     public async Task HandleAsync(PublishToMarketplace cmd)
@@ -61,8 +99,8 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         var key = $"{pack.Name}@{pack.Version}";
         _published.RemoveAll(p => $"{p.Name}@{p.Version}" == key);
         _published.Add(pack);
+        SaveToDisk();
 
-        // Durability via journal of Publish events (replay logic can be added in activate for full persistence)
         Logger.LogInformation("Marketplace PUBLISHED real pack {Name}@{Ver} owner={Owner} private={Private} commission={Rate:P0}",
             pack.Name, pack.Version, pack.OwnerId, pack.IsPrivate, pack.CommissionRate);
     }
@@ -84,7 +122,6 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
             return;
         }
 
-        // Commission taking - core for "marketplace should take commissions"
         var commissionAmount = 1.0 * pack.CommissionRate;
         await FireAsync(new CommissionTaken(
             pack.Name, 
@@ -94,10 +131,8 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
             pack.CommissionRate, 
             commissionAmount));
 
-        // Deliver full real pack
         await FireAsync(new NeuroPackInstalled(pack));
 
-        // Activate for the buyer
         var genKey = "generated-" + pack.Name.ToLowerInvariant();
         var generated = GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
         await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated"));
@@ -182,11 +217,8 @@ public class CompilerNeuron : Neuron, ICompiler
         return text.Trim();
     }
 
-    static string FallbackSnippet(string pack, string desc) =>
-        $"[GrainType(\"digitalbrain.generated.{pack.ToLower()}\")]\npublic class {pack}Neuron : Neuron, INeuron {{\n    // {desc}\n}}";
-
     static string FallbackGeneralCode(string pack, string desc) =>
-        $"// Generated software/automation for: {desc}\nusing System;\n\npublic class {pack}\n{{\n    public static void Run() {{ Console.WriteLine(\"Automation for: {desc}\"); }}\n}}";
+        $"using System;\n\npublic class {pack}\n{{\n    public static void Run(string input = \"\") {{ Console.WriteLine(\"Automation: {desc} input=\" + input); }}\n    public static void Main(string[] args) => Run(args.Length > 0 ? string.Join(\" \", args) : \"\");\n}}";
 }
 
 [GrainType("digitalbrain.optimizer.v1")]

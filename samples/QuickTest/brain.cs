@@ -23,7 +23,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Server;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.IO;
 using System.Reflection;
 
 var isMcpMode = args.Contains("--mcp");
@@ -61,66 +63,11 @@ else
 {
     Console.WriteLine("=== DIGITALBRAIN BOOTED (from single command) ===");
     Console.WriteLine("Kernel + client + REPL ready. Marketplace, LLM neuron, everything is alive.");
-    Console.WriteLine("Commands: generate <desc> | export | publish ... | install | ask-llm <prompt> | use-generated <pack> <input> | timeline <id> | list | exit");
-    Console.WriteLine("Create real software: 'generate simple todo cli automation with file persistence' then 'export' (writes .cs you can run).");
-    Console.WriteLine("Self-improving example: generate something useful for the brain (e.g. a pack analyzer), export, then use the ideas to improve prompts or add new tools.");
+    Console.WriteLine("Commands: generate <desc> | create-software <desc> | run | export | self-improve | publish | install | list | ask-llm | exit");
+    Console.WriteLine("Practical AI factory: 'create-software daily log file rotator' then 'run' or 'export' then dotnet run the project. 'self-improve' closes generate->run->feedback loop.");
 
     string? lastGeneratedCode = null;
     string? lastGeneratedDesc = null;
-
-    async Task<string> ExecuteGeneratedCode(string code, string input = "")
-    {
-        try
-        {
-            // Use Roslyn Scripting for simple execution of generated automations/logic.
-            // For class with Run(), we wrap it.
-            var options = ScriptOptions.Default
-                .AddReferences(typeof(object).Assembly, typeof(Console).Assembly, typeof(Enumerable).Assembly)
-                .AddImports("System", "System.Collections.Generic", "System.Linq");
-
-            // If it's a class definition, try to find and call a Run method or Main.
-            if (code.Contains("public class") || code.Contains("class "))
-            {
-                // Compile to assembly for full class support.
-                var syntaxTree = CSharpSyntaxTree.ParseText(code);
-                var compilation = CSharpCompilation.Create("DynamicAssembly")
-                    .AddReferences(
-                        MetadataReference.CreateFromFile(typeof(object).Assembly.Location),
-                        MetadataReference.CreateFromFile(typeof(Console).Assembly.Location))
-                    .AddSyntaxTrees(syntaxTree);
-
-                using var ms = new System.IO.MemoryStream();
-                var emitResult = compilation.Emit(ms);
-                if (!emitResult.Success)
-                {
-                    return "Compilation errors: " + string.Join(", ", emitResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.GetMessage()));
-                }
-
-                ms.Seek(0, System.IO.SeekOrigin.Begin);
-                var assembly = Assembly.Load(ms.ToArray());
-                var type = assembly.GetTypes().FirstOrDefault(t => t.Name.Contains("Automation") || t.Name.Contains("Program") || t.GetMethods().Any(m => m.Name == "Run" || m.Name == "Main"));
-                if (type != null)
-                {
-                    var instance = Activator.CreateInstance(type);
-                    var runMethod = type.GetMethod("Run") ?? type.GetMethod("Main");
-                    if (runMethod != null)
-                    {
-                        var invokeResult = runMethod.Invoke(instance, runMethod.GetParameters().Length > 0 ? new object[] { input } : null);
-                        return invokeResult?.ToString() ?? "Executed successfully.";
-                    }
-                }
-                return "Compiled but no Run/Main found. Code loaded.";
-            }
-
-            // Simple script
-            var scriptResult = await CSharpScript.EvaluateAsync(code + (string.IsNullOrEmpty(input) ? "" : $"; Console.WriteLine({input});"), options);
-            return scriptResult?.ToString() ?? "Executed.";
-        }
-        catch (Exception ex)
-        {
-            return "Execution error: " + ex.Message;
-        }
-    }
 
     while (true)
     {
@@ -205,24 +152,7 @@ else
                             lastGeneratedCode = genEvt.GeneratedCodeSnippet;
                             lastGeneratedDesc = parts[1];
                             Console.WriteLine("Generated software/automation:\n" + lastGeneratedCode);
-
-                            // Immediately materialize as real file (core to using the system for software creation)
-                            var name = lastGeneratedDesc.Replace(" ", "") + "Automation";
-                            var dir = "output";
-                            Directory.CreateDirectory(dir);
-                            var path = Path.Combine(dir, name + ".cs");
-                            File.WriteAllText(path, lastGeneratedCode);
-
-                            // Better materialization: also emit a minimal .csproj for standalone project
-                            var csprojContent = $@"<Project Sdk=""Microsoft.NET.Sdk"">
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net11.0</TargetFramework>
-  </PropertyGroup>
-</Project>";
-                            File.WriteAllText(Path.Combine(dir, name + ".csproj"), csprojContent);
-                            Console.WriteLine($"\n>>> Exported real software to {path} and {name}.csproj . Run 'dotnet run --project {dir}/{name}.csproj' for the automation.");
-                            Console.WriteLine("This is real usable C# software/automation created by the brain.");
+                            CodeRunner.MaterializeAsProject(lastGeneratedDesc, lastGeneratedCode);
                         }
                     }
                     break;
@@ -230,12 +160,7 @@ else
                 case "export":
                     if (lastGeneratedCode != null)
                     {
-                        var name = lastGeneratedDesc?.Replace(" ", "") ?? "GeneratedAutomation";
-                        var dir = "output";
-                        Directory.CreateDirectory(dir);
-                        var path = Path.Combine(dir, name + ".cs");
-                        File.WriteAllText(path, lastGeneratedCode);
-                        Console.WriteLine($"Exported to {path}. This is real usable C# software/automation you can compile and run.");
+                        CodeRunner.MaterializeAsProject(lastGeneratedDesc ?? "Generated", lastGeneratedCode);
                     }
                     else
                     {
@@ -247,7 +172,7 @@ else
                 case "execute":
                     if (lastGeneratedCode != null)
                     {
-                        var result = await ExecuteGeneratedCode(lastGeneratedCode, parts.Length > 1 ? string.Join(' ', parts[1..]) : "");
+                        var result = await CodeRunner.ExecuteCode(lastGeneratedCode, parts.Length > 1 ? string.Join(' ', parts[1..]) : "");
                         Console.WriteLine("Execution result: " + result);
                     }
                     else if (parts.Length > 1)
@@ -260,13 +185,38 @@ else
                         var targetPack = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(packName, StringComparison.OrdinalIgnoreCase));
                         if (targetPack != null)
                         {
-                            var execResult = await ExecuteGeneratedCode(targetPack.Code, string.Join(' ', parts.Skip(2)));
+                            var execResult = await CodeRunner.ExecuteCode(targetPack.Code, string.Join(' ', parts.Skip(2)));
                             Console.WriteLine("Execution result: " + execResult);
                         }
                     }
                     else
                     {
                         Console.WriteLine("No code to execute. Use 'generate' or 'create-software' first.");
+                    }
+                    break;
+
+                case "self-improve":
+                    {
+                        var analyzerDesc = "a marketplace pack analyzer: when run, print 3 actionable ideas to improve the compiler prompt library or add usage logging to the REPL for self-improvement";
+                        Console.WriteLine("Generating self-improvement automation: " + analyzerDesc);
+                        var comp = grains.GetGrain<ICompiler>("compiler-main");
+                        await comp.FireAsync(new CreateNeuronRequest(analyzerDesc));
+                        await Task.Delay(2500);
+                        var tline = await comp.GetTimelineAsync();
+                        var genEvt2 = tline.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
+                        if (genEvt2 != null)
+                        {
+                            lastGeneratedCode = genEvt2.GeneratedCodeSnippet;
+                            lastGeneratedDesc = "SelfAnalyzer";
+                            CodeRunner.MaterializeAsProject(lastGeneratedDesc, lastGeneratedCode);
+                            var analysis = await CodeRunner.ExecuteCode(lastGeneratedCode, "");
+                            Console.WriteLine("=== Self-improvement artifact executed ===");
+                            Console.WriteLine(analysis);
+                            Console.WriteLine(">>> Result fed back. Use ideas above to refine future generations (e.g. publish this analyzer or paste suggestions into next create-software).");
+                            var mkt = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                            await mkt.FireAsync(new PublishToMarketplace("SelfAnalyzer", "0.1-loop", lastGeneratedCode, "self-brain", false, 0.05, analyzerDesc));
+                            Console.WriteLine("Analyzer published to marketplace (survives restart via disk).");
+                        }
                     }
                     break;
 
@@ -317,6 +267,143 @@ else
 
 Console.WriteLine("DigitalBrain shut down.");
 
+internal static class CodeRunner
+{
+    public static async Task<string> ExecuteCode(string code, string input = "")
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "No code.";
+        try
+        {
+            var scriptOptions = ScriptOptions.Default
+                .AddReferences(typeof(object).Assembly, typeof(Console).Assembly, typeof(Enumerable).Assembly)
+                .AddImports("System", "System.Collections.Generic", "System.Linq", "System.IO");
+
+            bool looksLikeClass = code.Contains("class ") || code.Contains("public class");
+
+            if (looksLikeClass)
+            {
+                var syntaxTree = CSharpSyntaxTree.ParseText(code);
+                var refs = new List<MetadataReference>();
+                void TryAdd(Type t) { try { if (!string.IsNullOrEmpty(t.Assembly.Location)) refs.Add(MetadataReference.CreateFromFile(t.Assembly.Location)); } catch { } }
+                TryAdd(typeof(object));
+                TryAdd(typeof(Console));
+                TryAdd(typeof(Enumerable));
+                TryAdd(typeof(List<>));
+                TryAdd(typeof(System.Text.StringBuilder));
+                TryAdd(typeof(System.Linq.Expressions.Expression));
+
+                var compilation = CSharpCompilation.Create(
+                        "BrainDynamic",
+                        new[] { syntaxTree },
+                        refs,
+                        new CSharpCompilationOptions(OutputKind.ConsoleApplication));
+
+                using var ms = new MemoryStream();
+                var emitResult = compilation.Emit(ms);
+                if (!emitResult.Success)
+                {
+                    var errs = emitResult.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => d.GetMessage());
+                    return "Compile errors: " + string.Join("; ", errs);
+                }
+
+                ms.Position = 0;
+                var asm = Assembly.Load(ms.ToArray());
+                var entry = asm.EntryPoint;
+                if (entry != null)
+                {
+                    var p = entry.GetParameters();
+                    var args = p.Length > 0 ? new object?[] { new string[] { input } } : null;
+                    var res = entry.Invoke(null, args);
+                    return res?.ToString() ?? "Entry ran.";
+                }
+
+                var candidate = asm.GetTypes()
+                    .FirstOrDefault(t => t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static)
+                        .Any(m => m.Name is "Run" or "Main" or "Execute"));
+                if (candidate != null)
+                {
+                    var m = candidate.GetMethod("Run") ?? candidate.GetMethod("Main") ?? candidate.GetMethod("Execute");
+                    if (m != null)
+                    {
+                        var target = m.IsStatic ? null : Activator.CreateInstance(candidate);
+                        var ps = m.GetParameters();
+                        var callArgs = ps.Length == 0 ? null : new object?[] { input };
+                        var invokeRes = m.Invoke(target, callArgs);
+                        return invokeRes?.ToString() ?? "Invoked.";
+                    }
+                }
+                return "Compiled, no entry or Run/Main found.";
+            }
+
+            var scriptRes = await CSharpScript.EvaluateAsync(code, scriptOptions);
+            return scriptRes?.ToString() ?? "Script ran.";
+        }
+        catch (Exception ex)
+        {
+            return "Exec error: " + ex.Message;
+        }
+    }
+
+    public static void MaterializeAsProject(string description, string code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return;
+        var safe = new string((description ?? "Automation").Where(char.IsLetterOrDigit).ToArray());
+        if (safe.Length == 0) safe = "Automation";
+        safe = char.ToUpper(safe[0]) + (safe.Length > 1 ? safe[1..].ToLower() : "");
+        var baseDir = Path.Combine("output", safe);
+        Directory.CreateDirectory(baseDir);
+
+        bool hasEntry = code.Contains("void Main(") || code.Contains("static void Main") || code.Contains("int Main(") || !code.Contains("class ");
+        string programFileContent;
+        if (hasEntry)
+        {
+            programFileContent = code;
+        }
+        else
+        {
+            programFileContent = code + "\n\n" + @"static class __Entry
+{
+    public static void Main(string[] args)
+    {
+        var inp = args.Length > 0 ? string.Join("" "", args) : """";
+        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+        var methods = asm.GetTypes()
+            .SelectMany(t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance))
+            .Where(m => m.Name is ""Run"" or ""Main"" or ""Execute"")
+            .OrderBy(m => m.Name == ""Run"" ? 0 : 1);
+        foreach (var m in methods)
+        {
+            try
+            {
+                var tgt = m.IsStatic ? null : Activator.CreateInstance(m.DeclaringType!);
+                var p = m.GetParameters();
+                object? r = p.Length == 0 ? m.Invoke(tgt, null) : m.Invoke(tgt, new object?[] { inp });
+                if (r != null) Console.WriteLine(r);
+                return;
+            }
+            catch { }
+        }
+        Console.WriteLine(""Automation ready (no Run/Main auto-detected)."");
+    }
+}";
+        }
+
+        File.WriteAllText(Path.Combine(baseDir, "Program.cs"), programFileContent);
+
+        var csproj = @"<Project Sdk=""Microsoft.NET.Sdk"">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+</Project>";
+        File.WriteAllText(Path.Combine(baseDir, safe + ".csproj"), csproj);
+
+        Console.WriteLine($">>> Materialized runnable project to {baseDir} . Use: dotnet run --project {baseDir}");
+    }
+}
+
 // === MCP TOOLS (integrated for --mcp mode - no separate project needed for "from dust" experience) ===
 [McpServerToolType]
 public class BrainMcpTools(IGrainFactory grains)
@@ -332,8 +419,8 @@ public class BrainMcpTools(IGrainFactory grains)
         return r?.Response ?? "LLM processed the prompt. Use get_timeline on llm-main for full result.";
     }
 
-    [McpServerTool(Name = "generate_software"), Description("Generate real software, automation or logic using the compiler. Returns the code + auto-materializes a .cs file in ./output when possible.")]
-    public async Task<string> GenerateSoftware([Description("Clear description of the desired software/automation/logic")] string description)
+    [McpServerTool(Name = "generate_software"), Description("Generate real software/automation/logic. Drives compiler, returns code, materializes full runnable project under output/.")]
+    public async Task<string> GenerateSoftware([Description("Description of automation or logic to create, e.g. 'daily log rotator that writes timestamped files'")] string description)
     {
         var compiler = grains.GetGrain<ICompiler>("compiler-main");
         await compiler.FireAsync(new CreateNeuronRequest(description));
@@ -345,17 +432,20 @@ public class BrainMcpTools(IGrainFactory grains)
         {
             try
             {
-                var name = "Generated" + description.Replace(" ", "").Substring(0, Math.Min(20, description.Length));
-                var dir = "output";
-                Directory.CreateDirectory(dir);
-                var path = Path.Combine(dir, name + ".cs");
-                File.WriteAllText(path, code);
-                return $"Generated and materialized to {path}:\n\n" + code;
+                CodeRunner.MaterializeAsProject(description, code);
+                return "Generated + materialized as dotnet-runnable project. Code:\n" + code;
             }
             catch { }
-            return "Generated code:\n" + code + "\n(Export to file failed in this environment)";
+            return "Generated:\n" + code;
         }
-        return "Generation failed. Try a more specific description.";
+        return "Generation failed. Try more specific description.";
+    }
+
+    [McpServerTool(Name = "execute_software"), Description("Execute code or installed pack snippet inside the brain using Roslyn. For end-to-end agent driven runs.")]
+    public async Task<string> ExecuteSoftware([Description("The C# code to run (class with Run/Main or script)")] string code, [Description("Optional input arg")] string? input = null)
+    {
+        var res = await CodeRunner.ExecuteCode(code, input ?? "");
+        return "Result: " + res;
     }
 
     [McpServerTool(Name = "fire_to_neuron"), Description("Fire a message to any neuron.")]
