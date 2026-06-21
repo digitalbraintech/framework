@@ -11,7 +11,7 @@ using Orleans.Journaling;
 namespace DigitalBrain.Silo;
 
 // IAspire neuron (orchestrates distributed apps via Aspire model, fires completion synapses)
-[GrainType("neuro.aspire.v1")]
+[GrainType("digitalbrain.kernel.aspire.v1")]
 public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
 {
     public AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger)
@@ -35,7 +35,7 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
 }
 
 // IMarketplace neuron (publish/install neuro packs, dynamic assembly load hook stub)
-[GrainType("neuro.marketplace.v1")]
+[GrainType("digitalbrain.marketplace.v1")]
 public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 {
     private readonly List<string> _published = new();
@@ -70,7 +70,7 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     }
 }
 
-[GrainType("neuro.compiler.v1")]
+[GrainType("digitalbrain.compiler.v1")]
 public class CompilerNeuron : Neuron, ICompiler
 {
     public CompilerNeuron(ILogger<CompilerNeuron> logger)
@@ -136,7 +136,7 @@ public class CompilerNeuron : Neuron, ICompiler
         $"[GrainType(\"neuro.generated.{pack.ToLower()}\")]\npublic class {pack}Neuron : Neuron, INeuron {{\n    // {desc}\n}}";
 }
 
-[GrainType("neuro.optimizer.v1")]
+[GrainType("digitalbrain.optimizer.v1")]
 public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 {
     private int _telemetryCount = 0;
@@ -181,7 +181,7 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 }
 
 // Dynamic generated neuron - "loaded" via compiler flow (prototype for NeuroPack dynamic assembly + grain reg)
-[GrainType("neuro.generated")]
+[GrainType("digitalbrain.generated")]
 public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry>
 {
     private string _id = string.Empty;
@@ -218,7 +218,7 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
     }
 }
 
-[GrainType("neuro.llm.qwen.v1")]
+[GrainType("digitalbrain.llm.qwen.v1")]
 public class LlmNeuron : Neuron, ILlmNeuron
 {
     public LlmNeuron(ILogger<LlmNeuron> logger)

@@ -77,6 +77,13 @@ public class NeuronSteps : IAsyncDisposable
         await _currentGrain.GetTimelineAsync();
     }
 
+    [Given(@"a system status neuron ""(.*)""")]
+    public async Task GivenASystemStatusNeuron(string id)
+    {
+        _currentGrain = _cluster.GrainFactory.GetGrain<ISystemStatus>(id);
+        await _currentGrain.GetTimelineAsync();
+    }
+
     [When(@"I send create neuron request ""(.*)""")]
     public async Task WhenISendCreateNeuronRequest(string desc)
     {
@@ -87,6 +94,12 @@ public class NeuronSteps : IAsyncDisposable
     public async Task WhenISendCreateSimpleAppRequest(string desc, string team)
     {
         await _currentGrain!.FireAsync(new CreateSimpleApp(team, desc));
+    }
+
+    [When(@"I fire a bad status for component ""(.*)""")]
+    public async Task WhenIFireABadStatusForComponent(string component)
+    {
+        await _currentGrain!.FireAsync(new SystemStatusChanged(component, "FailedToStart", "simulated failure"));
     }
 
     [When(@"I fire multiple messages to trigger telemetry")]
@@ -189,6 +202,22 @@ public class NeuronSteps : IAsyncDisposable
     {
         _timeline = await _currentGrain!.GetTimelineAsync();
         Assert.Contains(_timeline, s => s.Type == nameof(SimpleAppCreated));
+    }
+
+    [Then(@"the timeline contains a FixProposal")]
+    public async Task ThenTheTimelineContainsAFixProposal()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.Contains(_timeline, s => s.Type == nameof(FixProposal));
+    }
+
+    [Then(@"the timeline contains a SimulationResult with success true")]
+    public async Task ThenTheTimelineContainsASimulationResultWithSuccessTrue()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        var sim = _timeline.LastOrDefault(s => s.Type == nameof(SimulationResult)) as SimulationResult;
+        Assert.NotNull(sim);
+        Assert.True(sim.Success);
     }
 
     [Then(@"the timeline contains a WiringOptimizationProposed")]

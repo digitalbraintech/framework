@@ -54,3 +54,9 @@ Scenario: Harness simulates other-brain publish-install-use flow via Marketplace
   When I publish, a simulated other brain installs and uses the pack "Generated-emailanalyzerforotherbrain" version "0.1-sim"
   Then the timeline contains a PublishedList
   And the generated neuron for pack "Generated-emailanalyzerforotherbrain" received an ExperienceUsed
+
+Scenario: System self-awareness with status, fix proposal and simulation
+  Given a system status neuron "status-self"
+  When I fire a bad status for component "kernel"
+  Then the timeline contains a FixProposal
+  And the timeline contains a SimulationResult with success true
