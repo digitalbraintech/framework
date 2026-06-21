@@ -57,7 +57,7 @@ public class NeuronTests : IAsyncLifetime
     public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
     {
         var status = _cluster!.GrainFactory.GetGrain<ISystemStatus>("status-sim");
-        var checkpoint = await status.GetTimelineAsync();
+        var cp = await status.CreateCheckpointAsync();  // capture clean checkpoint before driving failure
         await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
         var timeline = await status.GetTimelineAsync();
         Assert.Contains(timeline, s => s.Type == nameof(FixProposal));
@@ -66,8 +66,7 @@ public class NeuronTests : IAsyncLifetime
         Assert.True(sim.Success);
         Assert.Contains("different", sim.Details, StringComparison.OrdinalIgnoreCase);
 
-        // Concrete isolated sim using a *real separate TestCluster* + journal snapshot (checkpoint) as starting state.
-        // Replay checkpoint into the isolated cluster, drive bad status (applies fix path in sim), assert different+healthy outcome.
+        // Hardened isolated sim: replay proper CreateCheckpoint snapshot into separate TestCluster.
         var simBuilder = new TestClusterBuilder();
         simBuilder.AddSiloBuilderConfigurator<SiloConfigurator>();
         var simCluster = simBuilder.Build();
@@ -75,8 +74,8 @@ public class NeuronTests : IAsyncLifetime
         try
         {
             var simStatus = simCluster.GrainFactory.GetGrain<ISystemStatus>("status-isolated-sim");
-            // Seed the sim cluster from the captured checkpoint (real replay into fresh cluster's journal)
-            foreach (var s in checkpoint.OfType<SystemStatusChanged>().TakeLast(8))
+            // Seed from checkpoint snapshot (faithful isolated replay)
+            foreach (var s in cp.Snapshot.OfType<SystemStatusChanged>())
             {
                 await simStatus.FireAsync(s);
             }
