@@ -2,7 +2,6 @@
 using DigitalBrain.Protocol;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Orleans;
 using Spectre.Console;
 
 var host = Host.CreateApplicationBuilder(args);

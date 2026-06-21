@@ -1,6 +1,3 @@
-global using Orleans;
-global using Orleans.Runtime;
-
 namespace DigitalBrain.Protocol;
 
 [GenerateSerializer]
@@ -16,38 +13,6 @@ public record Synapse(
     public Synapse Stamp(NeuronId sender) =>
         this with { Sender = sender, Timestamp = DateTimeOffset.UtcNow };
 }
-
-[GenerateSerializer]
-public record NeuronId([property: Id(0)] string Value)
-{
-    public static implicit operator string(NeuronId id) => id.Value;
-    public override string ToString() => Value;
-}
-
-public interface INeuron : IGrainWithStringKey
-{
-    ValueTask FireAsync<T>(T payload) where T : Synapse;
-    Task<IReadOnlyList<Synapse>> GetTimelineAsync();
-    Task DeliverAsync(Synapse synapse);
-}
-
-[GenerateSerializer]
-public record NeuronActivated(NeuronId Neuron) : Synapse(nameof(NeuronActivated), DateTimeOffset.UtcNow);
-
-public interface IHandle<T> where T : Synapse
-{
-    Task HandleAsync(T synapse);
-}
-
-// Command / event synapses for core system neurons (per v2 spec)
-[GenerateSerializer]
-public record StartDistributedApp(string AppName) : Synapse(nameof(StartDistributedApp), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record RestartResource(string ResourceName) : Synapse(nameof(RestartResource), DateTimeOffset.UtcNow);
-
-[GenerateSerializer]
-public record DistributedAppStarted(string AppName, bool Success, string? Details = null) : Synapse(nameof(DistributedAppStarted), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record PublishToMarketplace(string PackName, string Version) : Synapse(nameof(PublishToMarketplace), DateTimeOffset.UtcNow);
@@ -85,7 +50,7 @@ public record PublishedList(IReadOnlyList<string> Packs) : Synapse(nameof(Publis
 // Core system neuron interfaces (everything is a Neuron)
 public interface IAspire : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
-public interface IMarketplace : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished> { }
+public interface IMarketplace : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished>;
 
 public interface ICompiler : INeuron, IHandle<CreateNeuronRequest> { }
 

@@ -1,4 +1,3 @@
-using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.DigitalBrain;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -20,4 +19,3 @@ var tui = builder.AddProject<Projects.DigitalBrain_Cli>("grok-cli")
 silo.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
 
 builder.Build().Run();
-

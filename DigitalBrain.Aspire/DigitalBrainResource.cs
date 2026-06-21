@@ -1,5 +1,3 @@
-using Aspire.Hosting.ApplicationModel;
-
 namespace Aspire.Hosting.ApplicationModel;
 
 public sealed class DigitalBrainResource(string name) : Resource(name), IResourceWithConnectionString

@@ -1,6 +1,4 @@
 using DigitalBrain.Protocol;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
 using OllamaSharp;

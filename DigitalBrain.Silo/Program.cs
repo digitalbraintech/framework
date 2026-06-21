@@ -1,6 +1,4 @@
 using DigitalBrain.Protocol;
-using Orleans;
-using Orleans.Journaling;
 
 var builder = Host.CreateApplicationBuilder(args);
 

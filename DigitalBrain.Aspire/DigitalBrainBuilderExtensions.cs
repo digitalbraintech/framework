@@ -1,7 +1,5 @@
-using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Orleans;
-using CommunityToolkit.Aspire.Hosting.Ollama;
 
 namespace Aspire.Hosting.DigitalBrain;
 
