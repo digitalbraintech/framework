@@ -22,7 +22,7 @@ This file is the single, slim source of guidance for AI agents and contributors.
 - **Docs in code**: Write meaningful XML docs on public API surface (DigitalBrain.Aspire etc.). Avoid vacuous repeat-the-signature comments.
 - **Paths**: Use relative paths for workspace files. Avoid leaking user profile details.
 - **No undefined "high severity" rituals**. Run the tests that are relevant.
-- **Skills**: The aspire/* family of skills come from the agent environment / marketplace. Local copies are for overrides only (single tree under .agents if present).
+- **Skills**: aspire/* and the full set from dotnet/skills (https://github.com/dotnet/skills) are present under .agents/skills (project level). Local copies here take precedence for overrides. Use `npx skills add dotnet/skills -y` (or with -g) to refresh from upstream. A skills-lock.json pins the installed set.
 
 ## Verification after changes
 
