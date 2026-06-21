@@ -17,16 +17,8 @@ public static class DigitalBrainKernelExtensions
             siloBuilder.UseLocalhostClustering();
             siloBuilder.AddMemoryGrainStorageAsDefault();
 
-            // Dual journals: incoming (received Deliver) + outgoing (Fire). Prototype in-memory for fast single-process boot.
-            // Population explicit in Neuron.FireAsync / DeliverAsync for synapse causality.
-            siloBuilder.ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal",
-                    (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
-                services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal",
-                    (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
-                services.AddSingleton<Orleans.Journaling.IJournaledStateManager, PrototypeJournaledStateManager>();
-            });
+            // Centralized prototype journals (single source in PrototypeJournals).
+            siloBuilder.ConfigurePrototypeJournals();
 
             // Built-in neurons discovered automatically.
         });
