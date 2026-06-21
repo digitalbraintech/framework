@@ -44,25 +44,15 @@ public class InoNeuron : Neuron, IInoNeuron
         var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
         var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
 
-        // Episodic tasks from own recent journal (not manual list).
-        var taskSyns = OutgoingJournal.OfType<KernelTaskStarted>().TakeLast(5).Select(t => t.TaskId);
-        var taskCtx = string.Join(";", taskSyns);
+        // Episodic tasks with real results (better than started-only for INO decisions).
+        var completed = OutgoingJournal.OfType<KernelTaskCompleted>().TakeLast(3);
+        var taskCtx = string.Join(";", completed.Select(t => t.TaskId + "=" + (t.Result ?? "")));
 
         // Long-term from MemorySummary in journal.
         var mems = OutgoingJournal.OfType<MemorySummary>().TakeLast(5);
         var memCtx = string.Join(";", mems.Select(m => m.Topic + "=" + m.Summary));
 
-        string cross = "";
-        try
-        {
-            var sys = GrainFactory.GetGrain<ISystemStatus>("status-main");
-            var sysTl = await sys.GetOutgoingTimelineAsync();
-            cross = "sys:" + string.Join(",", sysTl.TakeLast(3).Select(s => s.Type));
-        }
-        catch { }
-
-        var focus = OutgoingJournal.TakeLast(3).OfType<InoResponse>().LastOrDefault()?.Prompt ?? "";
-        return $"focus:{focus}\nprompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\ncross:{cross}";
+        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}";
     }
 
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)
