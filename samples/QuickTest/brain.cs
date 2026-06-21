@@ -1,17 +1,6 @@
-// FASTEST "from dust to usable" entry point (following Elon's 5 Steps)
-// Command: dotnet run --project samples/QuickTest
-// 
-// This single entry boots the full DigitalBrain:
-// - Kernel (Orleans host with all built-in neurons: Marketplace, Compiler, Llm, SystemStatus...)
-// - Client
-// - Interactive REPL for human testing ("send text", test private packs + commissions)
-// - --mcp flag: runs as MCP server (for LLM agents to ask_llm_neuron etc.)
-//
-// No Aspire required for this fast path. Use the AppHost for full distributed demos.
-//
-// Encapsulation: All config is in UseDigitalBrainKernel() + AddDigitalBrainClient() (see DigitalBrain.Silo/DigitalBrainKernelExtensions.cs)
-//
-// To "dotnet run brain.cs" feeling: copy this file to a temp folder with a minimal .csproj that references DigitalBrain.Silo + ModelContextProtocol + Orleans packages, then dotnet run brain.cs (or rename Program.cs).
+// dotnet run --project samples/QuickTest
+// Fast entry for practical software creation: create-software -> run/export -> self-improve loop.
+// --mcp for agents. Core via grains + Roslyn execution.
 
 using DigitalBrain.Protocol;
 using DigitalBrain.Silo;
@@ -61,9 +50,8 @@ if (isMcpMode)
 }
 else
 {
-    Console.WriteLine("=== DIGITALBRAIN BOOTED (from single command) ===");
-    Console.WriteLine("Kernel + REPL + Marketplace ready. Type 'help' for flows.");
-    Console.WriteLine("Example: create-software 'count lines in cs files'  |  run  |  export  |  self-improve");
+    Console.WriteLine("=== DIGITALBRAIN BOOTED ===");
+    Console.WriteLine("create-software 'desc' | run [name] | export [name] | self-improve | list | help");
 
     string? lastGeneratedCode = null;
     string? lastGeneratedDesc = null;
@@ -79,176 +67,96 @@ else
             var parts = line.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
             switch (parts[0].ToLower())
             {
-                case "fire":
-                    if (parts.Length > 2)
-                    {
-                        await grains.GetGrain<INeuron>(parts[1]).FireAsync(new DemoMessageSynapse(parts[2]));
-                        Console.WriteLine("fired");
-                    }
-                    break;
-
-                case "publish":
-                    bool priv = parts.Length > 1 && parts[1].Equals("private", StringComparison.OrdinalIgnoreCase);
-                    int idx = priv ? 2 : 1;
-                    if (parts.Length > idx + 1)
-                    {
-                        var name = parts[idx];
-                        var ver = parts[idx + 1];
-                        var code = parts.Length > idx + 2 ? parts[^1] : "// generated";
-                        await grains.GetGrain<IMarketplaceNeuron>("market-main")
-                            .FireAsync(new PublishToMarketplace(name, ver, code, "brain-user", priv, 0.15));
-                        Console.WriteLine($"published {(priv ? "PRIVATE " : "")}{name}@{ver} (15% commission)");
-                    }
-                    break;
-
-                case "install":
-                    if (parts.Length > 1)
-                    {
-                        await grains.GetGrain<IMarketplaceNeuron>("market-main")
-                            .FireAsync(new InstallFromMarketplace(parts[1], "0.1-dev", "brain-buyer"));
-                        Console.WriteLine("installed + commission taken. The generated grain now EMBODIES the pack.");
-                    }
-                    break;
-
-                case "use-generated":
-                    if (parts.Length > 2)
-                    {
-                        var gen = grains.GetGrain<IGeneratedNeuron>("generated-" + parts[1].ToLower());
-                        await gen.FireAsync(new ExperienceUsed(parts[1], parts[2]));
-                        Console.WriteLine($"Used installed pack '{parts[1]}' with input '{parts[2]}' (behavior now comes from the pack)");
-                    }
-                    break;
-
-                case "generate":
-                case "create":
-                    if (parts.Length > 1)
-                    {
-                        var desc = string.Join(' ', parts[1..]);
-                        var compiler = grains.GetGrain<ICompiler>("compiler-main");
-                        await compiler.FireAsync(new CreateNeuronRequest(desc));
-                        var tl = await compiler.GetTimelineAsync();
-                        var genEvt = tl.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
-                        if (genEvt != null)
-                        {
-                            Console.WriteLine("Generated code:\n" + genEvt.GeneratedCodeSnippet);
-                            lastGeneratedCode = genEvt.GeneratedCodeSnippet;
-                            lastGeneratedDesc = desc;
-                        }
-                    }
-                    break;
-
                 case "create-software":
                 case "make-automation":
                     if (parts.Length > 1)
                     {
-                        var desc = "Create a simple, complete, runnable C# console automation or logic for: " + string.Join(' ', parts[1..]);
+                        var desc = string.Join(' ', parts[1..]);
                         var compiler = grains.GetGrain<ICompiler>("compiler-main");
-                        await compiler.FireAsync(new CreateNeuronRequest(desc));
+                        await compiler.FireAsync(new CreateNeuronRequest("Create a complete runnable C# console automation for: " + desc));
                         var tl = await compiler.GetTimelineAsync();
                         var genEvt = tl.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
                         if (genEvt != null)
                         {
                             lastGeneratedCode = genEvt.GeneratedCodeSnippet;
-                            lastGeneratedDesc = parts[1];
-                            Console.WriteLine("Generated software/automation:\n" + lastGeneratedCode);
-                            CodeRunner.MaterializeAsProject(lastGeneratedDesc, lastGeneratedCode);
-
-                            // Auto-publish so it's immediately in the durable library and runnable by name
-                            var safe = lastGeneratedDesc.Replace(" ", "").Replace("\"", "").Replace("-", "");
-                            if (string.IsNullOrWhiteSpace(safe)) safe = "Automation" + DateTime.Now.Ticks % 10000;
-                            await grains.GetGrain<IMarketplaceNeuron>("market-main")
-                                .FireAsync(new PublishToMarketplace(safe, "0.1-dev", lastGeneratedCode, "local", false, 0.0, lastGeneratedDesc));
-                            Console.WriteLine("Auto-published as " + safe + " (run " + safe + " or list)");
+                            lastGeneratedDesc = desc;
+                            Console.WriteLine("Generated:\n" + lastGeneratedCode);
+                            CodeRunner.MaterializeAsProject(desc, lastGeneratedCode);
                         }
                     }
                     break;
 
                 case "export":
-                    if (lastGeneratedCode != null)
                     {
-                        CodeRunner.MaterializeAsProject(lastGeneratedDesc ?? "Generated", lastGeneratedCode);
-                    }
-                    else
-                    {
-                        Console.WriteLine("Generate something first (use 'create-software simple email filter automation')");
-                    }
-                    break;
-
-                case "export-pack":
-                    if (parts.Length > 1)
-                    {
-                        var name = parts[1];
-                        var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                        await marketGrain.FireAsync(new ListPublished());
-                        var marketTl = await marketGrain.GetTimelineAsync();
-                        var publishedList = marketTl.LastOrDefault(s => s is PublishedList) as PublishedList;
-                        var target = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-                        if (target != null)
+                        string? code = lastGeneratedCode;
+                        string nameForDir = lastGeneratedDesc ?? "Generated";
+                        if (parts.Length > 1)
                         {
-                            CodeRunner.MaterializeAsProject(target.Name, target.Code);
-                            Console.WriteLine("Exported pack " + target.Name + " as runnable project.");
+                            var n = parts[1];
+                            var mkt = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                            await mkt.FireAsync(new ListPublished());
+                            var tl = await mkt.GetTimelineAsync();
+                            var pl = tl.LastOrDefault(s => s is PublishedList) as PublishedList;
+                            var p = pl?.Packs.FirstOrDefault(x => x.Name.Contains(n, StringComparison.OrdinalIgnoreCase));
+                            if (p != null)
+                            {
+                                code = p.Code;
+                                nameForDir = p.Name;
+                            }
                         }
+                        if (code != null)
+                            CodeRunner.MaterializeAsProject(nameForDir, code);
                         else
-                        {
-                            Console.WriteLine("Pack not found. Use 'list' to see available.");
-                        }
+                            Console.WriteLine("Nothing to export. Use create-software first or export <name>");
                     }
                     break;
 
                 case "run":
                 case "execute":
                     {
-                        string? codeToRun = null;
-                        string input = "";
+                        string? code = lastGeneratedCode;
+                        string inp = "";
                         if (parts.Length > 1)
                         {
-                            var name = parts[1];
-                            input = parts.Length > 2 ? string.Join(' ', parts[2..]) : "";
-                            var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                            await marketGrain.FireAsync(new ListPublished());
-                            var marketTl = await marketGrain.GetTimelineAsync();
-                            var publishedList = marketTl.LastOrDefault(s => s is PublishedList) as PublishedList;
-                            var target = publishedList?.Packs.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
-                            if (target != null) codeToRun = target.Code;
+                            var n = parts[1];
+                            inp = parts.Length > 2 ? string.Join(' ', parts[2..]) : "";
+                            var mkt = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                            await mkt.FireAsync(new ListPublished());
+                            var tl = await mkt.GetTimelineAsync();
+                            var pl = tl.LastOrDefault(s => s is PublishedList) as PublishedList;
+                            var p = pl?.Packs.FirstOrDefault(x => x.Name.Contains(n, StringComparison.OrdinalIgnoreCase));
+                            if (p != null) code = p.Code;
                         }
-                        if (codeToRun == null && lastGeneratedCode != null)
+                        if (code != null)
                         {
-                            codeToRun = lastGeneratedCode;
-                            input = parts.Length > 1 ? string.Join(' ', parts[1..]) : "";
-                        }
-                        if (codeToRun != null)
-                        {
-                            var result = await CodeRunner.ExecuteCode(codeToRun, input);
-                            Console.WriteLine("Execution result: " + result);
+                            var res = await CodeRunner.ExecuteCode(code, inp);
+                            Console.WriteLine("Result: " + res);
                         }
                         else
                         {
-                            Console.WriteLine("Nothing to run. Use 'create-software <desc>' (auto-published), 'run <packname>', or 'run' for last.");
+                            Console.WriteLine("Nothing to run. create-software then run, or run <name>");
                         }
                     }
                     break;
 
                 case "self-improve":
                     {
-                        var analyzerDesc = "a marketplace pack analyzer: when run, print 3 actionable ideas to improve the compiler prompt library or add usage logging to the REPL for self-improvement";
-                        Console.WriteLine("Generating self-improvement automation: " + analyzerDesc);
-                        var comp = grains.GetGrain<ICompiler>("compiler-main");
-                        await comp.FireAsync(new CreateNeuronRequest(analyzerDesc));
-                        await Task.Delay(2500);
-                        var tline = await comp.GetTimelineAsync();
-                        var genEvt2 = tline.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
-                        if (genEvt2 != null)
+                        var d = "marketplace pack analyzer that prints 3 ideas to improve the compiler or REPL";
+                        var c = grains.GetGrain<ICompiler>("compiler-main");
+                        await c.FireAsync(new CreateNeuronRequest(d));
+                        await Task.Delay(800);
+                        var tl = await c.GetTimelineAsync();
+                        var g = tl.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
+                        if (g != null)
                         {
-                            lastGeneratedCode = genEvt2.GeneratedCodeSnippet;
+                            lastGeneratedCode = g.GeneratedCodeSnippet;
                             lastGeneratedDesc = "SelfAnalyzer";
-                            CodeRunner.MaterializeAsProject(lastGeneratedDesc, lastGeneratedCode);
-                            var analysis = await CodeRunner.ExecuteCode(lastGeneratedCode, "");
-                            Console.WriteLine("=== Self-improvement artifact executed ===");
-                            Console.WriteLine(analysis);
-                            Console.WriteLine(">>> Result fed back. Use ideas above to refine future generations (e.g. publish this analyzer or paste suggestions into next create-software).");
-                            var mkt = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                            await mkt.FireAsync(new PublishToMarketplace("SelfAnalyzer", "0.1-loop", lastGeneratedCode, "self-brain", false, 0.05, analyzerDesc));
-                            Console.WriteLine("Analyzer published to marketplace (survives restart via disk).");
+                            CodeRunner.MaterializeAsProject("SelfAnalyzer", lastGeneratedCode);
+                            var r = await CodeRunner.ExecuteCode(lastGeneratedCode);
+                            Console.WriteLine("=== analysis ===\n" + r);
+                            var mk = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                            await mk.FireAsync(new PublishToMarketplace("SelfAnalyzer", "0.1", lastGeneratedCode, "self", false, 0.0, d));
+                            Console.WriteLine("published SelfAnalyzer");
                         }
                     }
                     break;
@@ -257,19 +165,11 @@ else
                     if (parts.Length > 1)
                     {
                         var llm = grains.GetGrain<ILlmNeuron>("llm-main");
-                        await llm.FireAsync(new LlmPrompt(string.Join(' ', parts[1..]), "qwen2.5-coder:1.5b"));
-                        await Task.Delay(2000);
+                        await llm.FireAsync(new LlmPrompt(string.Join(' ', parts[1..])));
+                        await Task.Delay(800);
                         var tl = await llm.GetTimelineAsync();
                         var resp = tl.OfType<LlmResponse>().LastOrDefault();
-                        Console.WriteLine(resp != null ? resp.Response : "LLM fired. Check timeline.");
-                    }
-                    break;
-
-                case "timeline":
-                    if (parts.Length > 1)
-                    {
-                        var tl = await grains.GetGrain<INeuron>(parts[1]).GetTimelineAsync();
-                        foreach (var s in tl.TakeLast(5)) Console.WriteLine($"{s.Type}");
+                        Console.WriteLine(resp != null ? resp.Response : "done");
                     }
                     break;
 
@@ -277,21 +177,17 @@ else
                     var m = grains.GetGrain<IMarketplaceNeuron>("market-main");
                     await m.FireAsync(new ListPublished());
                     var mtl = await m.GetTimelineAsync();
-                    if (mtl.LastOrDefault(s => s is PublishedList) is PublishedList pl)
-                    {
-                        foreach (var p in pl.Packs)
-                            Console.WriteLine($"- {p.Name}@{p.Version} private={p.IsPrivate} comm={p.CommissionRate:P0}");
-                    }
+                    var pll = mtl.LastOrDefault(s => s is PublishedList) as PublishedList;
+                    if (pll != null)
+                        foreach (var p in pll.Packs) Console.WriteLine(p.Name + "@" + p.Version);
                     break;
 
                 case "help":
-                    Console.WriteLine("Flows: create-software 'desc'  ->  run [or run <name>]  ->  export [or export-pack <name>]  ->  dotnet run output/xxx");
-                    Console.WriteLine("         self-improve (auto generates+materializes+runs+publishes analyzer)");
-                    Console.WriteLine("         list | export-pack <name> | run <name> | install <name> | ask-llm <p> | help");
+                    Console.WriteLine("create-software 'desc' | run [name] | export [name] | self-improve | list | ask-llm | exit");
                     break;
 
                 default:
-                    Console.WriteLine("unknown. try: create-software 'word counter' ; run ; help ; exit");
+                    Console.WriteLine("unknown. try create-software 'word counter' ; run ; help");
                     break;
             }
         }
@@ -392,41 +288,11 @@ internal static class CodeRunner
         var baseDir = Path.Combine("output", safe);
         Directory.CreateDirectory(baseDir);
 
-        bool hasEntry = code.Contains("void Main(") || code.Contains("static void Main") || code.Contains("int Main(") || !code.Contains("class ");
-        string programFileContent;
-        if (hasEntry)
+        string programFileContent = code;
+        if (!code.Contains("void Main(") && !code.Contains("static void Main") && code.Contains("class "))
         {
-            programFileContent = code;
+            programFileContent = "using System;\n" + code + "\n\nstatic class Program { static void Main(string[] a) { /* run the class or define Run/Main in your code */ } }";
         }
-        else
-        {
-            programFileContent = code + "\n\n" + @"static class __Entry
-{
-    public static void Main(string[] args)
-    {
-        var inp = args.Length > 0 ? string.Join("" "", args) : """";
-        var asm = System.Reflection.Assembly.GetExecutingAssembly();
-        var methods = asm.GetTypes()
-            .SelectMany(t => t.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Instance))
-            .Where(m => m.Name is ""Run"" or ""Main"" or ""Execute"")
-            .OrderBy(m => m.Name == ""Run"" ? 0 : 1);
-        foreach (var m in methods)
-        {
-            try
-            {
-                var tgt = m.IsStatic ? null : Activator.CreateInstance(m.DeclaringType!);
-                var p = m.GetParameters();
-                object? r = p.Length == 0 ? m.Invoke(tgt, null) : m.Invoke(tgt, new object?[] { inp });
-                if (r != null) Console.WriteLine(r);
-                return;
-            }
-            catch { }
-        }
-        Console.WriteLine(""Automation ready (no Run/Main auto-detected)."");
-    }
-}";
-        }
-
         File.WriteAllText(Path.Combine(baseDir, "Program.cs"), programFileContent);
 
         var csproj = @"<Project Sdk=""Microsoft.NET.Sdk"">
@@ -455,7 +321,7 @@ public class BrainMcpTools(IGrainFactory grains)
     {
         var llm = grains.GetGrain<ILlmNeuron>("llm-main");
         await llm.FireAsync(new LlmPrompt(prompt));
-        await Task.Delay(2500);
+        await Task.Delay(800);
         var tl = await llm.GetTimelineAsync();
         var r = tl.OfType<LlmResponse>().LastOrDefault();
         return r?.Response ?? "LLM processed the prompt. Use get_timeline on llm-main for full result.";
@@ -466,7 +332,7 @@ public class BrainMcpTools(IGrainFactory grains)
     {
         var compiler = grains.GetGrain<ICompiler>("compiler-main");
         await compiler.FireAsync(new CreateNeuronRequest(description));
-        await Task.Delay(3000);
+        await Task.Delay(800);
         var tl = await compiler.GetTimelineAsync();
         var gen = tl.LastOrDefault(s => s is NeuronCodeGenerated) as NeuronCodeGenerated;
         var code = gen?.GeneratedCodeSnippet;
@@ -475,10 +341,7 @@ public class BrainMcpTools(IGrainFactory grains)
             try
             {
                 CodeRunner.MaterializeAsProject(description, code);
-                var safe = (description.Replace(" ", "").Replace("\"", "").Replace("-", "") + "Auto").Substring(0, Math.Min(20, description.Length + 4));
-                await grains.GetGrain<IMarketplaceNeuron>("market-main")
-                    .FireAsync(new PublishToMarketplace(safe, "0.1-dev", code, "mcp", false, 0.05, description));
-                return "Generated + materialized + published as " + safe + ". Code:\n" + code;
+                return "Generated + materialized. Code:\n" + code;
             }
             catch { }
             return "Generated:\n" + code;
@@ -493,19 +356,12 @@ public class BrainMcpTools(IGrainFactory grains)
         return "Result: " + res;
     }
 
-    [McpServerTool(Name = "fire_to_neuron"), Description("Fire a message to any neuron.")]
-    public async Task<string> FireToNeuron(string neuronId, string text)
-    {
-        await grains.GetGrain<INeuron>(neuronId).FireAsync(new DemoMessageSynapse(text));
-        return "fired";
-    }
-
     [McpServerTool(Name = "list_marketplace"), Description("List packs available in the persistent marketplace library.")]
     public async Task<string> ListMarketplace()
     {
         var m = grains.GetGrain<IMarketplaceNeuron>("market-main");
         await m.FireAsync(new ListPublished());
-        await Task.Delay(300);
+        await Task.Delay(100);
         var tl = await m.GetTimelineAsync();
         if (tl.LastOrDefault(s => s is PublishedList) is PublishedList pl && pl.Packs.Count > 0)
             return string.Join("\n", pl.Packs.Select(p => p.Name + "@" + p.Version));
@@ -533,7 +389,7 @@ public class BrainMcpTools(IGrainFactory grains)
     {
         var m = grains.GetGrain<IMarketplaceNeuron>("market-main");
         await m.FireAsync(new ListPublished());
-        await Task.Delay(200);
+        await Task.Delay(100);
         var tl = await m.GetTimelineAsync();
         var pl = tl.LastOrDefault(s => s is PublishedList) as PublishedList;
         var pack = pl?.Packs.FirstOrDefault(p => p.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
