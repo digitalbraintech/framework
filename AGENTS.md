@@ -22,7 +22,10 @@ This file is the single, slim source of guidance for AI agents and contributors.
 - **Docs in code**: Write meaningful XML docs on public API surface (DigitalBrain.Aspire etc.). Avoid vacuous repeat-the-signature comments.
 - **Paths**: Use relative paths for workspace files. Avoid leaking user profile details.
 - **No undefined "high severity" rituals**. Run the tests that are relevant.
-- **Skills**: aspire/* and the full set from dotnet/skills (https://github.com/dotnet/skills) are present under .agents/skills (project level). Local copies here take precedence for overrides. Use `npx skills add dotnet/skills -y` (or with -g) to refresh from upstream. A skills-lock.json pins the installed set.
+- **Skills**: 
+  - General .NET: full set from dotnet/skills (https://github.com/dotnet/skills) under .agents/skills.
+  - Aspire: the official bundle (aspire, aspire-init, aspireify, aspire-orchestration, aspire-monitoring, aspire-deployment) from microsoft/aspire-skills. Added via `npx skills add microsoft/aspire-skills -y` and refreshed with `aspire agent init --non-interactive`.
+  Local copies under .agents/skills take precedence for overrides. skills-lock.json pins sources/hashes. Use the npx or `aspire agent init` commands to refresh.
 
 ## Verification after changes
 
