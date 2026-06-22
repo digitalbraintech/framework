@@ -11,15 +11,18 @@ namespace DigitalBrain.Tests.Steps;
 public class CodeFoundrySteps : IAsyncDisposable
 {
     private readonly TestCluster _cluster;
+    private readonly DigitalBrain.Tests.Foundry.FakeBuildRunner _sharedBuildRunner = new();
     private INeuron? _currentGrain;
     private IReadOnlyList<Synapse>? _timeline;
 
     public CodeFoundrySteps()
     {
+        FoundrySiloConfig.BuildRunner = _sharedBuildRunner;
         var builder = new TestClusterBuilder();
         builder.AddSiloBuilderConfigurator<FoundrySiloConfig>();
         _cluster = builder.Build();
         _cluster.DeployAsync().GetAwaiter().GetResult();
+        FoundrySiloConfig.BuildRunner = null;
     }
 
     public async ValueTask DisposeAsync() => await _cluster.StopAllSilosAsync();
@@ -92,10 +95,58 @@ public class CodeFoundrySteps : IAsyncDisposable
         Assert.False(result.Success);
     }
 
+    [Given(@"a code deploy neuron ""(.*)"" with verify-build (succeeding|failing)")]
+    public async Task GivenACodeDeployNeuron(string id, string mode)
+    {
+        _sharedBuildRunner.NextResult = mode == "succeeding";
+        _currentGrain = _cluster.GrainFactory.GetGrain<ICodeDeployNeuron>(id);
+        await _currentGrain.GetTimelineAsync();
+    }
+
+    [When(@"I deploy module ""(.*)"" with source ""(.*)""")]
+    public async Task WhenIDeployModule(string module, string source)
+    {
+        await _currentGrain!.FireAsync(new DeployGeneratedCode(source, module));
+        _timeline = await _currentGrain.GetTimelineAsync();
+    }
+
+    [Then(@"the timeline contains a CodeBuilt")]
+    public async Task ThenTimelineContainsCodeBuilt()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.Contains(_timeline, s => s.Type == nameof(CodeBuilt));
+    }
+
+    [Then(@"the timeline contains a SiloRestartRequested")]
+    public async Task ThenTimelineContainsSiloRestartRequested()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.Contains(_timeline, s => s.Type == nameof(SiloRestartRequested));
+    }
+
+    [Then(@"the timeline does not contain a SiloRestartRequested")]
+    public async Task ThenTimelineDoesNotContainSiloRestartRequested()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.DoesNotContain(_timeline, s => s.Type == nameof(SiloRestartRequested));
+    }
+
+    [Then(@"the timeline contains a FoundryRolledBack")]
+    public async Task ThenTimelineContainsFoundryRolledBack()
+    {
+        _timeline = await _currentGrain!.GetTimelineAsync();
+        Assert.Contains(_timeline, s => s.Type == nameof(FoundryRolledBack));
+    }
+
     private class FoundrySiloConfig : ISiloConfigurator
     {
+        // Populated by the CodeFoundrySteps constructor before cluster deploy so the silo
+        // and the test step share the exact same FakeBuildRunner instance.
+        internal static DigitalBrain.Tests.Foundry.FakeBuildRunner? BuildRunner;
+
         public void Configure(ISiloBuilder siloBuilder)
         {
+            var runner = BuildRunner ?? new DigitalBrain.Tests.Foundry.FakeBuildRunner();
             siloBuilder
                 .AddMemoryGrainStorageAsDefault()
                 .AddMemoryStreams("Default")
@@ -105,8 +156,8 @@ public class CodeFoundrySteps : IAsyncDisposable
                     services.AddKeyedScoped<Orleans.Journaling.IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                     services.AddSingleton<ICodeExecutor, InProcessAlcExecutor>();
-                    services.AddSingleton<IBuildRunner, DigitalBrain.Tests.Foundry.FakeBuildRunner>();
-                    services.AddSingleton<IResourceController, DigitalBrain.Tests.Foundry.FakeResourceController>();
+                    services.AddSingleton<IBuildRunner>(runner);
+                    services.AddSingleton<IResourceController>(new DigitalBrain.Tests.Foundry.FakeResourceController());
                 });
         }
     }

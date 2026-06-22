@@ -15,3 +15,15 @@ Scenario: Tier-1 run reports compile failure
   Given a code run neuron "coderun2"
   When I run invalid generated source
   Then the last CodeRunResult is a failure
+
+Scenario: Tier-2 deploy with passing verify-build requests a restart
+  Given a code deploy neuron "deploy1" with verify-build succeeding
+  When I deploy module "GreeterNeuron" with source "// greeter"
+  Then the timeline contains a CodeBuilt
+  And the timeline contains a SiloRestartRequested
+
+Scenario: Tier-2 deploy with failing verify-build rolls back without restart
+  Given a code deploy neuron "deploy2" with verify-build failing
+  When I deploy module "BadNeuron" with source "// broken"
+  Then the timeline contains a FoundryRolledBack
+  And the timeline does not contain a SiloRestartRequested
