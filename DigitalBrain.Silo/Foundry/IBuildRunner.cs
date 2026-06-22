@@ -27,10 +27,11 @@ public sealed class ProcessBuildRunner : IBuildRunner
                 UseShellExecute = false
             };
             using var process = Process.Start(psi)!;
-            var stdout = await process.StandardOutput.ReadToEndAsync();
-            var stderr = await process.StandardError.ReadToEndAsync();
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(stdoutTask, stderrTask);
             await process.WaitForExitAsync();
-            return new BuildOutcome(process.ExitCode == 0, stdout + stderr);
+            return new BuildOutcome(process.ExitCode == 0, stdoutTask.Result + stderrTask.Result);
         }
         finally
         {
