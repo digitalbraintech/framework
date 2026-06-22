@@ -20,3 +20,6 @@ compile, run, and durably load real C# at runtime.
 - The in-process `AssemblyLoadContext` is a guardrail, NOT a security sandbox (.NET has no
   CAS). For untrusted specs, swap `InProcessAlcExecutor` for a future out-of-process
   `ICodeExecutor` implementation.
+- **Tier-2 gate caveat:** `CapabilityGate` currently runs only in the Tier-1 in-process
+  execution path (`InProcessAlcExecutor`). The Tier-2 deploy path relies on verify-build
+  plus checkpoint/rollback for safety; running the gate on Tier-2 source is planned hardening.

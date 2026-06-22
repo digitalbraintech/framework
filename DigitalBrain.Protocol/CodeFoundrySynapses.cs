@@ -35,7 +35,8 @@ public record CodeRunResult(
 public record DeployGeneratedCode(
     [property: Id(0)] string Source,
     [property: Id(1)] string ModuleName,
-    [property: Id(2)] IReadOnlyList<string>? Refs = null) : Synapse(nameof(DeployGeneratedCode), DateTimeOffset.UtcNow);
+    [property: Id(2)] IReadOnlyList<string>? Refs = null,
+    [property: Id(3)] string CheckpointId = "") : Synapse(nameof(DeployGeneratedCode), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
 public record CodeBuilt(

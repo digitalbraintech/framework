@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using DigitalBrain.Protocol;
 
 namespace DigitalBrain.Silo.Foundry;
@@ -38,15 +40,21 @@ public class CodeFoundryClosedLoopNeuron : Neuron, ICodeFoundryLoopNeuron
             return;
         }
 
-        var moduleName = "Gen_" + Math.Abs(request.Spec.GetHashCode());
+        var moduleName = StableModuleName(request.Spec);
         var deployer = GrainFactory.GetGrain<ICodeDeployNeuron>("foundry-codedeploy");
-        await deployer.FireAsync(new DeployGeneratedCode(generated.Source, moduleName));
+        await deployer.FireAsync(new DeployGeneratedCode(generated.Source, moduleName, CheckpointId: checkpointId));
         var built = (await deployer.GetOutgoingTimelineAsync()).OfType<CodeBuilt>().LastOrDefault(b => b.ModuleName == moduleName);
 
         if (built is { Success: true })
             await FireAsync(new FoundryCompleted(request.Spec, request.Tier, "restart-requested:" + moduleName, Applied: true));
         else
             await FireAsync(new FoundryRolledBack(request.Spec, "build", checkpointId));
+    }
+
+    private static string StableModuleName(string spec)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(spec));
+        return "Gen_" + Convert.ToHexString(bytes)[..12];
     }
 
     // Note on resume-after-restart: in production a Tier-2 restart interrupts this handler after

@@ -12,7 +12,7 @@ public class CodeDeployNeuron : Neuron, ICodeDeployNeuron
     {
         if (RestartPending())
         {
-            await FireAsync(new FoundryRolledBack(cmd.ModuleName, "deploy-in-progress", LastCheckpointId()));
+            await FireAsync(new FoundryRolledBack(cmd.ModuleName, "deploy-in-progress", cmd.CheckpointId));
             return;
         }
 
@@ -22,7 +22,7 @@ public class CodeDeployNeuron : Neuron, ICodeDeployNeuron
 
         if (!outcome.Success)
         {
-            await FireAsync(new FoundryRolledBack(cmd.ModuleName, "build", LastCheckpointId()));
+            await FireAsync(new FoundryRolledBack(cmd.ModuleName, "build", cmd.CheckpointId));
             return;
         }
 
@@ -37,16 +37,9 @@ public class CodeDeployNeuron : Neuron, ICodeDeployNeuron
     {
         var lastRestart = OutgoingJournal.OfType<SiloRestartRequested>().LastOrDefault();
         if (lastRestart is null) return false;
-        // A NeuronActivated fired after the restart request means the silo already came back.
-        var activatedAfter = OutgoingJournal
-            .SkipWhile(s => !ReferenceEquals(s, lastRestart))
-            .OfType<NeuronActivated>()
-            .Any();
-        return !activatedAfter;
+        var lastActivated = OutgoingJournal.OfType<NeuronActivated>().LastOrDefault();
+        return lastActivated is null || lastRestart.Timestamp >= lastActivated.Timestamp;
     }
-
-    private string LastCheckpointId() =>
-        OutgoingJournal.OfType<FoundryCheckpointed>().LastOrDefault()?.CheckpointId ?? "none";
 
     private static void CommitSource(string moduleName, string source)
     {
