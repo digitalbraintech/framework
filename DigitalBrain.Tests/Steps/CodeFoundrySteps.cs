@@ -105,9 +105,8 @@ public class CodeFoundrySteps : IAsyncDisposable
                     services.AddKeyedScoped<Orleans.Journaling.IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                     services.AddSingleton<ICodeExecutor, InProcessAlcExecutor>();
-                    // uncomment after Task 6:
-                    // services.AddSingleton<IBuildRunner, DigitalBrain.Tests.Foundry.FakeBuildRunner>();
-                    // services.AddSingleton<IResourceController, DigitalBrain.Tests.Foundry.FakeResourceController>();
+                    services.AddSingleton<IBuildRunner, DigitalBrain.Tests.Foundry.FakeBuildRunner>();
+                    services.AddSingleton<IResourceController, DigitalBrain.Tests.Foundry.FakeResourceController>();
                 });
         }
     }
