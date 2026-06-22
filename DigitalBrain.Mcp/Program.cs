@@ -228,5 +228,3 @@ public class DigitalBrainTools(IGrainFactory grains)
         catch { return "Fired for 3D graph (demo)."; }
     }
 }
-    }
-}
