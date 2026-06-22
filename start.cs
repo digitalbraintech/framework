@@ -37,6 +37,10 @@ _ = grains.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
 _ = grains.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
 _ = grains.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
 
+// Closed loops from marketplace: UI (Dart MCP widget tree authoring) + SoftwareEngineering (Aspire MCP + LLM runtime mods)
+_ = grains.GetGrain<INeuron>("closedloop-main").GetTimelineAsync(); // SoftwareEngineeringClosedLoopNeuron or embodied Generated
+_ = grains.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync(); // also routes UI loop via requests
+
 Console.WriteLine("=== DIGITALBRAIN KERNEL STARTED ===");
 Console.WriteLine($"Target: {target}");
 Console.WriteLine("INO + KernelTasks + Marketplace + AspireOrchestrator loaded.");
@@ -71,8 +75,8 @@ if (target.Equals("marketplace", StringComparison.OrdinalIgnoreCase) || target.E
 }
 
 // Default / "kernel": full interactive experience with tasks view, ino, marketplace, run-any, updates
-Console.WriteLine("\nCommands: tasks | ino <prompt> | market list|install|update <name> | run <name> | update-kernel | awesome | help | exit");
-Console.WriteLine("Examples: ino 'plan my week and backup files' | market install GmailDigest | run GmailDigest");
+Console.WriteLine("\nCommands: tasks | ino <prompt> | market list|install|update <name> | run <name> | ide | update-kernel | awesome | help | exit");
+Console.WriteLine("Examples: market install UIClosedLoop | market install SoftwareEngineeringClosedLoop | ide apply GmailDigest | ino 'use closed loops to improve editor or mod system'");
 
 var knownTasks = new List<string>();
 
@@ -184,16 +188,28 @@ while (true)
 
             case "edit":
             case "ide":
-                // Stub for the future INO IDE: modify the INO code/desc of a pack, re-publish + install to hot-reload the embodiment
+                var editor = grains.GetGrain<IInoCodeEditor>("ino-editor-main");
                 if (parts.Length > 1)
                 {
-                    var pack = parts[1];
-                    Console.WriteLine($"[IDE] Editing INO description for {pack} (in real IDE this would open editor on the .feature or pack source)...");
-                    await market.FireAsync(new PublishToMarketplace(pack, "1.1-dev", "edited via IDE", "user", false, 0.05, "User-modified INO spec from live IDE session"));
-                    await market.FireAsync(new InstallFromMarketplace(pack, "1.1-dev", "current-user"));
-                    Console.WriteLine($"[IDE] Re-published and re-installed. Run it again to execute the updated INO code.");
+                    var arg = parts[1];
+                    if (arg.Contains("apply", StringComparison.OrdinalIgnoreCase) && parts.Length > 2)
+                    {
+                        var skill = parts[2];
+                        await editor.FireAsync(new InoCodeApplySkill("cli", skill));
+                        Console.WriteLine($"[editor] Applied skill {skill} -> context injected, Generated primed.");
+                    }
+                    else
+                    {
+                        var spec = $"task process using skill if any\n// spec for {arg}";
+                        await editor.FireAsync(new InoCodeSave("cli", spec, arg, "Saved from IDE/REPL"));
+                        await editor.FireAsync(new InoCodeExecute("cli", spec, "generate processor using loaded skill"));
+                        Console.WriteLine($"[editor] Saved+executed {arg}. Check market list / run {arg}.");
+                    }
                 }
-                else Console.WriteLine("ide <pack>   // live edit + hot reload of INO-described experience");
+                else
+                {
+                    Console.WriteLine("ide <pack> | ide apply <SkillName>   // uses InoCodeEditorNeuron + skill load + save/execute");
+                }
                 break;
 
             case "awesome":
@@ -216,8 +232,8 @@ while (true)
                 break;
 
             case "help":
-                Console.WriteLine("tasks | ino <prompt> | market list/install/update | run <name> | update-kernel | awesome | exit");
-                Console.WriteLine("Everything (including Gmail auth UI, tasks, apps) is INO code translated live by the framework.");
+                Console.WriteLine("tasks | ino <prompt> | market list/install <UIClosedLoop|SoftwareEngineeringClosedLoop|...> | run <name> | ide apply <skill> | update-kernel | awesome | exit");
+                Console.WriteLine("Closed loops: UIClosedLoop (Dart MCP widget tree + hot_reload for live UI authoring of INO editor), SoftwareEngineeringClosedLoop (LLM + Aspire MCP for runtime system mods).");
                 break;
 
             default:
@@ -261,6 +277,38 @@ static async Task SeedPreExistingAsync(IMarketplaceNeuron market)
     await market.FireAsync(new PublishToMarketplace(
         "CalendarSync", "0.9", "Basic INO-driven 2-way calendar sync with task extraction.", "digitalbraintech", false, 0.08,
         ""));
+
+    await market.FireAsync(new PublishToMarketplace(
+        "EmailProcessor", "0.1-ino", "", "digitalbraintech", false, 0.0,
+        "Email processor generated via INO + GmailDigest skill loaded in editor. Uses journals + embodiment."));
+
+    // The two closed loops added to marketplace
+    await market.FireAsync(new PublishToMarketplace(
+        "UIClosedLoop", "1.0", "Dart MCP powered: connect_dart_tooling_daemon + get_widget_tree(summaryOnly) + hot_reload to inspect live Flutter widget trees and author/modify UI (InoCodeEditor, surfaces, skill integration) iteratively with INO/LLM. Close the authoring loop while running flutter_demo.",
+        "digitalbraintech", false, 0.0,
+        "UI authoring closed loop. Install to enable live widget tree driven improvement of DigitalBrain Dart UI from marketplace."));
+
+    await market.FireAsync(new PublishToMarketplace(
+        "SoftwareEngineeringClosedLoop", "1.0", "ClosedLoopNeuron: LLM (local Ollama) + Aspire MCP (list_resources + execute restart) + marketplace publish/install. Modifies system at runtime (neurons, editor, new packs). Uses Aspire because multiple kernels may run. Checkpoint safe applies.",
+        "digitalbraintech", false, 0.0,
+        "SoftwareEngineering runtime self-mod closed loop. Embodies ClosedLoopNeuron or guides Generated for live system evolution."));
+
+    // Additional marketplace experiences using closed loops
+    await market.FireAsync(new PublishToMarketplace(
+        "UpdateAllWindowsApps", "1.0", "Run winget upgrade --all (or equivalent) via KernelTask. Triggered by INO or SE closed loop for system maintenance. Uses local tools under the hood.",
+        "digitalbraintech", false, 0.0,
+        "Update all Windows apps experience. Install and run to keep host up to date using closed loop driven tasks."));
+
+    await market.FireAsync(new PublishToMarketplace(
+        "SystemSelfUpdate", "1.0", "Use both UIClosedLoop (Dart MCP widget tree) and SoftwareEngineeringClosedLoop (Aspire MCP + LLM) to self-update the DigitalBrain, add new packs, improve UI and neurons at runtime, apply via marketplace and Aspire.",
+        "digitalbraintech", false, 0.0,
+        "Self update the entire system using ONLY the two closed loops from marketplace."));
+
+    // One more marketplace experience added via closed loops
+    await market.FireAsync(new PublishToMarketplace(
+        "CleanAndOptimizeResources", "1.0", "Use SEClosedLoop + Aspire MCP to clean logs, restart unhealthy, optimize using Ollama/Redis, under the hood uses execute_resource_command and marketplace for updates.",
+        "digitalbraintech", false, 0.0,
+        "Clean and optimize the system using ONLY closed loops and MCP."));
 }
 
 static async Task ShowTasksViewAsync(IGrainFactory grains, IInoNeuron ino, List<string>? known = null)

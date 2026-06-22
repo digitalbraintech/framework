@@ -11,13 +11,16 @@ builder.AddOllamaApiClient("qwen");
 
 builder.UseOrleans(siloBuilder =>
 {
-    siloBuilder.UseLocalhostClustering();
+    // Use localhost only for direct/fast-path runs; Aspire wires clustering+storage via env/refs (redis) when present.
+    var hasRedis = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("REDIS_URI")) ||
+                   !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__redis"));
+    if (!hasRedis)
+    {
+        siloBuilder.UseLocalhostClustering();
+    }
 
     // Centralized prototype journals (single source).
     siloBuilder.ConfigurePrototypeJournals();
-
-    // Grain storage still required for DurableGrain base.
-    siloBuilder.AddMemoryGrainStorageAsDefault();
 });
 
 var host = builder.Build();
@@ -31,6 +34,7 @@ if (grainFactory != null)
     _ = grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
     _ = grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
     _ = grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
+    // Closed loop activation via Mcp or INO using closed loops only (removed direct INeuron to avoid ambiguity; use mcp and closed loops to activate)
 }
 
 host.Run();

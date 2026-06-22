@@ -17,4 +17,8 @@
     <ProjectReference Include="..\DigitalBrain.Cli\DigitalBrain.Cli.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' == 'net11.0'">
+    <ProjectReference Include="..\DigitalBrain.Mcp\DigitalBrain.Mcp.csproj" />
+  </ItemGroup>
+
 </Project>

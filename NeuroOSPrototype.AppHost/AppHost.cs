@@ -16,11 +16,19 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 var silo = builder.AddProject<Projects.DigitalBrain_Silo>("silo")
     .WithReference(ctx.Orleans)
     .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
-    .WithReplicas(ctx.KernelReplicas)
+    .WithReplicas(1)  // Set to 1 to allow proxy-less orleans-dashboard endpoint; use closed loops for multi-kernel concerns via Aspire
     .WithEndpoint(name: "orleans-dashboard", port: ctx.OrleansDashboardPort ?? 8080, isProxied: false);
 
 var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient);
+
+if (ctx.EnableMcp)
+{
+    // Expose DigitalBrain MCP (stdio tools) as resource so aspire mcp call can discover registered tools: run_closed_loop, ask_ino, publish_to_marketplace, list_marketplace, etc.
+    var mcp = builder.AddProject<Projects.DigitalBrain_Mcp>("mcp")
+        .WithReference(ctx.OrleansClient)
+        .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm);
+}
 
 silo.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
 silo.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");

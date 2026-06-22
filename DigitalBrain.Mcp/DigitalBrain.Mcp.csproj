@@ -20,6 +20,7 @@
     <PackageReference Include="Aspire.StackExchange.Redis" />
     <PackageReference Include="Microsoft.Orleans.Client" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
+    <PackageReference Include="Microsoft.Orleans.Core" />
   </ItemGroup>
 
 </Project>

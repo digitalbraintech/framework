@@ -40,19 +40,27 @@ public class InoNeuron : Neuron, IInoNeuron
 
     private async Task<string> BuildContextAsync(string prompt)
     {
-        // Purely journal-driven multi-scale context (no private state).
         var recentOut = OutgoingJournal.TakeLast(8).Select(s => s.Type + ":" + s.ToString()).ToList();
         var recentIn = IncomingJournal.TakeLast(5).Select(s => "in:" + s.ToString()).ToList();
 
-        // Episodic tasks with real results (better than started-only for INO decisions).
         var completed = OutgoingJournal.OfType<KernelTaskCompleted>().TakeLast(3);
         var taskCtx = string.Join(";", completed.Select(t => t.TaskId + "=" + (t.Result ?? "")));
 
-        // Long-term from MemorySummary in journal.
         var mems = OutgoingJournal.OfType<MemorySummary>().TakeLast(5);
         var memCtx = string.Join(";", mems.Select(m => m.Topic + "=" + m.Summary));
 
-        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}";
+        // Include recently applied marketplace skills / installed packs so INO can use their code+desc at runtime.
+        var skills = OutgoingJournal.Concat(IncomingJournal).OfType<SkillContextInjected>().TakeLast(2)
+            .Select(s => s.SkillPackName + ":" + (s.Description.Length > 60 ? s.Description[..60] : s.Description));
+        var packs = OutgoingJournal.Concat(IncomingJournal).OfType<NeuroPackInstalled>().TakeLast(2)
+            .Select(p => p.Pack.Name + "@" + p.Pack.Version);
+        var skillCtx = string.Join(";", skills.Concat(packs));
+
+        // Recent editor activity for INO awareness of live edits.
+        var edits = OutgoingJournal.Concat(IncomingJournal).OfType<InoCodeEdit>().TakeLast(1).Select(e => "edit:" + (e.Code.Length > 80 ? e.Code[..80] : e.Code));
+        var editorCtx = string.Join(";", edits);
+
+        return $"prompt:{prompt}\nrecent-out:{string.Join(";", recentOut)}\nrecent-in:{string.Join(";", recentIn)}\ntasks:{taskCtx}\nmem:{memCtx}\nskills:{skillCtx}\neditor:{editorCtx}";
     }
 
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)

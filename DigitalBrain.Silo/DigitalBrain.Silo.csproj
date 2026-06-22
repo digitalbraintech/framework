@@ -12,6 +12,8 @@
   <ItemGroup>
     <PackageReference Include="Aspire.StackExchange.Redis" />
     <PackageReference Include="CommunityToolkit.Aspire.OllamaSharp" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />

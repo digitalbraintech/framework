@@ -218,7 +218,39 @@ public record InoCodeEdit(string EditorId, string Code, string Language = "ino")
 [GenerateSerializer]
 public record InoCodeRun(string EditorId, string Result) : Synapse(nameof(InoCodeRun), DateTimeOffset.UtcNow);
 
-public interface IInoCodeEditor : INeuron, IHandle<InoCodeEdit>, IHandle<InoCodeRun> { }
+// NuGet + Roslyn architect for closed loops (SEClosedLoopNeuron).
+[GenerateSerializer]
+public record NuGetCommand(string Action, string Target, string Args = "") : Synapse(nameof(NuGetCommand), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record NuGetResult(string Target, bool Success, string Output) : Synapse(nameof(NuGetResult), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ArchitectRequest(string Path, string Task) : Synapse(nameof(ArchitectRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ArchitectReport(string Path, string Report) : Synapse(nameof(ArchitectReport), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ArchitectResult(string Path, string Result, string Task) : Synapse(nameof(ArchitectResult), DateTimeOffset.UtcNow);
+
+// Closed loop request (routed exclusively via run_closed_loop MCP).
+[GenerateSerializer]
+public record ClosedLoopRequest(string LoopType, string Prompt) : Synapse(nameof(ClosedLoopRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record InoCodeSave(string EditorId, string Code, string ExperienceName, string Description = "") : Synapse(nameof(InoCodeSave), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record InoCodeExecute(string EditorId, string Code, string Instruction) : Synapse(nameof(InoCodeExecute), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record InoCodeApplySkill(string EditorId, string SkillPackName) : Synapse(nameof(InoCodeApplySkill), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record SkillContextInjected(string SkillPackName, string Description, string Code) : Synapse(nameof(SkillContextInjected), DateTimeOffset.UtcNow);
+
+public interface IInoCodeEditor : INeuron, IHandle<InoCodeEdit>, IHandle<InoCodeRun>, IHandle<InoCodeSave>, IHandle<InoCodeExecute>, IHandle<InoCodeApplySkill> { }
 
 // Smart ContextNeuron for INO - manages chat, agent, filter, cluster contexts like context providers
 [GenerateSerializer]
@@ -248,3 +280,18 @@ public record ClusterActivity(string NodeId, string Activity, double Value) : Sy
 
 [GenerateSerializer]
 public record ThreeDGraphUpdate(string GraphId, string DataJson) : Synapse(nameof(ThreeDGraphUpdate), DateTimeOffset.UtcNow);
+
+// Closed loops for marketplace (UI authoring via Dart MCP + widget tree; SoftwareEngineering runtime mod via Aspire MCP + LLM)
+
+
+[GenerateSerializer]
+public record WidgetTreeInspected(string Summary, string TreeJson = "", string App = "flutter_demo") : Synapse(nameof(WidgetTreeInspected), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UIModificationProposed(string TargetFileOrWidget, string Rationale, string ProposedDartCode) : Synapse(nameof(UIModificationProposed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record SystemModificationProposed(string Component, string Rationale, string ProposedChange, string ApplyVia = "aspire-restart") : Synapse(nameof(SystemModificationProposed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ClosedLoopCompleted(string LoopType, string Outcome, bool AppliedViaMcpOrMarket) : Synapse(nameof(ClosedLoopCompleted), DateTimeOffset.UtcNow);
