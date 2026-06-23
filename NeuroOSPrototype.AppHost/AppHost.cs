@@ -56,7 +56,7 @@ if (ctx.EnableMcp)
         .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm);
 }
 
-var gateway = builder.AddProject<Projects.DigitalBrain_Gateway>("gateway")
+builder.AddProject<Projects.DigitalBrain_Gateway>("gateway")
     .WithReference(ctx.OrleansClient)
     .WithReference(ctx.ClusteringTable)
     .WithExternalHttpEndpoints();

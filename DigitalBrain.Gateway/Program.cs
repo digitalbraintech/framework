@@ -7,26 +7,9 @@ app.MapGet("/health", () => Results.Text("ok"));
 
 app.MapGet("/status", (IConfiguration cfg) =>
 {
-    string cluster;
-    try
-    {
-        // No live cluster in test environment — degrade gracefully
-        cluster = "unknown";
-    }
-    catch
-    {
-        cluster = "unreachable";
-    }
-
-    string storage;
-    try
-    {
-        storage = "unknown";
-    }
-    catch
-    {
-        storage = "unreachable";
-    }
+    // TODO (sub-project B/Task 10): probe IClusterClient + BlobServiceClient and report "reachable"/"unreachable" (wrap in try/catch + ILogger when real probes are added).
+    var cluster = "unknown";
+    var storage = "unknown";
 
     return Results.Json(new
     {
