@@ -23,9 +23,7 @@ placeholder-image deploy are gone.
 
 ### Image registry
 The silo image lives in **public Docker Hub**: `docker.io/vhorbachov/digitalbrain-silo:v4`
-(built with `dotnet publish -t:PublishContainer --os linux --arch x64`, pushed via the docker CLI). ACA
-pulls it anonymously — no registry credentials. Live revision `digitalbrain-jobs--0000005` is `Running`
-on this image.
+(built with `dotnet publish -t:PublishContainer --os linux --arch x64`, pushed via the docker CLI). ACA currently runs revision `digitalbrain-jobs--0000005` on the previous image (v3). Image **v4** (which adds the co-hosted gRPC gateway + needs the internal Http2 ingress) is built and pushed to Docker Hub but **not yet deployed** — apply with `pulumi up` to roll it out.
 
 ### Silo (Orleans) runtime
 The silo now exposes an internal-only Http2 ingress on port 8080 serving the gRPC `DigitalBrainGateway` (Ask/Fire/Timeline/Health).
