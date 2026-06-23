@@ -67,18 +67,25 @@ public sealed class GatewayService(
         {
             throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
         }
-        var timeline = await neuron.GetTimelineAsync();
-
-        var reply = new TimelineReply();
-        foreach (var s in timeline.TakeLast(max))
+        try
         {
-            reply.Entries.Add(new TimelineEntry
+            var timeline = await neuron.GetTimelineAsync();
+            var reply = new TimelineReply();
+            foreach (var s in timeline.TakeLast(max))
             {
-                Type = s.Type,
-                Timestamp = s.Timestamp.ToString("O"),
-                Text = s is DemoMessageSynapse demo ? demo.Text : (s.ToString() ?? string.Empty)
-            });
+                reply.Entries.Add(new TimelineEntry
+                {
+                    Type = s.Type,
+                    Timestamp = s.Timestamp.ToString("O"),
+                    Text = s is DemoMessageSynapse demo ? demo.Text : (s.ToString() ?? string.Empty)
+                });
+            }
+            return reply;
         }
-        return reply;
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Timeline failed for {NeuronId}", request.NeuronId);
+            throw new RpcException(new Status(StatusCode.Internal, ex.GetBaseException().Message));
+        }
     }
 }

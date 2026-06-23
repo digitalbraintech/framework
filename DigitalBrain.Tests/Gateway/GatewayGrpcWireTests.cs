@@ -5,31 +5,34 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Gateway;
 
-public class GatewayGrpcWireTests : IClassFixture<WebApplicationFactory<Program>>
+[Collection("silo-host")]
+public class GatewayGrpcWireTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
-    private readonly WebApplicationFactory<Program> _factory;
-    public GatewayGrpcWireTests(WebApplicationFactory<Program> factory) => _factory = factory;
+    private readonly GrpcChannel _channel;
+    private readonly DigitalBrainGateway.DigitalBrainGatewayClient _client;
 
-    private DigitalBrainGateway.DigitalBrainGatewayClient NewClient()
+    public GatewayGrpcWireTests(WebApplicationFactory<Program> factory)
     {
-        var channel = GrpcChannel.ForAddress(_factory.Server.BaseAddress, new GrpcChannelOptions
+        _channel = GrpcChannel.ForAddress(factory.Server.BaseAddress, new GrpcChannelOptions
         {
-            HttpHandler = _factory.Server.CreateHandler()
+            HttpHandler = factory.Server.CreateHandler()
         });
-        return new DigitalBrainGateway.DigitalBrainGatewayClient(channel);
+        _client = new DigitalBrainGateway.DigitalBrainGatewayClient(_channel);
     }
+
+    public void Dispose() => _channel.Dispose();
 
     [Fact]
     public async Task Health_OverGrpc_ReturnsOk()
     {
-        var reply = await NewClient().HealthAsync(new HealthRequest());
+        var reply = await _client.HealthAsync(new HealthRequest());
         Assert.True(reply.Ok);
     }
 
     [Fact]
     public async Task Ask_Ino_OverGrpc_ReturnsText()
     {
-        var reply = await NewClient().AskAsync(new AskRequest { NeuronId = "ino-main", Prompt = "hi" });
+        var reply = await _client.AskAsync(new AskRequest { NeuronId = "ino-main", Prompt = "hi" });
         Assert.False(string.IsNullOrWhiteSpace(reply.Text));
     }
 }

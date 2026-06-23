@@ -12,6 +12,7 @@ using Xunit;
 
 namespace DigitalBrain.Tests.Gateway;
 
+[Collection("silo-host")]
 public class GatewayServiceTests : IAsyncLifetime
 {
     private TestCluster _cluster = null!;
