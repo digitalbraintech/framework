@@ -238,6 +238,8 @@ public record ArchitectResult(string Path, string Result, string Task) : Synapse
 [GenerateSerializer]
 public record ClosedLoopRequest(string LoopType, string Prompt) : Synapse(nameof(ClosedLoopRequest), DateTimeOffset.UtcNow);
 
+public interface IClosedLoopNeuron : INeuron, IHandle<ClosedLoopRequest>, IHandle<ExperienceUsed> { }
+
 [GenerateSerializer]
 public record InoCodeSave(string EditorId, string Code, string ExperienceName, string Description = "") : Synapse(nameof(InoCodeSave), DateTimeOffset.UtcNow);
 

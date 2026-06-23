@@ -45,8 +45,18 @@ static IHost BuildHost(string[] args, bool useOrleans)
 
     if (useOrleans)
     {
-        // Setup Orleans client exactly like DigitalBrain.Cli (connects to real cluster).
-        builder.AddKeyedRedisClient("redis");
+        // Register the Aspire-injected clustering client before Orleans resolves its provider.
+        var clusteringProvider = Environment.GetEnvironmentVariable("Orleans__Clustering__ProviderType");
+        if (string.Equals(clusteringProvider, "AzureTableStorage", StringComparison.OrdinalIgnoreCase))
+        {
+            var clusteringServiceKey = Environment.GetEnvironmentVariable("Orleans__Clustering__ServiceKey") ?? "clustering";
+            builder.AddKeyedAzureTableServiceClient(clusteringServiceKey);
+        }
+        else
+        {
+            builder.AddKeyedRedisClient("redis");
+        }
+
         builder.UseOrleansClient();
     }
 
@@ -174,7 +184,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     {
         try
         {
-            var neuron = grains.GetGrain<INeuron>(neuronId);
+            var neuron = ResolveNeuron(neuronId);
             await neuron.FireAsync(new DemoMessageSynapse(text));
             return $"Successfully fired DemoMessageSynapse with text '{text}' to neuron '{neuronId}'.";
         }
@@ -191,7 +201,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     {
         try
         {
-            var neuron = grains.GetGrain<INeuron>(neuronId);
+            var neuron = ResolveNeuron(neuronId);
             var timeline = await neuron.GetTimelineAsync();
             var recent = timeline.TakeLast(maxEntries);
             var lines = recent.Select(s => $"{s.Timestamp:HH:mm:ss} | {s.Type}: {s}");
@@ -199,7 +209,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
         }
         catch (Exception ex)
         {
-            return $"Error getting timeline for {neuronId}: {ex.Message}";
+            return $"Error getting timeline for {neuronId}: {Explain(ex)}";
         }
     }
 
@@ -220,7 +230,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
             IReadOnlyList<Synapse> graphTimeline = Array.Empty<Synapse>();
             try
             {
-                graphTimeline = await grains.GetGrain<INeuron>("cluster-vis").GetTimelineAsync();
+                graphTimeline = await ResolveNeuron("cluster-vis").GetTimelineAsync();
             }
             catch
             {
@@ -253,7 +263,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
         }
         catch (Exception ex)
         {
-            return $"Error building workbench surfaces: {ex.Message}";
+            return $"Error building workbench surfaces: {Explain(ex)}";
         }
     }
 
@@ -344,7 +354,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
                 default:
                 {
                     var target = ReadString(props, "neuronId") ?? defaultNeuronId;
-                    await grains.GetGrain<INeuron>(target).FireAsync(new DemoMessageSynapse(actionJson));
+                    await ResolveNeuron(target).FireAsync(new DemoMessageSynapse(actionJson));
                     return $"Forwarded unrecognized UI action '{synapseType}' to {target} as DemoMessageSynapse.";
                 }
             }
@@ -418,7 +428,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     public async Task<string> AskIno([Description("Prompt for INO navigation/assistant")] string prompt)
     {
         try { var ino = grains.GetGrain<IInoNeuron>("ino-main"); return await ino.AskAsync(prompt); }
-        catch (Exception ex) { return $"[DEMO INO] {ex.Message}"; }
+        catch (Exception ex) { return $"[DEMO INO] {Explain(ex)}"; }
     }
 
     [McpServerTool(Name = "ino_code_editor"), Description("Interact with INOCodeEditor neuron for visual editing/running INO code.")]
@@ -464,7 +474,7 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     {
         try
         {
-            var vis = grains.GetGrain<INeuron>("cluster-vis");
+            var vis = ResolveNeuron("cluster-vis");
             await vis.FireAsync(new ClusterActivity(node, act, v));
             await vis.FireAsync(new ThreeDGraphUpdate("main", $"{{\"node\":\"{node}\",\"act\":\"{act}\",\"v\":{v}}}"));
             return "Cluster activity sent for 3D visualization.";
@@ -478,12 +488,12 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     {
         try
         {
-            var loop = grains.GetGrain<INeuron>("closedloop-main");
+            var loop = grains.GetGrain<IClosedLoopNeuron>("closedloop-main");
             await loop.FireAsync(new ClosedLoopRequest(loopType, prompt));
             // For ui loop, the caller (agent) can also directly use dart MCP: connect + get_widget_tree + hot_reload
             return $"ClosedLoop {loopType} triggered on marketplace-installed experience. For UI: also use dart MCP tools (connect_dart_tooling_daemon, get_widget_tree) then hot_reload after LLM proposes edits.";
         }
-        catch (Exception ex) { return $"Error closed loop: {ex.Message}"; }
+        catch (Exception ex) { return $"Error closed loop: {Explain(ex)}"; }
     }
 
     [McpServerTool(Name = "dart_ui_inspect_and_reload"), Description("Helper for UIClosedLoop: connect Dart DTD (uri from flutter run), get live widget tree (for INO editor UI authoring), and hot reload after mods.")]
@@ -518,6 +528,38 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
     private static IEnumerable<string> SplitIds(string value) =>
         value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(id => !string.IsNullOrWhiteSpace(id));
+
+    private static string Explain(Exception exception)
+    {
+        var root = exception.GetBaseException();
+        return root.Message == exception.Message
+            ? exception.Message
+            : $"{exception.Message} ({root.Message})";
+    }
+
+    private INeuron ResolveNeuron(string neuronId)
+    {
+        if (neuronId.StartsWith("task-", StringComparison.OrdinalIgnoreCase))
+        {
+            return grains.GetGrain<IKernelTask>(neuronId);
+        }
+
+        return neuronId switch
+        {
+            "aspire-main" => grains.GetGrain<IAspireNeuron>(neuronId),
+            "closedloop-main" => grains.GetGrain<IClosedLoopNeuron>(neuronId),
+            "compiler-main" => grains.GetGrain<ICompiler>(neuronId),
+            "context-main" => grains.GetGrain<IContextNeuron>(neuronId),
+            "db-main" => grains.GetGrain<IDbSupportNeuron>(neuronId),
+            "foundry-main" => grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
+            "ino-editor-main" => grains.GetGrain<IInoCodeEditor>(neuronId),
+            "ino-main" => grains.GetGrain<IInoNeuron>(neuronId),
+            "llm-main" => grains.GetGrain<ILlmNeuron>(neuronId),
+            "market-main" => grains.GetGrain<IMarketplaceNeuron>(neuronId),
+            "status-main" => grains.GetGrain<ISystemStatus>(neuronId),
+            _ => grains.GetGrain<IDemoNeuron>(neuronId)
+        };
+    }
 
     private static JsonElement ReadObject(JsonElement element, string propertyName)
     {

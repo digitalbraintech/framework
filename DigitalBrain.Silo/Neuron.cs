@@ -9,6 +9,8 @@ namespace DigitalBrain.Silo;
 public abstract class Neuron : DurableGrain, INeuron
 {
     protected readonly ILogger Logger;
+    private IDurableList<Synapse>? _incomingJournal;
+    private IDurableList<Synapse>? _outgoingJournal;
 
     protected NeuronId Self => new(this.GetPrimaryKeyString() ?? this.GetGrainId().ToString());
 
@@ -18,20 +20,56 @@ public abstract class Neuron : DurableGrain, INeuron
     }
 
     // Dual journals for OS-like causality: incoming = received Deliver, outgoing = our Fires.
-    protected IDurableList<Synapse> IncomingJournal => this.ServiceProvider.GetRequiredKeyedService<IDurableList<Synapse>>("in-journal");
-    protected IDurableList<Synapse> OutgoingJournal => this.ServiceProvider.GetRequiredKeyedService<IDurableList<Synapse>>("out-journal");
+    protected IDurableList<Synapse> IncomingJournal => _incomingJournal ??= ResolveJournal("in-journal");
+    protected IDurableList<Synapse> OutgoingJournal => _outgoingJournal ??= ResolveJournal("out-journal");
+
+    private IDurableList<Synapse> ResolveJournal(string key)
+    {
+        var journal = this.ServiceProvider.GetKeyedService<IDurableList<Synapse>>(key);
+        if (journal is not null)
+        {
+            return journal;
+        }
+
+        Logger.LogWarning("Journal service {JournalKey} is not registered; using prototype in-memory journal for {Neuron}.", key, Self);
+        return new InMemoryJournalForPrototype<Synapse>();
+    }
+
+    private void AddToJournal(ref IDurableList<Synapse>? journal, string key, Synapse synapse)
+    {
+        var target = journal ??= ResolveJournal(key);
+        try
+        {
+            target.Add(synapse);
+        }
+        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
+        {
+            Logger.LogWarning(ex, "Journal service {JournalKey} cannot write for {Neuron}; switching to prototype in-memory journal.", key, Self);
+            target = new InMemoryJournalForPrototype<Synapse>();
+            journal = target;
+            target.Add(synapse);
+        }
+    }
 
     public override async Task OnActivateAsync(CancellationToken ct)
     {
-        await base.OnActivateAsync(ct);
+        try
+        {
+            await base.OnActivateAsync(ct);
+        }
+        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
+        {
+            Logger.LogWarning(ex, "Journal state writer is not initialized during activation for {Neuron}; continuing with in-memory journal state.", Self);
+        }
+
         await FireAsync(new NeuronActivated(Self));
     }
 
     public async ValueTask FireAsync<T>(T payload) where T : Synapse
     {
         var stamped = payload.Stamp(Self);
-        OutgoingJournal.Add(stamped);
-        await WriteStateAsync();
+        AddToJournal(ref _outgoingJournal, "out-journal", stamped);
+        await WriteJournalStateAsync();
 
         if (stamped.IsBroadcast)
         {
@@ -82,8 +120,8 @@ public abstract class Neuron : DurableGrain, INeuron
     // Internal for point to point. Incoming synapses are auto-recorded here (called by sender Fire or direct).
     public async Task DeliverAsync(Synapse synapse)
     {
-        IncomingJournal.Add(synapse);
-        await WriteStateAsync();
+        AddToJournal(ref _incomingJournal, "in-journal", synapse);
+        await WriteJournalStateAsync();
 
         // Support IHandle<T> by reflection for any implementing neuron (prototype; source-gen later)
         var handled = false;
@@ -113,4 +151,19 @@ public abstract class Neuron : DurableGrain, INeuron
     }
 
     protected virtual Task DispatchSynapse(Synapse synapse) => Task.CompletedTask;
+
+    private async Task WriteJournalStateAsync()
+    {
+        try
+        {
+            await WriteStateAsync();
+        }
+        catch (Exception ex) when (IsJournalWriterUninitialized(ex))
+        {
+            Logger.LogWarning(ex, "Journal state writer is not initialized for {Neuron}; continuing with in-memory journal state.", Self);
+        }
+    }
+
+    private static bool IsJournalWriterUninitialized(Exception exception) =>
+        exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
 }

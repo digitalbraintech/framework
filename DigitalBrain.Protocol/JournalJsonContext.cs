@@ -2,6 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace DigitalBrain.Protocol;
 
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(bool))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(uint))]
+[JsonSerializable(typeof(double))]
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(DateTimeOffset))]
+[JsonSerializable(typeof(Guid))]
 [JsonSerializable(typeof(Synapse))]
 [JsonSerializable(typeof(NeuronId))]
 [JsonSerializable(typeof(Checkpoint))]

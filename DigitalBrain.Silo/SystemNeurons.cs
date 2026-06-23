@@ -380,7 +380,7 @@ public class Software20TeamNeuron : Neuron, ISoftware20Team
 // Embodiable via marketplace NeuroPack. Uses local Ollama + MCP connections (Aspire for SE mods, Dart MCP knowledge for UI).
 // Handles multi-kernel by preferring Aspire orchestration (restart resources, inspect distributed state) + marketplace for behavior updates (new packs become live via Generated).
 [GrainType("softwareengineering.closedloop.v1")]
-public class SoftwareEngineeringClosedLoopNeuron : Neuron, IHandle<ClosedLoopRequest>, IHandle<ExperienceUsed>
+public class SoftwareEngineeringClosedLoopNeuron : Neuron, IClosedLoopNeuron
 {
     private McpClient? _aspireMcp;
 
