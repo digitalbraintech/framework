@@ -12,6 +12,7 @@ public class UiSurfaceContractTests
         { UiSurfaceSamples.TaskWindow(), new[] { "taskId", "state", "body", UiSurfaceKeys.Actions } },
         { UiSurfaceSamples.UserInput(), new[] { "prompt", "schema", "submitAction", "cancelAction" } },
         { UiSurfaceSamples.MarketplaceList(), new[] { "packs", "installAction", "updateAction" } },
+        { UiSurfaceSamples.InstalledBundles(), new[] { "bundles", "experiences" } },
         { UiSurfaceSamples.Timeline(), new[] { "events", "filters" } },
         { UiSurfaceSamples.DataChart(), new[] { UiSurfaceKeys.ChartSpec, "data", "x", "y", "chartType" } }
     };
@@ -42,6 +43,7 @@ public class UiSurfaceContractTests
         Assert.Equal("task-window", UiSurfaceKinds.TaskWindow);
         Assert.Equal("user-input", UiSurfaceKinds.UserInput);
         Assert.Equal("marketplace-list", UiSurfaceKinds.MarketplaceList);
+        Assert.Equal("installed-bundles", UiSurfaceKinds.InstalledBundles);
         Assert.Equal("timeline", UiSurfaceKinds.Timeline);
         Assert.Equal("data-chart", UiSurfaceKinds.DataChart);
     }
@@ -61,6 +63,14 @@ public class UiSurfaceContractTests
         var marketplace = UiSurfaceSamples.MarketplaceList();
         AssertSynapseAction(marketplace.Props["installAction"], nameof(InstallFromMarketplace));
         AssertSynapseAction(marketplace.Props["updateAction"], nameof(InstallFromMarketplace));
+
+        var installedBundles = UiSurfaceSamples.InstalledBundles();
+        var bundles = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            installedBundles.Props["bundles"]);
+        var bundle = Assert.Single(bundles);
+        var experiences = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            bundle["experiences"]);
+        AssertSynapseAction(Assert.Single(experiences)["action"], nameof(InoRequest));
     }
 
     [Fact]
@@ -127,6 +137,27 @@ public class UiSurfaceContractTests
 
         AssertSynapseAction(surface.Props["installAction"], nameof(InstallFromMarketplace));
         AssertSynapseAction(surface.Props["updateAction"], nameof(InstallFromMarketplace));
+    }
+
+    [Fact]
+    public void Live_InstalledBundles_Surface_Exposes_Runnable_Experiences()
+    {
+        var surface = UiSurfaceLiveData.InstalledBundlesFromPacks(
+            MarketplaceSeeds.LocalUiPacks,
+            Array.Empty<NeuroPack>());
+
+        Assert.Equal(UiSurfaceKinds.InstalledBundles, surface.Kind);
+
+        var bundles = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            surface.Props["bundles"]);
+        Assert.Contains(bundles, bundle => Equals(bundle["name"], "DigitalBrain.UI.Workbench"));
+
+        var experiences = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            surface.Props["experiences"]);
+        Assert.Contains(experiences, experience => Equals(experience["name"], "Open Workbench"));
+
+        var workbench = experiences.Single(experience => Equals(experience["name"], "Open Workbench"));
+        AssertSynapseAction(workbench["action"], nameof(InoRequest));
     }
 
     [Fact]

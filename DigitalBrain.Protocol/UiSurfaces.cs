@@ -45,6 +45,7 @@ public static class UiSurfaceKinds
     public const string TaskWindow = "task-window";
     public const string UserInput = "user-input";
     public const string MarketplaceList = "marketplace-list";
+    public const string InstalledBundles = "installed-bundles";
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
 }
@@ -241,6 +242,62 @@ public static class UiSurfaceSamples
                 })
             }));
 
+    public static UiSurface InstalledBundles() => new(
+        UiSurfaceKinds.InstalledBundles,
+        WithCommon(
+            surfaceId: "surface.installed-bundles",
+            emitter: "market-main",
+            title: "Installed Bundles",
+            layout: UiSurfaceLayouts.Panel,
+            priority: 11,
+            props: new Dictionary<string, object?>
+            {
+                ["bundles"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = "DigitalBrain.UI.Workbench",
+                        ["version"] = "0.1.0",
+                        ["ownerId"] = "digitalbraintech",
+                        ["installed"] = true,
+                        ["status"] = "ready",
+                        ["description"] = "Startup workbench experience.",
+                        ["experienceCount"] = 1,
+                        ["experiences"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["experienceId"] = "digitalbrain-ui-workbench-open",
+                                ["name"] = "Open Workbench",
+                                ["kind"] = "app",
+                                ["status"] = "ready",
+                                ["summary"] = "Launch the main DigitalBrain workbench.",
+                                ["action"] = SynapseAction(
+                                    "open-workbench",
+                                    "Open",
+                                    nameof(InoRequest),
+                                    new Dictionary<string, object?>
+                                    {
+                                        ["prompt"] = "Open the DigitalBrain workbench experience.",
+                                        ["sessionId"] = "workbench"
+                                    })
+                            }
+                        }
+                    }
+                },
+                ["experiences"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["experienceId"] = "digitalbrain-ui-workbench-open",
+                        ["bundleName"] = "DigitalBrain.UI.Workbench",
+                        ["name"] = "Open Workbench",
+                        ["kind"] = "app",
+                        ["status"] = "ready"
+                    }
+                }
+            }));
+
     public static UiSurface Timeline() => new(
         UiSurfaceKinds.Timeline,
         WithCommon(
@@ -353,6 +410,7 @@ public static class UiSurfaceLiveData
         var surfaces = new List<UiSurface>
         {
             KernelTasksFromTimelines(taskTimelines),
+            InstalledBundlesFromPacks(publishedPacks, installedPacks),
             ActivityGraphFromTimeline(graphTimeline, maxEvents),
             MarketplaceListFromPacks(publishedPacks, installedPacks)
         };
@@ -483,6 +541,45 @@ public static class UiSurfaceLiveData
                         {
                             ["buyerId"] = "current-user"
                         })
+                }));
+    }
+
+    public static UiSurface InstalledBundlesFromPacks(
+        IReadOnlyList<NeuroPack> publishedPacks,
+        IReadOnlyList<NeuroPack> installedPacks)
+    {
+        var installedKeys = installedPacks
+            .Select(PackKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var bundles = installedPacks
+            .Concat(publishedPacks.Where(pack =>
+                installedKeys.Contains(PackKey(pack)) ||
+                pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal)))
+            .GroupBy(PackKey, StringComparer.OrdinalIgnoreCase)
+            .Select(group => BundleRow(group.First()))
+            .ToArray();
+
+        var experiences = bundles
+            .SelectMany(bundle =>
+                bundle.TryGetValue("experiences", out var value) &&
+                value is IEnumerable<IReadOnlyDictionary<string, object?>> rows
+                    ? rows
+                    : Array.Empty<IReadOnlyDictionary<string, object?>>())
+            .ToArray();
+
+        return new UiSurface(
+            UiSurfaceKinds.InstalledBundles,
+            WithCommon(
+                surfaceId: "surface.installed-bundles.live",
+                emitter: "market-main",
+                title: "Installed Bundles",
+                layout: UiSurfaceLayouts.Panel,
+                priority: 11,
+                props: new Dictionary<string, object?>
+                {
+                    ["bundles"] = bundles,
+                    ["experiences"] = experiences
                 }));
     }
 
@@ -617,6 +714,158 @@ public static class UiSurfaceLiveData
                     ["taskId"] = taskId
                 })
         };
+
+    private static Dictionary<string, object?> BundleRow(NeuroPack pack)
+    {
+        var experiences = ExperiencesForPack(pack).ToArray();
+        return new Dictionary<string, object?>
+        {
+            ["name"] = pack.Name,
+            ["version"] = pack.Version,
+            ["ownerId"] = pack.OwnerId,
+            ["installed"] = true,
+            ["status"] = experiences.Length == 0 ? "installed" : "ready",
+            ["description"] = pack.Description,
+            ["experienceCount"] = experiences.Length,
+            ["experiences"] = experiences
+        };
+    }
+
+    private static IEnumerable<IReadOnlyDictionary<string, object?>> ExperiencesForPack(NeuroPack pack)
+    {
+        if (pack.Name.Equals("DigitalBrain.UI.Workbench", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "open",
+                "Open Workbench",
+                "app",
+                "Launch the main DigitalBrain workbench.",
+                UiSurfaceSamples.SynapseAction(
+                    "open-workbench",
+                    "Open",
+                    nameof(InoRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["prompt"] = "Open the DigitalBrain workbench experience.",
+                        ["sessionId"] = "workbench"
+                    }));
+        }
+        else if (pack.Name.Equals("DigitalBrain.UI.Graph3D", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "cluster-graph",
+                "Cluster Graph",
+                "experience",
+                "Open the live cluster graph experience.",
+                UiSurfaceSamples.SynapseAction(
+                    "open-cluster-graph",
+                    "Open",
+                    nameof(InoRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["prompt"] = "Open the live cluster graph experience.",
+                        ["sessionId"] = "workbench"
+                    }));
+        }
+        else if (pack.Name.Equals("DigitalBrain.UI.CreatorSurfaces", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "create-surface",
+                "Create Surface",
+                "experience",
+                "Start a generated UI surface workflow.",
+                UiSurfaceSamples.SynapseAction(
+                    "create-surface",
+                    "Create",
+                    nameof(InoRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["prompt"] = "Create a new DigitalBrain UI surface from the installed CreatorSurfaces bundle.",
+                        ["sessionId"] = "workbench"
+                    }));
+        }
+        else if (pack.Name.Equals("DigitalBrain.UI.AspireFlutter", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "restart-ui",
+                "Restart UI Client",
+                "app",
+                "Restart the Aspire-hosted Flutter UI client.",
+                UiSurfaceSamples.SynapseAction(
+                    "restart-flutter-ui",
+                    "Restart",
+                    nameof(RestartResource),
+                    new Dictionary<string, object?>
+                    {
+                        ["resourceName"] = "flutter-ui"
+                    }));
+        }
+        else if (pack.Name.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase))
+        {
+            var loopType = pack.Name.Contains("Software", StringComparison.OrdinalIgnoreCase) ? "se" : "ui";
+            yield return ExperienceRow(
+                pack,
+                "run-closed-loop",
+                "Run Closed Loop",
+                "experience",
+                "Run the installed closed-loop experience.",
+                UiSurfaceSamples.SynapseAction(
+                    "run-" + ExperienceSlug(pack, "closed-loop"),
+                    "Run",
+                    nameof(ClosedLoopRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["loopType"] = loopType,
+                        ["prompt"] = "Run installed bundle " + pack.Name
+                    }));
+        }
+        else
+        {
+            yield return ExperienceRow(
+                pack,
+                "run",
+                "Run Experience",
+                "experience",
+                "Run this installed bundle through INO.",
+                UiSurfaceSamples.SynapseAction(
+                    "run-" + ExperienceSlug(pack, "experience"),
+                    "Run",
+                    nameof(InoRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["prompt"] = "Run installed bundle " + pack.Name,
+                        ["sessionId"] = "workbench"
+                    }));
+        }
+    }
+
+    private static IReadOnlyDictionary<string, object?> ExperienceRow(
+        NeuroPack pack,
+        string suffix,
+        string name,
+        string kind,
+        string summary,
+        IReadOnlyDictionary<string, object?> action) => new Dictionary<string, object?>
+        {
+            ["experienceId"] = ExperienceSlug(pack, suffix),
+            ["bundleName"] = pack.Name,
+            ["name"] = name,
+            ["kind"] = kind,
+            ["status"] = "ready",
+            ["summary"] = summary,
+            ["action"] = action
+        };
+
+    private static string ExperienceSlug(NeuroPack pack, string suffix) =>
+        (pack.Name + "-" + pack.Version + "-" + suffix)
+            .ToLowerInvariant()
+            .Replace(".", "-")
+            .Replace("@", "-")
+            .Replace(" ", "-");
 
     private static bool IsTaskEventFor(Synapse synapse, string taskId) =>
         synapse switch

@@ -398,6 +398,16 @@ public class DigitalBrainTools(IServiceProvider services, IConfiguration configu
                     return $"Fired RestartResource for {resourceName}.";
                 }
 
+                case nameof(ClosedLoopRequest):
+                {
+                    var loopType = ReadString(props, "loopType") ?? "ui";
+                    var prompt = ReadString(props, "prompt") ?? "Run installed closed loop";
+
+                    await grains.GetGrain<IClosedLoopNeuron>("closedloop-main")
+                        .FireAsync(new ClosedLoopRequest(loopType, prompt));
+                    return $"Fired ClosedLoopRequest for {loopType}.";
+                }
+
                 default:
                 {
                     var target = ReadString(props, "neuronId") ?? defaultNeuronId;
