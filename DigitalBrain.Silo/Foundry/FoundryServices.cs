@@ -11,7 +11,11 @@ public static class FoundryServices
         {
             services.AddSingleton<ICodeExecutor, InProcessAlcExecutor>();
             services.AddSingleton<IBuildRunner, ProcessBuildRunner>();
-            services.AddSingleton<IResourceController, AspireResourceController>();
+            var env = Environment.GetEnvironmentVariable("DIGITALBRAIN_ENV");
+            if (string.Equals(env, "cloud", StringComparison.OrdinalIgnoreCase))
+                services.AddSingleton<IResourceController, AzureResourceController>();
+            else
+                services.AddSingleton<IResourceController, AspireResourceController>();
         });
         return siloBuilder;
     }
