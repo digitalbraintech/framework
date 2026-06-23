@@ -85,6 +85,12 @@ public class ContainerSettings
     public IngressSettings? IngressSettings { get; set; }
 
     /// <summary>
+    /// Optional custom domain bound to the external (API) app via an ACA-native free managed certificate.
+    /// The domain's CNAME + asuid TXT records must exist before deploy so the certificate can be issued.
+    /// </summary>
+    public string? CustomDomainHostname { get; set; }
+
+    /// <summary>
     /// Non-secret environment variables applied to all Container Apps in the environment.
     /// Secret values should be injected via Key Vault references instead.
     /// </summary>

@@ -61,6 +61,16 @@ E:/tools/pulumi/pulumi/bin/pulumi.exe login file://E:/tools/pulumi-state
 # stack dev. Image push: az acr admin creds via SDK_CONTAINER_REGISTRY_UNAME/PWORD + dotnet publish /t:PublishContainer
 ```
 
+## Custom domain on the gateway (ACA-native, free managed cert)
+
+Off by default. To bind e.g. `api.digitalbrain.tech` to the gateway (no App Gateway, no Azure DNS Zone):
+1. At the DNS host (GoDaddy): `CNAME api → digitalbrain-api.<env>.westeurope.azurecontainerapps.io` and
+   `TXT asuid.api → <customDomainVerificationId>` (`az containerapp show -n digitalbrain-api -g digitalbrain-rg --query properties.customDomainVerificationId -o tsv`).
+2. After those records resolve: `pulumi config set customDomain api.digitalbrain.tech` then `pulumi up`.
+   This creates an ACA `ManagedCertificate` (CNAME-validated) and binds it to the gateway ingress (SNI). The
+   cert issuance validates via DNS, so the records must exist first. Frontend (Flutter) lives on the apex via
+   GitHub Pages (separate repo `LeftTwixWand/digitalbrain`); apex+www → GH Pages, `api.` → this gateway.
+
 ## Commands
 ```sh
 pulumi up   --stack dev --cwd framework/deploy     # provision / update (INCURS COST)
