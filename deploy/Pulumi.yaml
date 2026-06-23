@@ -1,5 +1,5 @@
 name: digitalbrain-deploy
 runtime: dotnet
-description: DigitalBrain / NeuroOS Azure deploy foundation (ACA + Storage + Azure OpenAI + Key Vault) via DeploymentKit.
+description: DigitalBrain / NeuroOS Azure deploy foundation (ACA silo + Storage + Azure OpenAI + monitoring).
 # Run a no-spend plan:  pulumi preview --stack dev -- --image-tag <tag>
 # Provision for real:   pulumi up      --stack dev -- --image-tag <tag>

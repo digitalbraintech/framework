@@ -1,128 +1,237 @@
-using DeploymentKit.Deployer;
-using DeploymentKit.Enums;
-using DeploymentKit.Interfaces;
-using DeploymentKit.Models.Outputs;
-using DeploymentKit.Settings;
+using System.Collections.Generic;
 using Pulumi;
+using Pulumi.AzureNative.Resources;
+using Storage = Pulumi.AzureNative.Storage;
+using StorageInputs = Pulumi.AzureNative.Storage.Inputs;
+using Cognitive = Pulumi.AzureNative.CognitiveServices;
+using CognitiveInputs = Pulumi.AzureNative.CognitiveServices.Inputs;
+using OpInsights = Pulumi.AzureNative.OperationalInsights;
+using OpInsightsInputs = Pulumi.AzureNative.OperationalInsights.Inputs;
+using AppInsights = Pulumi.AzureNative.ApplicationInsights;
+using App = Pulumi.AzureNative.App;
+using AppInputs = Pulumi.AzureNative.App.Inputs;
 
 namespace DigitalBrain.Deploy;
 
-/// <summary>
-/// Pulumi program that provisions the Azure infrastructure for DigitalBrain / NeuroOS and brings the
-/// gateway live: Azure Container Apps (gateway external, silo internal), Azure Storage (Table clustering +
-/// Blob grain/journal), Azure OpenAI (gpt-4o-mini chat deployment), Key Vault, Log Analytics + App Insights,
-/// and an Azure Container Registry the apps pull from — all in resource group <c>digitalbrain-rg</c>
-/// (westeurope). Run a no-spend plan with <c>pulumi preview</c>; provision for real with <c>pulumi up</c>.
-/// </summary>
+// Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
+// a resource group, one StorageV2 account (Orleans Table clustering + Blob grain/journal), Azure OpenAI
+// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, and a single silo
+// container app (ingress-less worker) pulling its image from public GHCR. Replaces the vendored DeploymentKit.
 internal static class Program
 {
-    private const string SubscriptionId = "08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9";
     private const string Region = "westeurope";
-    private const string ResourceGroup = "digitalbrain-rg";
-    private const string NamingPrefix = "digitalbrain";
-
-    // Repository names inside the provisioned ACR (Container Apps pull {acrLoginServer}/{repo}:{tag}).
-    private const string GatewayRepository = "digitalbrain-gateway";
-    private const string SiloRepository = "digitalbrain-silo";
-    private const string McpRepository = "digitalbrain-mcp";
-
+    private const string ResourceGroupName = "digitalbrain-rg";
+    private const string EnvSuffix = "prod";
     private const string ChatDeploymentName = "chat";
 
-    private static Task<int> Main() => Deployment.RunAsync(ProvisionAsync);
+    // Silo image lives in public Docker Hub. ACA pulls it without registry creds because the repo is public;
+    // otherwise add an AppInputs.RegistryCredentialsArgs (server=docker.io) with a Docker Hub access-token secret.
+    private const string SiloImageRepository = "docker.io/vhorbachov/digitalbrain-silo";
 
-    private static async Task<IDictionary<string, object?>> ProvisionAsync()
+    // Container App secret names backing the NeuroOS runtime contract.
+    private const string StorageConnectionSecret = "digitalbrain-storage-connection";
+    private const string OpenAiKeySecret = "digitalbrain-openai-key";
+
+    // The env + silo were previously created under DeploymentKit's "app-runtime" component. Alias to that old
+    // parent URN so Pulumi re-parents them to the stack root in place instead of replacing the live resources.
+    private const string LegacyRuntimeComponentUrn =
+        "urn:pulumi:dev::digitalbrain-deploy::DeploymentKit:deploymentkit:DeploymentKitApp::digitalbrain-app-runtime-prod";
+
+    private static Task<int> Main() => Pulumi.Deployment.RunAsync(Provision);
+
+    private static IDictionary<string, object?> Provision()
     {
-        Config config = new();
-        string imageTag = config.Get("imageTag")
-            ?? Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
+        var config = new Config();
+        var imageTag = config.Get("imageTag")
+            ?? System.Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? "latest";
 
-        // Phase-1 `up` runs the apps on a public hello-world image so the ACR can be populated before the
-        // real images are pulled (phase-2 flips this to false). Defaults to true so a bare `up` is safe.
-        bool usePlaceholderImages = config.GetBoolean("usePlaceholderImages") ?? true;
+        var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
+        {
+            ResourceGroupName = ResourceGroupName,
+            Location = Region,
+            Tags = StandardTags("resource-group")
+        });
 
-        InfrastructureSettings settings = BuildSettings(imageTag, usePlaceholderImages);
-        InfrastructureDeploymentOutputs outputs = await InfrastructureDeployer.DeployAsync(settings);
+        var storage = new Storage.StorageAccount("digitalbrainstprod", new Storage.StorageAccountArgs
+        {
+            AccountName = "digitalbrainstprod",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            Kind = Storage.Kind.StorageV2,
+            Sku = new StorageInputs.SkuArgs { Name = Storage.SkuName.Standard_LRS },
+            AccessTier = Storage.AccessTier.Hot,
+            AllowBlobPublicAccess = false,
+            AllowSharedKeyAccess = true,
+            EnableHttpsTrafficOnly = true,
+            MinimumTlsVersion = Storage.MinimumTlsVersion.TLS1_2,
+            NetworkRuleSet = new StorageInputs.NetworkRuleSetArgs
+            {
+                Bypass = Storage.Bypass.AzureServices,
+                DefaultAction = Storage.DefaultAction.Allow
+            },
+            Tags = StandardTags("storage-account")
+        });
+
+        var storageKey = Storage.ListStorageAccountKeys.Invoke(new Storage.ListStorageAccountKeysInvokeArgs
+        {
+            ResourceGroupName = resourceGroup.Name,
+            AccountName = storage.Name
+        }).Apply(keys => keys.Keys[0].Value);
+
+        var storageConnectionString = Output.CreateSecret(Output.Tuple(storage.Name, storageKey).Apply(t =>
+            $"DefaultEndpointsProtocol=https;AccountName={t.Item1};AccountKey={t.Item2};EndpointSuffix=core.windows.net"));
+
+        var openAi = new Cognitive.Account("digitalbrainopenaiprod", new Cognitive.AccountArgs
+        {
+            AccountName = "digitalbrainopenaiprod",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            Kind = "OpenAI",
+            Sku = new CognitiveInputs.SkuArgs { Name = "S0" },
+            Identity = new CognitiveInputs.IdentityArgs { Type = Cognitive.ResourceIdentityType.SystemAssigned },
+            Properties = new CognitiveInputs.AccountPropertiesArgs
+            {
+                CustomSubDomainName = "digitalbrainopenaiprod",
+                PublicNetworkAccess = Cognitive.PublicNetworkAccess.Enabled
+            },
+            Tags = StandardTags("azure-openai")
+        });
+
+        var chatDeployment = new Cognitive.Deployment(ChatDeploymentName, new Cognitive.DeploymentArgs
+        {
+            DeploymentName = ChatDeploymentName,
+            AccountName = openAi.Name,
+            ResourceGroupName = resourceGroup.Name,
+            Sku = new CognitiveInputs.SkuArgs { Name = "GlobalStandard", Capacity = 10 },
+            Properties = new CognitiveInputs.DeploymentPropertiesArgs
+            {
+                Model = new CognitiveInputs.DeploymentModelArgs
+                {
+                    Format = "OpenAI",
+                    Name = "gpt-4o-mini",
+                    Version = "2024-07-18"
+                }
+            }
+        });
+
+        var openAiEndpoint = openAi.Properties.Apply(p => p.Endpoint ?? string.Empty);
+        var openAiKey = Output.CreateSecret(Cognitive.ListAccountKeys.Invoke(new Cognitive.ListAccountKeysInvokeArgs
+        {
+            ResourceGroupName = resourceGroup.Name,
+            AccountName = openAi.Name
+        }).Apply(keys => keys.Key1 ?? string.Empty));
+
+        var workspace = new OpInsights.Workspace("digitalbrain-log-prod", new OpInsights.WorkspaceArgs
+        {
+            WorkspaceName = "digitalbrain-log-prod",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            Sku = new OpInsightsInputs.WorkspaceSkuArgs { Name = OpInsights.WorkspaceSkuNameEnum.PerGB2018 },
+            RetentionInDays = 90,
+            Tags = StandardTags("log-analytics")
+        });
+
+        _ = new AppInsights.Component("digitalbrain-ai-prod", new AppInsights.ComponentArgs
+        {
+            ResourceName = "digitalbrain-ai-prod",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            Kind = "web",
+            ApplicationType = AppInsights.ApplicationType.Web,
+            WorkspaceResourceId = workspace.Id,
+            Tags = StandardTags("application-insights")
+        });
+
+        var workspaceSharedKey = Output.CreateSecret(OpInsights.GetSharedKeys.Invoke(new OpInsights.GetSharedKeysInvokeArgs
+        {
+            ResourceGroupName = resourceGroup.Name,
+            WorkspaceName = workspace.Name
+        }).Apply(k => k.PrimarySharedKey ?? string.Empty));
+
+        var containerEnvironment = new App.ManagedEnvironment("digitalbrain-cae-prod", new App.ManagedEnvironmentArgs
+        {
+            EnvironmentName = "digitalbrain-cae-prod",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            AppLogsConfiguration = new AppInputs.AppLogsConfigurationArgs
+            {
+                Destination = "log-analytics",
+                LogAnalyticsConfiguration = new AppInputs.LogAnalyticsConfigurationArgs
+                {
+                    CustomerId = workspace.CustomerId,
+                    SharedKey = workspaceSharedKey
+                }
+            },
+            Tags = StandardTags("container-apps-environment")
+        }, AliasOldRuntimeParent());
+
+        var siloImage = Output.Format($"{SiloImageRepository}:{imageTag}");
+
+        var silo = new App.ContainerApp("digitalbrain-jobs", new App.ContainerAppArgs
+        {
+            ContainerAppName = "digitalbrain-jobs",
+            ResourceGroupName = resourceGroup.Name,
+            Location = Region,
+            ManagedEnvironmentId = containerEnvironment.Id,
+            Configuration = new AppInputs.ConfigurationArgs
+            {
+                Secrets =
+                {
+                    new AppInputs.SecretArgs { Name = StorageConnectionSecret, Value = storageConnectionString },
+                    new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey }
+                }
+            },
+            Template = new AppInputs.TemplateArgs
+            {
+                Containers =
+                {
+                    new AppInputs.ContainerArgs
+                    {
+                        Name = "jobs",
+                        Image = siloImage,
+                        Resources = new AppInputs.ContainerResourcesArgs { Cpu = 1.0, Memory = "2Gi" },
+                        Env =
+                        {
+                            new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_ENV", Value = "cloud" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Provider", Value = "azureopenai" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Model", Value = ChatDeploymentName },
+                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__clustering", SecretRef = StorageConnectionSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__grainstate", SecretRef = StorageConnectionSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret }
+                        }
+                    }
+                },
+                Scale = new AppInputs.ScaleArgs { MinReplicas = 1, MaxReplicas = 5 }
+            },
+            Tags = StandardTags("container-app-jobs")
+        }, AliasOldRuntimeParent());
 
         return new Dictionary<string, object?>
         {
-            ["gatewayFqdn"] = outputs.ApiUrl,
-            ["resourceGroup"] = outputs.ResourceGroupName,
-            ["acrLoginServer"] = outputs.AcrLoginServer,
-            ["openAiEndpoint"] = outputs.OpenAi?.Endpoint ?? Output.Create(string.Empty),
+            ["resourceGroup"] = resourceGroup.Name,
+            ["storageAccount"] = storage.Name,
+            ["openAiEndpoint"] = openAiEndpoint,
             ["chatDeployment"] = ChatDeploymentName,
+            ["siloApp"] = silo.Name,
             ["imageTag"] = imageTag,
-            ["usePlaceholderImages"] = usePlaceholderImages,
-            ["environment"] = settings.Environment
+            ["environment"] = EnvSuffix
         };
     }
 
-    private static InfrastructureSettings BuildSettings(string imageTag, bool usePlaceholderImages)
+    private static CustomResourceOptions AliasOldRuntimeParent() =>
+        new() { Aliases = { new Alias { ParentUrn = LegacyRuntimeComponentUrn } } };
+
+    private static InputMap<string> StandardTags(string resourceType) => new Dictionary<string, string>
     {
-        OpenAiSettings openAi = new()
-        {
-            ChatDeploymentName = ChatDeploymentName,
-            ChatModelName = "gpt-4o-mini",
-            ChatModelVersion = "2024-07-18",
-            // gpt-4o-mini in westeurope is only offered as GlobalStandard (no plain "Standard" SKU).
-            DeploymentSkuName = "GlobalStandard",
-            DeploymentCapacity = 10
-        };
-
-        ContainerSettings containers = BuildContainerSettings(imageTag, usePlaceholderImages, openAi.ChatDeploymentName);
-
-        IInfrastructureBuilder builder = InfrastructureDeployer.CreateBuilder()
-            .SetName(NamingPrefix)
-            .SetEnvironment(EnvironmentType.Production)
-            .SetLocation(Region)
-            .SetSubscriptionId(SubscriptionId)
-            .SetResourceGroupName(ResourceGroup)
-            .SetNamingPrefix(NamingPrefix)
-            .SetValidationMode(ValidationMode.Basic)
-            .SkipAzureAuthValidation()
-            // Azure Storage: one StorageV2 account backs Orleans Table clustering + Blob grain/journal.
-            // Public network access is required because the Container Apps have no VNet integration.
-            .AddStorage(new StorageSettings { AllowPublicNetworkAccess = true })
-            .AddTableStorage()
-            .AddBlobStorage()
-            // Azure OpenAI account + chat model deployment (provisioned by the orchestrator).
-            .AddOpenAi(openAi)
-            // Log Analytics + Application Insights (required: the Container Apps env logs there).
-            .AddInsights()
-            // Key Vault holds secrets; managed identity grants the apps read access.
-            .AddKeyVault(new KeyVaultSettings { EnableRbacAuthorization = true, ApplyToContainerApps = true })
-            // ACA environment + container apps (gateway external on 8080, silo internal).
-            .AddContainerApps(containers);
-
-        return builder.Build();
-    }
-
-    private static ContainerSettings BuildContainerSettings(string imageTag, bool usePlaceholderImages, string chatDeployment)
-    {
-        ContainerSettings containers = new()
-        {
-            UsePlaceholderImages = usePlaceholderImages,
-            ApiImageTag = $"{GatewayRepository}:{imageTag}",
-            JobsImageTag = $"{SiloRepository}:{imageTag}",
-            BotImageTag = $"{McpRepository}:{imageTag}",
-            MinReplicas = 1,
-            MaxReplicas = 5,
-            // Gateway is the only externally reachable app. The real gateway serves 8080; the phase-1
-            // placeholder hello-world image listens on 80, so ingress tracks the image being run.
-            IngressSettings = new IngressSettings
-            {
-                External = true,
-                TargetPort = usePlaceholderImages ? 80 : 8080,
-                Transport = "Http"
-            }
-        };
-
-        // Plain (non-secret) runtime config; the storage connection string + Azure OpenAI endpoint/key are
-        // injected as additional env vars by the Container Apps service from the provisioned resources.
-        containers.AdditionalEnvironmentVariables["DIGITALBRAIN_ENV"] = "cloud";
-        containers.AdditionalEnvironmentVariables["DigitalBrain__Llm__Provider"] = "azureopenai";
-        containers.AdditionalEnvironmentVariables["DigitalBrain__Llm__Model"] = chatDeployment;
-
-        return containers;
-    }
+        ["Environment"] = EnvSuffix,
+        ["Project"] = "Application",
+        ["Owner"] = "Application-DevOps",
+        ["CorrelationId"] = "unknown",
+        ["CreatedBy"] = "Pulumi",
+        ["ManagedBy"] = "Pulumi",
+        ["ResourceType"] = resourceType
+    };
 }

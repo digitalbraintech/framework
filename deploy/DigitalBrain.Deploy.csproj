@@ -13,21 +13,7 @@
     <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
   </PropertyGroup>
 
-  <!-- DeploymentKit is a sibling project referenced below; exclude its source tree from this
-       project's default compile/embed/none globs so we do not double-compile it. -->
   <ItemGroup>
-    <Compile Remove="DeploymentKit\**\*.cs" />
-    <Content Remove="DeploymentKit\**" />
-    <EmbeddedResource Remove="DeploymentKit\**" />
-    <None Remove="DeploymentKit\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="DeploymentKit\DeploymentKit.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Versions kept in sync with DeploymentKit\DeploymentKit.csproj. -->
     <PackageReference Include="Pulumi" Version="3.101.2" />
     <PackageReference Include="Pulumi.AzureNative" Version="3.14.0" />
   </ItemGroup>

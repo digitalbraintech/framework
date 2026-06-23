@@ -1,7 +1,10 @@
 name: deploy
 
-# Manual until the first successful deploy (Task 10), then flip to push:[main] for auto-deploy.
+# Auto-deploy on merge to main. The simplified Pass-1 flow: build+push ONE image (the silo) to Docker Hub,
+# then `pulumi up` the minimal program (RG, Storage, Azure OpenAI, monitoring, ACA env + silo).
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -18,7 +21,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TAG: "${{ inputs.image_tag }}"
+      TAG: "${{ inputs.image_tag || github.sha }}"
     steps:
       - uses: actions/checkout@v4
 
@@ -29,24 +32,18 @@ jobs:
       - name: Run tests
         run: dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release
 
-      - name: Log in to GHCR
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish container images
+      - name: Publish silo image
         run: |
-          publish() {
-            dotnet publish "$1/$1.csproj" -c Release /t:PublishContainer \
-              -p:ContainerRegistry=ghcr.io \
-              -p:ContainerRepository="digitalbraintech/$2" \
-              -p:ContainerImageTag="${TAG}"
-          }
-          publish DigitalBrain.Silo    digitalbrain-silo
-          publish DigitalBrain.Gateway digitalbrain-gateway
-          publish DigitalBrain.Mcp     digitalbrain-mcp
+          dotnet publish DigitalBrain.Silo/DigitalBrain.Silo.csproj -c Release /t:PublishContainer \
+            -p:ContainerRegistry=docker.io \
+            -p:ContainerRepository=vhorbachov/digitalbrain-silo \
+            -p:ContainerImageTag="${TAG}"
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -55,9 +52,13 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Provision and deploy
+      - name: Provision (pulumi up)
+        uses: pulumi/actions@v6
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
-        run: |
-          pulumi login azblob://pulumi-state
-          dotnet run --project deploy/DigitalBrain.Deploy.csproj -- --image-tag "${TAG}"
+          DIGITALBRAIN_IMAGE_TAG: "${{ env.TAG }}"
+        with:
+          command: up
+          stack-name: dev
+          work-dir: deploy
+          cloud-url: azblob://pulumi-state
