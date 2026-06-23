@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Worker">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net11.0</TargetFramework>
@@ -28,7 +28,6 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" />
     <PackageReference Include="Microsoft.CodeAnalysis.Workspaces.MSBuild" />
     <PackageReference Include="ModelContextProtocol" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
@@ -40,5 +39,13 @@
     <!-- Microsoft.Orleans.Dashboard added for .WithOrleansDashboard() - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
     <ProjectReference Include="..\DigitalBrain.Protocol\DigitalBrain.Protocol.csproj" />
     <ProjectReference Include="..\NeuroOSPrototype.ServiceDefaults\NeuroOSPrototype.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\digitalbrain.proto" GrpcServices="Both" />
   </ItemGroup>
 </Project>

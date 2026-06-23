@@ -2,6 +2,7 @@ using Azure.Storage.Blobs;
 using DigitalBrain.Protocol;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Silo.Llm;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -14,9 +15,14 @@ using Orleans.Journaling.Json;
 
 #pragma warning disable ORLEANSEXP005
 
-var builder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+builder.WebHost.ConfigureKestrel(options =>
+    options.ListenAnyIP(8080, listen => listen.Protocols = HttpProtocols.Http2));
+
+builder.Services.AddGrpc();
 
 var isAspireHosted = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__clustering"))
     || !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("ConnectionStrings__grainstate"))
@@ -77,10 +83,12 @@ builder.UseOrleans(siloBuilder =>
 
 #pragma warning restore ORLEANSEXP005
 
-var host = builder.Build();
+var app = builder.Build();
+
+app.MapGrpcService<DigitalBrain.Silo.Gateway.GatewayService>();
 
 // Bootstrap self-awareness (SystemStatusNeuron will connect MCP + fire Launched on activate)
-var grainFactory = host.Services.GetService<IGrainFactory>();
+var grainFactory = app.Services.GetService<IGrainFactory>();
 if (grainFactory != null)
 {
     var status = grainFactory.GetGrain<ISystemStatus>("status-main");
@@ -89,7 +97,8 @@ if (grainFactory != null)
     _ = grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
     _ = grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
     _ = grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
-    // Closed loop activation via Mcp or INO using closed loops only (removed direct INeuron to avoid ambiguity; use mcp and closed loops to activate)
 }
 
-host.Run();
+app.Run();
+
+public partial class Program;

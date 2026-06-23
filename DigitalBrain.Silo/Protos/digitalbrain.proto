@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+option csharp_namespace = "DigitalBrain.Runtime.Grpc";
+
+package digitalbrain;
+
+service DigitalBrainGateway {
+  rpc Health(HealthRequest) returns (HealthReply);
+  rpc Ask(AskRequest) returns (AskReply);
+  rpc Fire(FireRequest) returns (FireReply);
+  rpc Timeline(TimelineRequest) returns (TimelineReply);
+}
+
+message HealthRequest {}
+message HealthReply {
+  bool ok = 1;
+  string llm_mode = 2;
+}
+
+message AskRequest {
+  string neuron_id = 1; // empty -> "ino-main"
+  string prompt = 2;
+}
+message AskReply { string text = 1; }
+
+message FireRequest {
+  string neuron_id = 1;
+  string text = 2;      // becomes DemoMessageSynapse(text)
+}
+message FireReply { bool accepted = 1; }
+
+message TimelineRequest {
+  string neuron_id = 1;
+  int32 max_entries = 2; // <=0 -> 10
+}
+message TimelineEntry {
+  string type = 1;
+  string timestamp = 2;
+  string text = 3;
+}
+message TimelineReply { repeated TimelineEntry entries = 1; }
