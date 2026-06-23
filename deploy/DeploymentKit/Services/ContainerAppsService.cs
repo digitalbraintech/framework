@@ -152,29 +152,7 @@ public class ContainerAppsService(ILogger<ContainerAppsService> logger, IResourc
             var digitalBrainEnv = BuildDigitalBrainRuntimeEnv(settings, storage, openAi);
             var digitalBrainSecrets = BuildDigitalBrainRuntimeSecrets(settings, storage, openAi);
 
-            // Optional ACA-native custom domain + free managed certificate on the external (API) app. The cert
-            // is issued by validating the domain via DNS, so the CNAME + asuid TXT records must already exist.
-            var apiCustomDomain = settings.Container?.CustomDomainHostname;
-            Input<string>? apiCustomDomainCertId = null;
-            if (!string.IsNullOrWhiteSpace(apiCustomDomain))
-            {
-                var managedCertName = $"{settings.NamingPrefix}-mc-{settings.Environment}";
-                var managedCertificate = new ManagedCertificate(managedCertName, new ManagedCertificateArgs
-                {
-                    EnvironmentName = containerAppsEnvironment.Name,
-                    ResourceGroupName = resourceGroup,
-                    Location = settings.Location,
-                    Properties = new ManagedCertificatePropertiesArgs
-                    {
-                        DomainControlValidation = ManagedCertificateDomainControlValidation.CNAME,
-                        SubjectName = apiCustomDomain
-                    },
-                    Tags = ResourceTagHelper.GetStandardTags(settings.Environment, "managed-certificate")
-                }, ComponentResourceScope.CreateChildOptions(managedCertName));
-                apiCustomDomainCertId = managedCertificate.Id;
-            }
-
-            var apiApp = CreateApiContainerApp(settings, resourceGroup, containerAppsEnvironment, containerRegistry, database, cache, monitoring, eventHubs, keyVault, azureFrontDoorId, digitalBrainEnv, digitalBrainSecrets, apiCustomDomain, apiCustomDomainCertId);
+            var apiApp = CreateApiContainerApp(settings, resourceGroup, containerAppsEnvironment, containerRegistry, database, cache, monitoring, eventHubs, keyVault, azureFrontDoorId, digitalBrainEnv, digitalBrainSecrets);
             var jobsApp = CreateJobsContainerApp(settings, resourceGroup, containerAppsEnvironment, containerRegistry, database, cache, monitoring, eventHubs, keyVault, azureFrontDoorId, digitalBrainEnv, digitalBrainSecrets);
             var botApp = CreateBotContainerApp(settings, resourceGroup, containerAppsEnvironment, containerRegistry, database, cache, monitoring, eventHubs, keyVault, azureFrontDoorId, digitalBrainEnv, digitalBrainSecrets);
 
@@ -264,26 +242,18 @@ public class ContainerAppsService(ILogger<ContainerAppsService> logger, IResourc
         KeyVaultOutputs? keyVault,
         Input<string>? azureFrontDoorId,
         IEnumerable<EnvironmentVarArgs>? additionalEnv,
-        IEnumerable<SecretArgs>? additionalSecrets,
-        string? customDomainHostname,
-        Input<string>? customDomainCertificateId)
+        IEnumerable<SecretArgs>? additionalSecrets)
     {
         var apiAppName = _namingService.GenerateContainerAppName(settings.NamingPrefix, ServiceConstants.ContainerAppTypes.Api, settings.Environment);
         var imageToUse = ResolveImage(settings.Container!.UsePlaceholderImages, containerRegistry.LoginServer, settings.Container.ApiImageTag);
         var ingressConfig = ContainerAppsConfigurationHelper.CreateIngressConfiguration(settings.Container.IngressSettings, _logger);
 
-        if (ingressConfig != null && !string.IsNullOrWhiteSpace(customDomainHostname) && customDomainCertificateId != null)
-        {
-            ingressConfig.CustomDomains = new[]
-            {
-                new CustomDomainArgs
-                {
-                    Name = customDomainHostname,
-                    CertificateId = customDomainCertificateId,
-                    BindingType = BindingType.SniEnabled
-                }
-            };
-        }
+        // Custom domains are bound out-of-band (`az containerapp hostname add` + `bind`): ACA managed certificates
+        // require the hostname registered on the app before the cert can be issued, which single-pass IaC can't
+        // order. Ignore custom-domain changes here so `pulumi up` does not strip an az-bound domain.
+        var apiAppOptions = ComponentResourceScope.CreateChildOptions(
+            apiAppName,
+            options => options.IgnoreChanges.Add("configuration.ingress.customDomains"));
         var registries = BuildRegistries(settings, containerRegistry);
         var (secrets, secretNames) = ContainerAppsSecretsHelper.BuildSecretsListWithKeyVault(settings, containerRegistry, database, keyVault, _logger, additionalSecrets);
 
@@ -321,7 +291,7 @@ public class ContainerAppsService(ILogger<ContainerAppsService> logger, IResourc
                 Scale = ContainerAppsConfigurationHelper.CreateScaleRules(settings)
             },
             Tags = ResourceTagHelper.GetStandardTags(settings.Environment, DeploymentConstants.ResourceTags.ContainerAppApiType)
-        }, ComponentResourceScope.CreateChildOptions(apiAppName));
+        }, apiAppOptions);
     }
 
     private ContainerApp CreateJobsContainerApp(

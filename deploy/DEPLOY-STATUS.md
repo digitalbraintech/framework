@@ -63,13 +63,20 @@ E:/tools/pulumi/pulumi/bin/pulumi.exe login file://E:/tools/pulumi-state
 
 ## Custom domain on the gateway (ACA-native, free managed cert)
 
-Off by default. To bind e.g. `api.digitalbrain.tech` to the gateway (no App Gateway, no Azure DNS Zone):
-1. At the DNS host (GoDaddy): `CNAME api → digitalbrain-api.<env>.westeurope.azurecontainerapps.io` and
-   `TXT asuid.api → <customDomainVerificationId>` (`az containerapp show -n digitalbrain-api -g digitalbrain-rg --query properties.customDomainVerificationId -o tsv`).
-2. After those records resolve: `pulumi config set customDomain api.digitalbrain.tech` then `pulumi up`.
-   This creates an ACA `ManagedCertificate` (CNAME-validated) and binds it to the gateway ingress (SNI). The
-   cert issuance validates via DNS, so the records must exist first. Frontend (Flutter) lives on the apex via
-   GitHub Pages (separate repo `LeftTwixWand/digitalbrain`); apex+www → GH Pages, `api.` → this gateway.
+`api.digitalbrain.tech` is bound to the gateway with a free ACA managed certificate. Binding is done via `az`,
+not Pulumi: an ACA managed cert requires the hostname registered on the app *before* the cert is issued, which
+single-pass IaC can't order (the cert resource would have to exist before the app, but the cert needs the app's
+hostname). The API app's ingress `customDomains` are therefore in Pulumi `IgnoreChanges`, so `pulumi up` never
+strips an az-bound domain (no App Gateway, no Azure DNS Zone needed; DNS stays at the registrar).
+1. DNS (GoDaddy): `CNAME api → digitalbrain-api.<env>.westeurope.azurecontainerapps.io` and
+   `TXT asuid.api → <id>` (`az containerapp show -n digitalbrain-api -g digitalbrain-rg --query properties.customDomainVerificationId -o tsv`).
+2. After the records resolve:
+   ```sh
+   az containerapp hostname add  --hostname api.digitalbrain.tech -g digitalbrain-rg -n digitalbrain-api
+   az containerapp hostname bind --hostname api.digitalbrain.tech -g digitalbrain-rg -n digitalbrain-api \
+     --environment digitalbrain-cae-prod --validation-method CNAME
+   ```
+Frontend (Flutter) lives on the apex via GitHub Pages (repo `digitalbraintech/app`); apex+www → GH Pages, `api.` → this gateway.
 
 ## Commands
 ```sh

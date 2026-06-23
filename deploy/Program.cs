@@ -41,11 +41,7 @@ internal static class Program
         // real images are pulled (phase-2 flips this to false). Defaults to true so a bare `up` is safe.
         bool usePlaceholderImages = config.GetBoolean("usePlaceholderImages") ?? true;
 
-        // Optional custom domain for the gateway (e.g. api.digitalbrain.tech). Off unless `pulumi config set
-        // customDomain ...` is provided; its CNAME + asuid TXT DNS records must exist before enabling it.
-        string? customDomain = config.Get("customDomain");
-
-        InfrastructureSettings settings = BuildSettings(imageTag, usePlaceholderImages, customDomain);
+        InfrastructureSettings settings = BuildSettings(imageTag, usePlaceholderImages);
         InfrastructureDeploymentOutputs outputs = await InfrastructureDeployer.DeployAsync(settings);
 
         return new Dictionary<string, object?>
@@ -61,7 +57,7 @@ internal static class Program
         };
     }
 
-    private static InfrastructureSettings BuildSettings(string imageTag, bool usePlaceholderImages, string? customDomain)
+    private static InfrastructureSettings BuildSettings(string imageTag, bool usePlaceholderImages)
     {
         OpenAiSettings openAi = new()
         {
@@ -73,7 +69,7 @@ internal static class Program
             DeploymentCapacity = 10
         };
 
-        ContainerSettings containers = BuildContainerSettings(imageTag, usePlaceholderImages, openAi.ChatDeploymentName, customDomain);
+        ContainerSettings containers = BuildContainerSettings(imageTag, usePlaceholderImages, openAi.ChatDeploymentName);
 
         IInfrastructureBuilder builder = InfrastructureDeployer.CreateBuilder()
             .SetName(NamingPrefix)
@@ -101,7 +97,7 @@ internal static class Program
         return builder.Build();
     }
 
-    private static ContainerSettings BuildContainerSettings(string imageTag, bool usePlaceholderImages, string chatDeployment, string? customDomain)
+    private static ContainerSettings BuildContainerSettings(string imageTag, bool usePlaceholderImages, string chatDeployment)
     {
         ContainerSettings containers = new()
         {
@@ -109,7 +105,6 @@ internal static class Program
             ApiImageTag = $"{GatewayRepository}:{imageTag}",
             JobsImageTag = $"{SiloRepository}:{imageTag}",
             BotImageTag = $"{McpRepository}:{imageTag}",
-            CustomDomainHostname = string.IsNullOrWhiteSpace(customDomain) ? null : customDomain,
             MinReplicas = 1,
             MaxReplicas = 5,
             // Gateway is the only externally reachable app. The real gateway serves 8080; the phase-1
