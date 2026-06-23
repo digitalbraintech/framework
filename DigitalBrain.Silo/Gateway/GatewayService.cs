@@ -58,7 +58,15 @@ public sealed class GatewayService(
     public override async Task<TimelineReply> Timeline(TimelineRequest request, ServerCallContext context)
     {
         var max = request.MaxEntries <= 0 ? 10 : request.MaxEntries;
-        var neuron = NeuronResolver.Resolve(grains, request.NeuronId);
+        INeuron neuron;
+        try
+        {
+            neuron = NeuronResolver.Resolve(grains, request.NeuronId);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new RpcException(new Status(StatusCode.InvalidArgument, ex.Message));
+        }
         var timeline = await neuron.GetTimelineAsync();
 
         var reply = new TimelineReply();
@@ -68,7 +76,7 @@ public sealed class GatewayService(
             {
                 Type = s.Type,
                 Timestamp = s.Timestamp.ToString("O"),
-                Text = s.ToString() ?? string.Empty
+                Text = s is DemoMessageSynapse demo ? demo.Text : (s.ToString() ?? string.Empty)
             });
         }
         return reply;
