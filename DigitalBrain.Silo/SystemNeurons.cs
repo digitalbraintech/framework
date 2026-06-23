@@ -324,7 +324,10 @@ public class LlmNeuron : Neuron, ILlmNeuron
             return;
         }
 
-        var response = await chat.GetResponseAsync(prompt.Prompt);
+        var options = string.IsNullOrWhiteSpace(prompt.PreferredModel)
+            ? null
+            : new Microsoft.Extensions.AI.ChatOptions { ModelId = prompt.PreferredModel };
+        var response = await chat.GetResponseAsync(prompt.Prompt, options);
         await FireAsync(new LlmResponse(prompt.Prompt, response.Text.Trim(), prompt.PreferredModel ?? "qwen2.5-coder:1.5b"));
     }
 }

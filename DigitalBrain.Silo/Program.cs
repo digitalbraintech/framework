@@ -1,4 +1,5 @@
 using DigitalBrain.Protocol;
+using DigitalBrain.Silo.Llm;
 
 // Prototype silo host for DigitalBrain.
 
@@ -7,7 +8,7 @@ var builder = Host.CreateApplicationBuilder(args);
 builder.AddServiceDefaults();
 
 builder.AddKeyedRedisClient("redis");
-builder.AddOllamaApiClient("qwen");
+builder.Services.AddDigitalBrainChat(builder.Configuration);
 
 builder.UseOrleans(siloBuilder =>
 {

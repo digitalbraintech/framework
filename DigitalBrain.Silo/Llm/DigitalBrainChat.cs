@@ -21,8 +21,10 @@ public static class DigitalBrainChat
         }
         else if (string.Equals(provider, "azureopenai", StringComparison.OrdinalIgnoreCase))
         {
-            var endpoint = config["DigitalBrain:Llm:AzureOpenAIEndpoint"]!;
-            var key = config["DigitalBrain:Llm:AzureOpenAIKey"]!;
+            var endpoint = config["DigitalBrain:Llm:AzureOpenAIEndpoint"]
+                ?? throw new InvalidOperationException("DigitalBrain:Llm:AzureOpenAIEndpoint is required for azureopenai provider.");
+            var key = config["DigitalBrain:Llm:AzureOpenAIKey"]
+                ?? throw new InvalidOperationException("DigitalBrain:Llm:AzureOpenAIKey is required for azureopenai provider.");
             services.AddChatClient(
                 new AzureOpenAIClient(new Uri(endpoint), new AzureKeyCredential(key))
                     .GetChatClient(model)
