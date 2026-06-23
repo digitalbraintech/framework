@@ -18,7 +18,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TAG: "${{ inputs.image_tag || github.sha }}"
+      TAG: "${{ inputs.image_tag }}"
     steps:
       - uses: actions/checkout@v4
 
@@ -38,12 +38,15 @@ jobs:
 
       - name: Publish container images
         run: |
-          for p in DigitalBrain.Silo DigitalBrain.Gateway DigitalBrain.Mcp; do
-            dotnet publish "$p/$p.csproj" -c Release /t:PublishContainer \
+          publish() {
+            dotnet publish "$1/$1.csproj" -c Release /t:PublishContainer \
               -p:ContainerRegistry=ghcr.io \
-              -p:ContainerRepository="digitalbraintech/$p" \
+              -p:ContainerRepository="digitalbraintech/$2" \
               -p:ContainerImageTag="${TAG}"
-          done
+          }
+          publish DigitalBrain.Silo    digitalbrain-silo
+          publish DigitalBrain.Gateway digitalbrain-gateway
+          publish DigitalBrain.Mcp     digitalbrain-mcp
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
@@ -55,7 +58,6 @@ jobs:
       - name: Provision and deploy
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
-          TAG: ${{ env.TAG }}
         run: |
           pulumi login azblob://pulumi-state
           dotnet run --project deploy/DigitalBrain.Deploy.csproj -- --image-tag "${TAG}"
