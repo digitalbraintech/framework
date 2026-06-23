@@ -26,6 +26,7 @@
     <PackageVersion Include="Microsoft.Orleans.Core" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.Core.Abstractions" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.Journaling" Version="10.2.1-preview.1.alpha.1" />
+    <PackageVersion Include="Microsoft.Orleans.Journaling.AzureStorage" Version="10.2.1-preview.1.alpha.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Memory" Version="10.2.1-preview.1" />
     <PackageVersion Include="Microsoft.Orleans.Persistence.Redis" Version="10.2.0" />
     <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.2.1-preview.1" />

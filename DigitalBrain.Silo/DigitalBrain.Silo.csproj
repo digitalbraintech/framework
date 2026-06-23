@@ -23,6 +23,7 @@
     <PackageReference Include="Microsoft.Orleans.Clustering.Redis" />
     <PackageReference Include="Microsoft.Orleans.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
+    <PackageReference Include="Microsoft.Orleans.Journaling.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Memory" />
     <PackageReference Include="Microsoft.Orleans.Persistence.Redis" />
     <PackageReference Include="Microsoft.Orleans.Server" />
