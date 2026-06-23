@@ -1,6 +1,6 @@
 using DigitalBrain.Protocol;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using OllamaSharp;
 
 namespace DigitalBrain.Silo.Ino;
 
@@ -65,16 +65,13 @@ public class InoNeuron : Neuron, IInoNeuron
 
     private async Task<string> ReasonWithLlmAsync(string prompt, string context)
     {
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat == null) return $"[no-llm] INO would act on: {prompt} (ctx len {context.Length})";
 
-        llm.SelectedModel = "qwen2.5-coder:1.5b";
         var sys = "You are INO, DigitalBrain's personal OS assistant. Use provided context from neuron journals. Be concise, propose kernel tasks or branches when useful. Output action if any as 'TASK: desc' or 'BRANCH: whatif'.";
         var full = sys + "\nCTX:\n" + context + "\nUSER: " + prompt;
-        var acc = "";
-        await foreach (var ch in llm.GenerateAsync(full))
-            if (ch?.Response is string t) acc += t;
-        return acc.Trim();
+        var response = await chat.GetResponseAsync(full);
+        return response.Text.Trim();
     }
 
     private async Task<List<string>> OrchestrateActionsIfNeededAsync(string prompt, string reply)
@@ -99,21 +96,16 @@ public class InoNeuron : Neuron, IInoNeuron
 
     private async Task CreateMemorySummaryAsync()
     {
-        // Long-term: compress recent journal into semantic summary using LLM, store as synapse for persistence.
         var recent = OutgoingJournal.Concat(IncomingJournal).TakeLast(20).ToList();
         if (recent.Count < 5) return;
 
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm == null) return;
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat == null) return;
 
-        llm.SelectedModel = "qwen2.5-coder:1.5b";
         var ctx = string.Join("\n", recent.Select(s => s.Type + ": " + s.ToString()));
         var prompt = "Summarize the following recent activity in DigitalBrain for personal assistant memory. One short topic + 1-sentence summary. Activity:\n" + ctx;
-        var acc = "";
-        await foreach (var ch in llm.GenerateAsync(prompt))
-            if (ch?.Response is string t) acc += t;
-
-        var summaryText = acc.Trim();
+        var response = await chat.GetResponseAsync(prompt);
+        var summaryText = response.Text.Trim();
         if (summaryText.Length > 10)
         {
             var topic = summaryText.Split('.')[0].Trim();

@@ -1,7 +1,7 @@
 using DigitalBrain.Protocol;
+using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
-using OllamaSharp;
 using Orleans.Journaling;
 using Orleans.Runtime;
 using System.Reflection;
@@ -128,19 +128,15 @@ public class CompilerNeuron : Neuron, ICompiler
         var packName = "Generated" + req.Description.Replace(" ", "").Replace("\"", "").Replace("-", "").Substring(0, Math.Min(18, req.Description.Length));
         string snippet;
 
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm != null)
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat != null)
         {
             var sys = "You are expert C# generator for real working software. Output ONLY complete minimal self-contained console app (top level or Main/Run) fulfilling the spec (may be .feature or English desc like 'process last 100 emails on PC, write report.txt with subjects/bodies'). Use file IO for archive. Only stdlib. Respond ONLY ```csharp block. (Neuron style only if requested)";
             var user = $"Description: {req.Description}\nBase name hint: {packName}";
             var fullPrompt = sys + "\n\n" + user;
 
-            llm.SelectedModel = "qwen2.5-coder:1.5b";
-            var acc = "";
-            await foreach (var chunk in llm.GenerateAsync(fullPrompt))
-            {
-                if (chunk?.Response is string t) acc += t;
-            }
+            var response = await chat.GetResponseAsync(fullPrompt);
+            var acc = response.Text;
             snippet = ExtractCode(acc);
             if (string.IsNullOrWhiteSpace(snippet))
                 snippet = FallbackGeneralCode(packName, req.Description);
@@ -214,14 +210,12 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
         if (count % 5 == 0)
         {
             string proposal;
-            var llm = ServiceProvider.GetService<IOllamaApiClient>();
-            if (llm != null)
+            var chat = ServiceProvider.GetService<IChatClient>();
+            if (chat != null)
             {
-                llm.SelectedModel = "qwen2.5-coder:1.5b";
                 var p = $"Telemetry count reached {count}. Propose ONE short, actionable wiring or scaling improvement for the DigitalBrain neuron system (Orleans grains + Aspire + compiler for code gen from English).";
-                var acc = "";
-                await foreach (var chunk in llm.GenerateAsync(p))
-                    if (chunk?.Response is string t) acc += t;
+                var response = await chat.GetResponseAsync(p);
+                var acc = response.Text;
                 proposal = acc.Length > 20 ? acc.Trim() : "Add parallel compiler neurons and route create requests through LlmNeuron";
             }
             else
@@ -285,15 +279,11 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
                                      $"Handle the following usage: {used.Action} on input related to '{used.Pack}'.\n" +
                                      "Respond in character as this specific installed neuron/experience would. Be concise and useful.";
 
-                var llm = ServiceProvider.GetService<IOllamaApiClient>();
-                if (llm != null)
+                var chat = ServiceProvider.GetService<IChatClient>();
+                if (chat != null)
                 {
-                    llm.SelectedModel = "qwen2.5-coder:1.5b";
-                    var acc = "";
-                    await foreach (var chunk in llm.GenerateAsync(behaviorPrompt))
-                        if (chunk?.Response is string t) acc += t;
-
-                    await FireAsync(new LlmResponse(behaviorPrompt, acc.Trim(), "embodied-pack"));
+                    var response = await chat.GetResponseAsync(behaviorPrompt);
+                    await FireAsync(new LlmResponse(behaviorPrompt, response.Text.Trim(), "embodied-pack"));
                     Logger.LogInformation("GeneratedNeuron embodied installed pack '{Pack}' for action '{Action}'", packKey, used.Action);
                 }
                 else
@@ -327,20 +317,15 @@ public class LlmNeuron : Neuron, ILlmNeuron
 
     public async Task HandleAsync(LlmPrompt prompt)
     {
-        var client = ServiceProvider.GetService<IOllamaApiClient>();
-        if (client == null)
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat == null)
         {
             await FireAsync(new LlmResponse(prompt.Prompt, "[no local llm client]", "none"));
             return;
         }
 
-        client.SelectedModel = prompt.PreferredModel ?? "qwen2.5-coder:1.5b";
-        var acc = "";
-        await foreach (var chunk in client.GenerateAsync(prompt.Prompt))
-        {
-            if (chunk?.Response is string t) acc += t;
-        }
-        await FireAsync(new LlmResponse(prompt.Prompt, acc.Trim(), client.SelectedModel));
+        var response = await chat.GetResponseAsync(prompt.Prompt);
+        await FireAsync(new LlmResponse(prompt.Prompt, response.Text.Trim(), prompt.PreferredModel ?? "qwen2.5-coder:1.5b"));
     }
 }
 
@@ -368,14 +353,12 @@ public class Software20TeamNeuron : Neuron, ISoftware20Team
         var name = "Neuro" + cmd.Description.Replace(" ", "").Substring(0, Math.Min(12, cmd.Description.Length));
         string code;
 
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm != null)
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat != null)
         {
-            llm.SelectedModel = "qwen2.5-coder:1.5b";
             var p = $"Create a clean minimal C# console or Neuron-style simple app for: {cmd.Description}. Make it modern, self-documenting, no legacy main if possible. Output only the code.";
-            var acc = "";
-            await foreach (var chunk in llm.GenerateAsync(p))
-                if (chunk?.Response is string t) acc += t;
+            var response = await chat.GetResponseAsync(p);
+            var acc = response.Text;
             code = acc.Trim().Length > 10 ? acc.Trim() : ModernTemplate(name, cmd.Description);
         }
         else
@@ -404,12 +387,11 @@ public class SoftwareEngineeringClosedLoopNeuron : Neuron, IHandle<ClosedLoopReq
     {
         Logger.LogInformation("ClosedLoop {Type} requested: {Prompt}", req.LoopType, req.Prompt);
 
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
+        var chat = ServiceProvider.GetService<IChatClient>();
         string analysis = "no-llm-fallback";
 
-        if (llm != null)
+        if (chat != null)
         {
-            llm.SelectedModel = "qwen2.5-coder:1.5b";
             string sysPrompt;
             if (req.LoopType.Equals("ui", StringComparison.OrdinalIgnoreCase) || req.LoopType.Contains("dart", StringComparison.OrdinalIgnoreCase))
             {
@@ -420,11 +402,10 @@ public class SoftwareEngineeringClosedLoopNeuron : Neuron, IHandle<ClosedLoopReq
                 sysPrompt = "You are the SoftwareEngineering ClosedLoopNeuron. Inspect via Aspire MCP (list_resources, list_structured_logs, list_traces), use local context from journals. Propose runtime modifications to neurons/marketplace/INO/editor. Apply via marketplace publish+install for new behavior, or Aspire execute_resource_command restart on resources (silo etc) because multiple kernels may run. Prefer safe Aspire-orchestrated applies + checkpoints. Be concise.";
             }
             var full = sysPrompt + "\nPROMPT: " + req.Prompt + "\nCTX: journal-driven";
-            var acc = "";
             try
             {
-                await foreach (var ch in llm.GenerateAsync(full))
-                    if (ch?.Response is string t) acc += t;
+                var response = await chat.GetResponseAsync(full);
+                var acc = response.Text;
                 analysis = string.IsNullOrWhiteSpace(acc) ? "processed" : acc.Trim();
             }
             catch (Exception ex)
@@ -640,22 +621,19 @@ public class SystemStatusNeuron : Neuron, ISystemStatus
 
     private async Task DiagnoseAndProposeAsync(SystemStatusChanged bad, CancellationToken ct)
     {
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
+        var chat = ServiceProvider.GetService<IChatClient>();
         string analysis = "manual review required";
-        if (llm != null && _mcp != null)
+        if (chat != null && _mcp != null)
         {
             try
             {
-                // Pull more real data via MCP for better diagnosis
                 var resources = await CallMcpAsync("list_resources", ct);
                 var logs = await CallMcpAsync("list_structured_logs", new { resourceName = bad.Component }, ct);
                 var traces = await CallMcpAsync("list_traces", new { resourceName = bad.Component }, ct);
 
-                llm.SelectedModel = "qwen2.5-coder:1.5b";
                 var prompt = $"Analyze this DigitalBrain failure. Component: {bad.Component} Status: {bad.Status}. Resources: {resources}. Logs: {logs}. Traces: {traces}. Propose one minimal actionable fix (e.g. restart resource or config change).";
-                var acc = "";
-                await foreach (var ch in llm.GenerateAsync(prompt)) if (ch?.Response is string t) acc += t;
-                analysis = acc.Trim();
+                var response = await chat.GetResponseAsync(prompt);
+                analysis = response.Text.Trim();
             }
             catch { /* fall through */ }
         }
@@ -734,17 +712,13 @@ public class KernelTaskNeuron : Neuron, IKernelTask
     {
         await FireAsync(new KernelTaskCreated(cmd.TaskId, cmd.Description));
         await FireAsync(new KernelTaskStarted(cmd.TaskId));
-        // Real execution: use LLM to actually perform the described task and capture meaningful result value.
         string result;
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm != null)
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat != null)
         {
-            llm.SelectedModel = "qwen2.5-coder:1.5b";
             var prompt = $"Perform the kernel task and output ONLY the concise result value: {cmd.Description}";
-            var acc = "";
-            await foreach (var ch in llm.GenerateAsync(prompt))
-                if (ch?.Response is string t) acc += t;
-            result = acc.Trim();
+            var response = await chat.GetResponseAsync(prompt);
+            result = response.Text.Trim();
             if (string.IsNullOrWhiteSpace(result)) result = "completed:" + cmd.Description;
         }
         else

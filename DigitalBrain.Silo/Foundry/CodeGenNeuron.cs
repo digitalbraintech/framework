@@ -1,6 +1,6 @@
 using DigitalBrain.Protocol;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
-using OllamaSharp;
 
 namespace DigitalBrain.Silo.Foundry;
 
@@ -18,8 +18,8 @@ public class CodeGenNeuron : Neuron, ICodeGenNeuron
 
     private async Task<string> GenerateSourceAsync(GenerateCode cmd)
     {
-        var llm = ServiceProvider.GetService<IOllamaApiClient>();
-        if (llm is null)
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat is null)
             return FallbackSource(cmd);
 
         var system = cmd.Tier == TargetTier.Run
@@ -27,12 +27,8 @@ public class CodeGenNeuron : Neuron, ICodeGenNeuron
             : "You generate ONE Orleans grain neuron deriving from DigitalBrain.Silo.Neuron with [GrainType] and an IHandle<T> handler. Respond ONLY with a ```csharp block.";
         var prompt = system + "\n\nSpec: " + cmd.Spec + "\nHints: " + cmd.Hints;
 
-        llm.SelectedModel = "qwen2.5-coder:1.5b";
-        var accumulated = "";
-        await foreach (var chunk in llm.GenerateAsync(prompt))
-            if (chunk?.Response is string t) accumulated += t;
-
-        var extracted = ExtractCode(accumulated);
+        var response = await chat.GetResponseAsync(prompt);
+        var extracted = ExtractCode(response.Text);
         return string.IsNullOrWhiteSpace(extracted) ? FallbackSource(cmd) : extracted;
     }
 

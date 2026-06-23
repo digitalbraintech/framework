@@ -1,4 +1,5 @@
 using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Silo.Llm;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Orleans;
@@ -25,7 +26,7 @@ public static class DigitalBrainKernelExtensions
             // Built-in neurons discovered automatically.
         });
 
-        builder.AddOllamaApiClient("qwen");
+        builder.Services.AddDigitalBrainChat(builder.Configuration);
 
         return builder;
     }
