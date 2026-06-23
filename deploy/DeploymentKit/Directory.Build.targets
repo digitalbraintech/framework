@@ -1,0 +1,12 @@
+<Project>
+  <PropertyGroup>
+    <_ToolsRestoredSentinel>$(MSBuildThisFileDirectory).config\.tools-restored</_ToolsRestoredSentinel>
+  </PropertyGroup>
+
+  <Target Name="RestoreDotnetTools" BeforeTargets="Restore;Build"
+          Condition="!Exists('$(_ToolsRestoredSentinel)')">
+    <Exec Command="dotnet tool restore" WorkingDirectory="$(MSBuildThisFileDirectory)" />
+    <MakeDir Directories="$(MSBuildThisFileDirectory).config" />
+    <Touch Files="$(_ToolsRestoredSentinel)" AlwaysCreate="true" />
+  </Target>
+</Project>
