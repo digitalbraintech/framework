@@ -97,4 +97,8 @@ namespace DigitalBrain.Protocol;
 [JsonSerializable(typeof(GitReverted))]
 // Distribution / embodiment
 [JsonSerializable(typeof(PackEmission))]
+// Awesome / software-engineering review
+[JsonSerializable(typeof(ReviewRequest))]
+[JsonSerializable(typeof(ReviewProjectRequest))]
+[JsonSerializable(typeof(ReviewResult))]
 public partial class JournalJsonContext : JsonSerializerContext;
