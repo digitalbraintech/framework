@@ -40,7 +40,9 @@ NOT regressions; everything else green.
 
 ## Extended (deferred items, user-requested)
 - L9 UI backbone DONE: RfwCard synapse + HomeFeedBus (fanout+dedup) + ChatNeuron (IHandle<VisualizeDataRequest> -> RfwCard) + streaming gRPC WatchHomeFeed. SDUI: UiSurface canonical, RfwCard added. Flutter client + gRPC wire test deferred (env sockets).
-- IN PROGRESS: Context phase 2 (Qdrant + embeddings + PDF), then WASM sandbox.
+- Context phase 2 DONE: IVectorStore + InMemoryVectorStore (tested) + QdrantVectorStore (build-verified) + TextChunker + DocumentIngestor. PDF deferred (feed lacks stable PdfPig); real embeddings are a drop-in IEmbeddingGenerator swap.
+- Sandbox DONE: ISandboxedExecutor + OutOfProcessSandbox (child-process isolation, CapabilityGate-screened, tested). True WASM (Wasmtime) documented as the next tier, not built.
+- ALL deferred items addressed. Only the 108-file Flutter CLIENT + live Qdrant/Ollama/Stripe/gRPC-wire need external infra (env-blocked here).
 ## Remaining:
 - L9 UI: server-side streaming gRPC pipeline (uigateway.proto + HomeFeedBus + ConversationGrain + RfwCard) and
   the 108-file Flutter client. XL; needs a canonical-SDUI-model decision (keep UiSurface + add RfwCard, vs migrate).
