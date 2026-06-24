@@ -193,21 +193,37 @@ public class NeuronTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Branch_And_TimeTravel_Isolates_Journals()
+    public async Task Branch_Forks_Same_Type_With_Replayed_History_And_Isolation()
     {
-        var src = _cluster!.GrainFactory.GetGrain<ISystemStatus>("branch-src");
-        await src.FireAsync(new SystemStatusChanged("test", "ok"));
+        var src = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("branch-src");
+        await src.FireAsync(new DemoMessageSynapse("original"));
         var cp = await src.CreateCheckpointAsync();
         var bid = await src.BranchAsync(cp);
         Assert.NotEqual(src.GetPrimaryKeyString(), bid.Value);
 
+        // The branch is a grain of the SAME type, seeded with the checkpoint history.
         var branch = _cluster.GrainFactory.GetGrain<IDemoNeuron>(bid.Value);
-        await branch.FireAsync(new DemoMessageSynapse("from branch only"));
-        var bOut = await branch.GetOutgoingTimelineAsync();
+        var branchIn = await branch.GetIncomingTimelineAsync();
+        Assert.Contains(branchIn, s => s is DemoMessageSynapse d && d.Text == "original");
+
+        // Firing on the branch does not pollute the source (isolation).
+        await branch.FireAsync(new DemoMessageSynapse("branch only"));
         var mainOut = await src.GetOutgoingTimelineAsync();
-        Assert.Contains(bOut, s => s is DemoMessageSynapse);
-        // Main not polluted by branch fire (isolation)
-        Assert.DoesNotContain(mainOut, s => s is DemoMessageSynapse && ((DemoMessageSynapse)s).Text.Contains("branch only"));
+        Assert.DoesNotContain(mainOut, s => s is DemoMessageSynapse d && d.Text.Contains("branch only"));
+    }
+
+    [Fact]
+    public async Task Restore_Seeds_Journal_From_Checkpoint_Without_Redispatch()
+    {
+        var src = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("restore-src");
+        await src.FireAsync(new DemoMessageSynapse("to-restore"));
+        var checkpoint = await src.CreateCheckpointAsync();
+
+        var target = _cluster.GrainFactory.GetGrain<IDemoNeuron>("restore-target");
+        await target.RestoreCheckpointAsync(checkpoint);
+
+        var restored = await target.GetIncomingTimelineAsync();
+        Assert.Contains(restored, s => s is DemoMessageSynapse d && d.Text == "to-restore");
     }
 
     [Fact]

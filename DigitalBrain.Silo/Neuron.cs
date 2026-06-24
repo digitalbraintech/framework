@@ -1,5 +1,6 @@
 using DigitalBrain.Protocol;
 using Orleans.Journaling;
+using Orleans.Runtime;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
@@ -102,7 +103,9 @@ public abstract class Neuron : DurableGrain, INeuron
 
     public async ValueTask<Checkpoint> CreateCheckpointAsync()
     {
-        var snap = OutgoingJournal.Concat(IncomingJournal).DistinctBy(s => new { s.Timestamp, s.Type, Sender = s.Sender?.Value, Receiver = s.Receiver?.Value }).ToList();
+        // Dedup by the stable SynapseId (a synapse fired then self-delivered appears in both journals as the
+        // same instance) — robust vs. the old {Timestamp,Type,Sender,Receiver} heuristic.
+        var snap = OutgoingJournal.Concat(IncomingJournal).DistinctBy(s => s.SynapseId).ToList();
         var cp = new Checkpoint(Self, snap.AsReadOnly(), DateTimeOffset.UtcNow);
         await FireAsync(cp);
         return cp;
@@ -111,14 +114,26 @@ public abstract class Neuron : DurableGrain, INeuron
     public async Task<NeuronId> BranchAsync(Checkpoint checkpoint)
     {
         var branchKey = $"{Self.Value}@branch-{Guid.NewGuid():N}";
-        // Use a known concrete (IDemoNeuron) as stand-in receiver for branch replay. It implements INeuron fully.
-        var branch = GrainFactory.GetGrain<IDemoNeuron>(branchKey);
+        // Branch into a NEW grain of the SAME concrete type as this neuron (was hardcoded to IDemoNeuron),
+        // so the fork really is a copy of *this* neuron's behavior, replayed from the checkpoint.
+        var branch = GrainFactory.GetGrain<INeuron>(GrainId.Create(this.GetGrainId().Type, branchKey));
         foreach (var s in checkpoint.Snapshot)
         {
             await branch.DeliverAsync(s);
         }
         await branch.FireAsync(new BranchCreated(Self, branchKey));
         return new NeuronId(branchKey);
+    }
+
+    // Restore: seed this neuron's incoming journal from a checkpoint WITHOUT re-dispatching handlers
+    // (state recovery, not re-execution). Branching, by contrast, replays into a fresh grain.
+    public async Task RestoreCheckpointAsync(Checkpoint checkpoint)
+    {
+        foreach (var s in checkpoint.Snapshot)
+        {
+            AddToJournal(ref _incomingJournal, "in-journal", s);
+        }
+        await WriteJournalStateAsync();
     }
 
     // Internal for point to point. Incoming synapses are auto-recorded here (called by sender Fire or direct).

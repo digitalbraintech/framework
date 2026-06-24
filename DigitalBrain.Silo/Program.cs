@@ -1,5 +1,6 @@
 using Azure.Storage.Blobs;
 using DigitalBrain.Protocol;
+using DigitalBrain.Silo;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Silo.Llm;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
@@ -62,6 +63,7 @@ if (isAspireHosted)
 }
 
 builder.Services.AddDigitalBrainChat(builder.Configuration);
+builder.Services.AddKernelSecurity(builder.Configuration);
 
 builder.UseOrleans(siloBuilder =>
 {
