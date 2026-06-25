@@ -67,3 +67,6 @@ Verifs: 10 pass.
 
 Verifs: 10 pass, doctor pass.
 Expanded coverage for UI surfaces in update flows.
+
+Continued: update kernel self-update to use seeded pack version/desc from MarketplaceSeeds.
+Verifs: build clean, tests pass.
