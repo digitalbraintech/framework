@@ -548,18 +548,21 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-dashboard\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 74
-  await testRunner.GivenAsync("a company skill orchestrator neuron \"company-skill-kupdate\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+  await testRunner.WhenAsync("I publish pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
 #line hidden
 #line 75
-  await testRunner.WhenAsync("I create company skill \"kernel\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+  await testRunner.AndAsync("I download/install the pack \"kernel\" version \"rolling-2026.6\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 76
-  await testRunner.ThenAsync("the timeline contains a UiSurface of kind \"kernel-rolling-drain\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+  await testRunner.AndAsync("I trigger kernel self update", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
 #line 77
-  await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-verify\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+  await testRunner.ThenAsync("the timeline contains a UiSurface of kind \"kernel-rolling-drain\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
 #line hidden
 #line 78
+  await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-verify\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 79
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-complete\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }

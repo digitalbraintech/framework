@@ -114,6 +114,7 @@ namespace DigitalBrain.Silo;
 [JsonSerializable(typeof(LicenseKeyPair))]
 // Server-driven UI
 [JsonSerializable(typeof(RfwCard))]
+[JsonSerializable(typeof(PerformKernelSelfUpdate))]
 // Kernel task records (listed here for Silo journaling; types defined in Core protocol)
 [JsonSerializable(typeof(DigitalBrain.Core.KernelTaskCreated))]
 [JsonSerializable(typeof(DigitalBrain.Core.KernelTaskStarted))]

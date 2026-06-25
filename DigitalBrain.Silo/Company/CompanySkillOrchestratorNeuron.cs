@@ -21,12 +21,6 @@ public sealed class CompanySkillOrchestratorNeuron : Neuron, ICompanySkillOrches
 
         Logger.LogInformation("Orchestrator starting skill creation for {Process}", processName);
 
-        if (string.Equals(processName, KernelPack.Name, StringComparison.OrdinalIgnoreCase))
-        {
-            await HandleKernelSelfUpdateAsync();
-            return;
-        }
-
         string baseDir = AppContext.BaseDirectory;
         string samplesRoot = Path.Combine(baseDir, "..", "..", "..", "samples", "CompanyBrain");
         if (!Directory.Exists(samplesRoot))
@@ -77,99 +71,5 @@ public sealed class CompanySkillOrchestratorNeuron : Neuron, ICompanySkillOrches
         await FireAsync(new CompanySkillCreationResult(processName, "1.0", verified, details));
 
         Logger.LogInformation("Company skill creation completed for {Process}: {Success} - {Details}", processName, verified, details);
-    }
-
-    private async Task HandleKernelSelfUpdateAsync()
-    {
-        var market = GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
-        // Use seeded knowledge consistently; kernel uses local pack metadata (no dummy code).
-        var version = KernelPack.DefaultVersion;
-        var seedDesc = KernelPack.Description;
-        // No generated dummy behavior code: kernel pack is metadata + rolling signal; embodiment handled by host.
-        var kernelPackCode = string.Empty;
-        await market.FireAsync(new PublishToMarketplace(KernelPack.Name, version, kernelPackCode, "digitalbraintech", false, 0.0, seedDesc));
-
-        await market.FireAsync(new InstallFromMarketplace(KernelPack.Name, version, "self"));
-
-        // Preserve state before rolling restart using checkpoint (seamless update primitive).
-        var preUpdateCheckpoint = await CreateCheckpointAsync();
-
-        var aspire = GrainFactory.GetGrain<IAspireNeuron>("aspire-main");
-
-        // Explicit rolling update across replicas (drain one, update, verify using checkpoint + lineage, rejoin).
-        // 3 replicas for HA, update incrementally.
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        var lineageCount = 0;
-
-        for (int replica = 1; replica <= 3; replica++)
-        {
-            // Drain phase.
-            var drainProps = new Dictionary<string, object?>
-            {
-                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingDrain}-{replica}",
-                [UiSurfaceKeys.Emitter] = Self.Value,
-                [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
-                [UiSurfaceKeys.Priority] = 70 + replica,
-                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-                ["replica"] = replica,
-                ["phase"] = "draining",
-                ["version"] = version,
-                ["checkpointId"] = preUpdateCheckpoint.SynapseId
-            };
-            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingDrain, drainProps));
-            if (bus is not null)
-            {
-                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
-            }
-
-            // Rolling restart signal for replica.
-            await aspire.FireAsync(new RestartResource("silo", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"));
-
-            // Verify using causal lineage.
-            var replicaLineage = await GetCausalLineageAsync(preUpdateCheckpoint.SynapseId);
-            lineageCount = replicaLineage.Count;
-
-            var verifyProps = new Dictionary<string, object?>
-            {
-                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingVerify}-{replica}",
-                [UiSurfaceKeys.Emitter] = Self.Value,
-                [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
-                [UiSurfaceKeys.Priority] = 70 + replica,
-                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-                ["replica"] = replica,
-                ["phase"] = "verified",
-                ["version"] = version,
-                ["lineageEvents"] = lineageCount
-            };
-            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingVerify, verifyProps));
-            if (bus is not null)
-            {
-                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "verified", version, lineageEvents = lineageCount })));
-            }
-        }
-
-        await FireAsync(new CompanySkillCreationResult(KernelPack.Name, version, true, $"Kernel pack installed from marketplace. Rolling update complete (3 replicas, drain-verify-rejoin, checkpoint preserved, lineage events: {lineageCount})."));
-
-        var statusData = System.Text.Json.JsonSerializer.Serialize(new { process = KernelPack.Name, version, status = "complete", haReplicas = 3, checkpoint = preUpdateCheckpoint.SynapseId, lineageEvents = lineageCount });
-        if (bus is not null)
-        {
-            bus.Broadcast(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData));
-        }
-
-        var completeProps = new Dictionary<string, object?>
-        {
-            [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingComplete}-{version}",
-            [UiSurfaceKeys.Emitter] = Self.Value,
-            [UiSurfaceKeys.Title] = "Kernel Rolling Update",
-            [UiSurfaceKeys.Priority] = 80,
-            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
-            ["version"] = version,
-            ["strategy"] = "one-replica-at-a-time",
-            ["checkpointId"] = preUpdateCheckpoint.SynapseId,
-            ["status"] = "complete",
-            ["replicasProcessed"] = 3,
-            ["lineageEvents"] = lineageCount
-        };
-        await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingComplete, completeProps));
     }
 }

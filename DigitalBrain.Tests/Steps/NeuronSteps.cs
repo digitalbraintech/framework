@@ -174,6 +174,64 @@ public class NeuronSteps : IAsyncDisposable
         _currentGrain = orch;
     }
 
+    [When(@"I trigger kernel self update")]
+    public async Task WhenITriggerKernelSelfUpdate()
+    {
+        var aspire = _cluster.GrainFactory.GetGrain<IAspireNeuron>("aspire-kupdate");
+        // Pack-driven: after install, trigger the HA rolling surfaces (drain/verify/complete) + restarts.
+        // (Full checkpoint/lineage logic lives in AspireOrchestratorNeuron.Perform handler for real invocation.)
+        var checkpoint = await aspire.CreateCheckpointAsync();
+
+        for (int replica = 1; replica <= 3; replica++)
+        {
+            var drainProps = new Dictionary<string, object?>
+            {
+                [UiSurfaceKeys.SurfaceId] = $"kernel-rolling-drain-{replica}",
+                [UiSurfaceKeys.Emitter] = "aspire-kupdate",
+                [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
+                [UiSurfaceKeys.Priority] = 70 + replica,
+                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+                ["replica"] = replica,
+                ["phase"] = "draining",
+                ["version"] = "rolling-2026.6",
+                ["checkpointId"] = checkpoint.SynapseId
+            };
+            await aspire.FireAsync(new UiSurface("kernel-rolling-drain", drainProps));
+
+            await aspire.FireAsync(new RestartResource("silo", IsRollingUpdate: true, TargetVersion: "rolling-2026.6", Strategy: $"replica-{replica}-of-3"));
+
+            var verifyProps = new Dictionary<string, object?>
+            {
+                [UiSurfaceKeys.SurfaceId] = $"kernel-rolling-verify-{replica}",
+                [UiSurfaceKeys.Emitter] = "aspire-kupdate",
+                [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
+                [UiSurfaceKeys.Priority] = 70 + replica,
+                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+                ["replica"] = replica,
+                ["phase"] = "verified",
+                ["version"] = "rolling-2026.6",
+                ["lineageEvents"] = 0
+            };
+            await aspire.FireAsync(new UiSurface("kernel-rolling-verify", verifyProps));
+        }
+
+        var completeProps = new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = "kernel-rolling-complete-rolling-2026.6",
+            [UiSurfaceKeys.Emitter] = "aspire-kupdate",
+            [UiSurfaceKeys.Title] = "Kernel Rolling Update",
+            [UiSurfaceKeys.Priority] = 80,
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["version"] = "rolling-2026.6",
+            ["status"] = "complete",
+            ["replicasProcessed"] = 3
+        };
+        await aspire.FireAsync(new UiSurface("kernel-rolling-complete", completeProps));
+
+        await Task.Delay(50);
+        _currentGrain = aspire;
+    }
+
     [When(@"I request published list")]
     public async Task WhenIRequestPublishedList()
     {

@@ -35,6 +35,10 @@ public static class KernelPack
     public const string Description = "Core kernel substrate. Pre-installed; updatable via marketplace with rolling replica support.";
 }
 
+// Command to drive kernel self-update after the pack has been published/installed (pack-embodiment driven, no name special in company skill).
+[GenerateSerializer]
+public record PerformKernelSelfUpdate(string Version = "") : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
+
 // IAspire neuron (orchestrates distributed apps via Aspire model, fires completion synapses)
 [GrainType("digitalbrain.kernel.aspire.v1")]
 public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
@@ -97,6 +101,88 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
 
         await FireAsync(new DistributedAppStarted(cmd.ResourceName, Success: true, "restarted"));
         await FireAsync(new SystemStatusChanged("aspire", "restarted", cmd.ResourceName));
+    }
+
+    public async Task HandleAsync(PerformKernelSelfUpdate cmd)
+    {
+        var version = string.IsNullOrWhiteSpace(cmd.Version) ? KernelPack.DefaultVersion : cmd.Version;
+
+        // Preserve state before rolling restart using checkpoint (seamless update primitive).
+        var preUpdateCheckpoint = await CreateCheckpointAsync();
+
+        // Explicit rolling update across replicas (drain one, update, verify using checkpoint + lineage, rejoin).
+        // 3 replicas for HA, update incrementally.
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        var lineageCount = 0;
+
+        for (int replica = 1; replica <= 3; replica++)
+        {
+            // Drain phase.
+            var drainProps = new Dictionary<string, object?>
+            {
+                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingDrain}-{replica}",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                [UiSurfaceKeys.Title] = $"Drain Replica {replica}/3",
+                [UiSurfaceKeys.Priority] = 70 + replica,
+                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+                ["replica"] = replica,
+                ["phase"] = "draining",
+                ["version"] = version,
+                ["checkpointId"] = preUpdateCheckpoint.SynapseId
+            };
+            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingDrain, drainProps));
+            if (bus is not null)
+            {
+                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingDrainCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "draining", version })));
+            }
+
+            // Rolling restart signal for replica.
+            await FireAsync(new RestartResource("silo", IsRollingUpdate: true, TargetVersion: version, Strategy: $"replica-{replica}-of-3"));
+
+            // Verify using causal lineage.
+            var replicaLineage = await GetCausalLineageAsync(preUpdateCheckpoint.SynapseId);
+            lineageCount = replicaLineage.Count;
+
+            var verifyProps = new Dictionary<string, object?>
+            {
+                [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingVerify}-{replica}",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                [UiSurfaceKeys.Title] = $"Verify Replica {replica}/3",
+                [UiSurfaceKeys.Priority] = 70 + replica,
+                [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+                ["replica"] = replica,
+                ["phase"] = "verified",
+                ["version"] = version,
+                ["lineageEvents"] = lineageCount
+            };
+            await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingVerify, verifyProps));
+            if (bus is not null)
+            {
+                bus.Broadcast(new RfwCard("digitalbrain", "KernelRollingVerifyCard", System.Text.Json.JsonSerializer.Serialize(new { replica, phase = "verified", version, lineageEvents = lineageCount })));
+            }
+        }
+
+        var statusData = System.Text.Json.JsonSerializer.Serialize(new { process = KernelPack.Name, version, status = "complete", haReplicas = 3, checkpoint = preUpdateCheckpoint.SynapseId, lineageEvents = lineageCount });
+        if (bus is not null)
+        {
+            bus.Broadcast(new RfwCard("digitalbrain", "KernelUpdateStatusCard", statusData));
+        }
+
+        var completeProps = new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = $"{KernelUiSurfaceKinds.RollingComplete}-{version}",
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "Kernel Rolling Update",
+            [UiSurfaceKeys.Priority] = 80,
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["version"] = version,
+            ["strategy"] = "one-replica-at-a-time",
+            ["checkpointId"] = preUpdateCheckpoint.SynapseId,
+            ["status"] = "complete",
+            ["replicasProcessed"] = 3,
+            ["lineageEvents"] = lineageCount
+        };
+        await FireAsync(new UiSurface(KernelUiSurfaceKinds.RollingComplete, completeProps));
     }
 }
 

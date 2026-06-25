@@ -71,9 +71,10 @@ Scenario: Kernel self-update publishes as pre-installed pack then performs expli
   And the timeline contains a DistributedAppStarted
   And the timeline contains a UiSurface
   And the timeline contains a UiSurface of kind "kernel-dashboard"
-  Given a company skill orchestrator neuron "company-skill-kupdate"
-  When I create company skill "kernel"
+  When I publish pack "kernel" version "rolling-2026.6"
+  And I download/install the pack "kernel" version "rolling-2026.6"
+  And I trigger kernel self update
   Then the timeline contains a UiSurface of kind "kernel-rolling-drain"
   And the timeline contains a UiSurface of kind "kernel-rolling-verify"
   And the timeline contains a UiSurface of kind "kernel-rolling-complete"
-  # drain/verify/complete phases asserted for kernel pack rolling self-update (HA, checkpoints, lineage)
+  # pack install drives the update; rolling (drain/verify/complete) emitted via Aspire after embodiment (no company-skill name special case)

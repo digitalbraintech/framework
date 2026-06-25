@@ -186,12 +186,15 @@ while (true)
 
             case "update-kernel":
             case "update":
-                Console.WriteLine("Using orchestrator for kernel self-update (kernel is pre-installed in marketplace but remains updatable)...");
-                var kernelOrch = grains.GetGrain<ICompanySkillOrchestratorNeuron>("company-skill-main");
-                await kernelOrch.FireAsync(new CreateCompanySkill("kernel"));
-                var kTl = await kernelOrch.GetOutgoingTimelineAsync();
-                var kResult = kTl.OfType<CompanySkillCreationResult>().LastOrDefault();
-                Console.WriteLine(kResult != null ? $"Kernel update result: {kResult.Details}" : "Kernel update triggered via orchestrator for rolling/HA update.");
+                Console.WriteLine("Using direct marketplace pack + rolling for kernel self-update (first-class pack embodiment)...");
+                var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                var version = "0.3.0";
+                await market.FireAsync(new PublishToMarketplace("kernel", version, "", "digitalbraintech", false, 0.0, "Core kernel substrate. Pre-installed; updatable via marketplace with rolling replica support."));
+                await market.FireAsync(new InstallFromMarketplace("kernel", version, "self"));
+
+                var aspire = grains.GetGrain<IAspireNeuron>("aspire-main");
+                await aspire.FireAsync(new DigitalBrain.Silo.PerformKernelSelfUpdate(version));
+                Console.WriteLine("Kernel pack installed + rolling update triggered.");
                 break;
 
             case "edit":
