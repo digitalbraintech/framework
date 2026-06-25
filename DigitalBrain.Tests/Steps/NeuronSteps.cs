@@ -178,10 +178,8 @@ public class NeuronSteps : IAsyncDisposable
     public async Task WhenITriggerKernelSelfUpdate()
     {
         var aspire = _cluster.GrainFactory.GetGrain<IAspireNeuron>("aspire-kupdate");
-        // Pack-driven: after install, trigger via command (production path in AspireOrchestratorNeuron handler)
-        // + direct surfaces using centralized kinds for reliable test assertion in cluster.
+        // Pack-driven: fire the command (exercises handler) + emit surfaces using consts for reliable assertion.
         await aspire.FireAsync(new DigitalBrain.Silo.PerformKernelSelfUpdate("rolling-2026.6"));
-
         var checkpoint = await aspire.CreateCheckpointAsync();
 
         for (int replica = 1; replica <= 3; replica++)
