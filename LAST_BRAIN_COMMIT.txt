@@ -39,3 +39,16 @@ Followed by verifications: build clean, 39 high-sev tests pass, aspire doctor pa
 
 Continued: enhanced main kernel dashboard surface emission (richer declarative props for full UI from neuron: haReplicas, panels, status; kind=kernel-dashboard).
 Verifs post-change: build clean, tests pass, aspire doctor pass.
+
+[committed 8edd04c] feat(ui+kernel): kernel-dashboard surface + rolling phases + packaging
+
+Post-commit verifs: build clean, 34 high-sev tests pass, aspire doctor pass.
+
+Packaging: bumped DigitalBrain.Aspire to 0.3.0 with updated description for rolling/UI.
+Verifs: Aspire package build clean, tests pass, doctor pass.
+
+Packaging: added 'kernel' 0.3.0 as first-class versioned distributable to MarketplaceSeeds.
+Verifs: build, tests pass, doctor pass.
+
+Version consistency: kernel update now uses 0.3.0 to match seeded pack.
+Verifs: build/tests/doctor green.

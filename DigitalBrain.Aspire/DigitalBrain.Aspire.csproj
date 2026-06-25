@@ -7,8 +7,8 @@
     <IsAspireProjectResource>false</IsAspireProjectResource>
     <IsPackable>true</IsPackable>
     <PackageId>DigitalBrain.Aspire</PackageId>
-    <Version>0.2.0-preview-kernel-updatable</Version>
-    <Description>Aspire hosting for DigitalBrain kernel (replicas for HA self-update, marketplace, embodiment). Core + kernel refactored for updatable pre-installed kernel package.</Description>
+    <Version>0.3.0</Version>
+    <Description>Aspire hosting for DigitalBrain kernel (replicas=3 for HA rolling self-update, marketplace, ALC embodiment). Core + kernel refactored for updatable pre-installed kernel package with manifest, causal queries, explicit drain/verify phases and neuron-emitted UI surfaces.</Description>
   </PropertyGroup>
 
   <ItemGroup>

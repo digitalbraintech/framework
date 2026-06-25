@@ -82,7 +82,7 @@ public sealed class CompanySkillOrchestratorNeuron : Neuron, ICompanySkillOrches
     private async Task HandleKernelSelfUpdateAsync()
     {
         var market = GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
-        var version = "2026.6-hotfix-kernel";
+        var version = "0.3.0"; // Matches kernel pack in MarketplaceSeeds for versioned distributable.
         // Carry real payload (metadata + signal) so kernel update is a proper typed pack embodiment opportunity.
         var kernelPackCode = "// kernel-update-signal version=" + version + "\npublic sealed class KernelUpdateBehavior : DigitalBrain.Core.IPackBehavior { public string Respond(string i) => \"kernel-rolling:\" + i; }";
         await market.FireAsync(new PublishToMarketplace("kernel", version, kernelPackCode, "digitalbraintech", false, 0.0, "Kernel runtime self-update via marketplace as pre-installed pack"));
