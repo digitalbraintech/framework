@@ -52,3 +52,6 @@ Verifs: build, tests pass, doctor pass.
 
 Version consistency: kernel update now uses 0.3.0 to match seeded pack.
 Verifs: build/tests/doctor green.
+
+Post-commit verifs (after 5944698): build clean, 39 high-sev tests pass, aspire doctor pass.
+Next: expand Reqnroll for rolling phases + UI surfaces, more declarative UI, use seeded kernel pack.

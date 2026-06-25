@@ -8,6 +8,7 @@ public class UiSurfaceContractTests
     public static TheoryData<UiSurface, string[]> PlannedSurfaces => new()
     {
         { UiSurfaceSamples.KernelTasks(), new[] { "tasks", UiSurfaceKeys.Actions } },
+        { UiSurfaceSamples.KernelDashboard(), new[] { "haReplicas", "status", "tasks", "workbenchPanels" } },
         { UiSurfaceSamples.ActivityGraph(), new[] { "nodes", "edges", "events" } },
         { UiSurfaceSamples.TaskWindow(), new[] { "taskId", "state", "body", UiSurfaceKeys.Actions } },
         { UiSurfaceSamples.UserInput(), new[] { "prompt", "schema", "submitAction", "cancelAction" } },

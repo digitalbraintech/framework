@@ -111,6 +111,22 @@ public static class UiSurfaceSamples
                 }
             }));
 
+    public static UiSurface KernelDashboard() => new(
+        "kernel-dashboard",
+        WithCommon(
+            surfaceId: "surface.kernel-dashboard",
+            emitter: "digitalbrain.kernel",
+            title: "Kernel Dashboard",
+            layout: UiSurfaceLayouts.Panel,
+            props: new Dictionary<string, object?>
+            {
+                ["haReplicas"] = 3,
+                ["status"] = "healthy",
+                ["tasks"] = "active",
+                ["lastUpdate"] = "none",
+                ["workbenchPanels"] = new[] { "tasks", "graph", "market", "chat", "timeline" }
+            }));
+
     public static UiSurface ActivityGraph() => new(
         UiSurfaceKinds.ActivityGraph,
         WithCommon(
