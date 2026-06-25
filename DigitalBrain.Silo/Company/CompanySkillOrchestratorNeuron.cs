@@ -82,7 +82,7 @@ public sealed class CompanySkillOrchestratorNeuron : Neuron, ICompanySkillOrches
     private async Task HandleKernelSelfUpdateAsync()
     {
         var market = GrainFactory.GetGrain<IMarketplaceNeuron>("market-main");
-        var kernelSeed = MarketplaceSeeds.LocalUiPacks.FirstOrDefault(p => p.Name == "kernel");
+        var kernelSeed = MarketplaceSeeds.LocalUiPacks.FirstOrDefault(p => p.Name == MarketplaceSeeds.KernelPackName);
         var version = kernelSeed?.Version ?? "0.3.0";
         var seedDesc = kernelSeed?.Description ?? "Kernel runtime self-update via marketplace as pre-installed pack with explicit rolling HA.";
         // Carry real payload (metadata + signal) so kernel update is a proper typed pack embodiment opportunity.

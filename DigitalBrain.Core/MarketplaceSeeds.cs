@@ -2,6 +2,8 @@ namespace DigitalBrain.Core;
 
 public static class MarketplaceSeeds
 {
+    public const string KernelPackName = "kernel";
+
     public static IReadOnlyList<NeuroPack> LocalUiPacks { get; } =
     [
         new NeuroPack(
@@ -51,7 +53,7 @@ public static class MarketplaceSeeds
 
         // Kernel as first-class versioned distributable pack (per best-impl doc).
         new NeuroPack(
-            "kernel",
+            KernelPackName,
             "0.3.0",
             "digitalbraintech",
             false,
