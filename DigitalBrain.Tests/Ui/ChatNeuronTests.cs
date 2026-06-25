@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Tests.TestSupport;
 using Orleans.TestingHost;
 using Xunit;
@@ -34,3 +34,4 @@ public class ChatNeuronTests : IAsyncLifetime
         Assert.Contains(conversation, c => c.DataJson.Contains("show sales"));
     }
 }
+

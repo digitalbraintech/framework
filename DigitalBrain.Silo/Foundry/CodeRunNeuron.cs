@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Silo.Foundry;
@@ -15,3 +15,4 @@ public class CodeRunNeuron : Neuron, ICodeRunNeuron
         await FireAsync(new CodeRunResult(result.Success, result.Output, result.Error));
     }
 }
+

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -114,3 +114,4 @@ public class InoNeuron : Neuron, IInoNeuron
         }
     }
 }
+

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -32,3 +32,4 @@ public static class KernelServices
         return services;
     }
 }
+

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.Sdk;
@@ -21,3 +21,4 @@ public class SdkContractsMetadataTests
         Assert.False(string.IsNullOrWhiteSpace(NeuronAgentMetadata.ReadFrom<IRoslynNeuron>().Instructions));
     }
 }
+

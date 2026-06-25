@@ -1,6 +1,6 @@
 using System.Diagnostics;
 using System.Text;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -115,3 +115,4 @@ public static class ProcessRunner
         return $"{output[..head]}\n\n... [{output.Length - maxLength} chars truncated] ...\n\n{output[^tail..]}";
     }
 }
+

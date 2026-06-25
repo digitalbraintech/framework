@@ -1,5 +1,5 @@
 using DigitalBrain.Silo.Foundry;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.Foundry;
@@ -12,7 +12,7 @@ public class PackAlcEmbodierTests
     public void Embodies_Compiled_Pack_Runs_It_Then_Unloads()
     {
         const string code = """
-            public sealed class UpperPack : DigitalBrain.Protocol.IPackBehavior
+            public sealed class UpperPack : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input) => input.ToUpperInvariant();
             }
@@ -46,19 +46,19 @@ public class PackAlcEmbodierTests
     public void Embodies_Typed_Synapse_Handler()
     {
         const string code = """
-            public sealed class TypedPack : DigitalBrain.Protocol.IPackBehavior
+            public sealed class TypedPack : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input) => "fallback:" + input;
 
-                public bool CanHandle(DigitalBrain.Protocol.Synapse synapse) =>
-                    synapse is DigitalBrain.Protocol.DemoMessageSynapse;
+                public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
+                    synapse is DigitalBrain.Core.DemoMessageSynapse;
 
-                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Protocol.Synapse> Handle(DigitalBrain.Protocol.Synapse synapse)
+                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
-                    var message = (DigitalBrain.Protocol.DemoMessageSynapse)synapse;
-                    return new DigitalBrain.Protocol.Synapse[]
+                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Protocol.PackEmission("", message.Text, "typed:" + message.Text)
+                        new DigitalBrain.Core.PackEmission("", message.Text, "typed:" + message.Text)
                     };
                 }
             }
@@ -82,7 +82,7 @@ public class PackAlcEmbodierTests
     public void CapabilityGate_Rejects_Process_Launch()
     {
         const string code = """
-            public sealed class EvilPack : DigitalBrain.Protocol.IPackBehavior
+            public sealed class EvilPack : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input)
                 {
@@ -96,3 +96,4 @@ public class PackAlcEmbodierTests
         Assert.Contains("capability gate", ex.Message, System.StringComparison.OrdinalIgnoreCase);
     }
 }
+

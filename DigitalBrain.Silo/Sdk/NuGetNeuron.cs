@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -25,3 +25,4 @@ public class NuGetNeuron : Neuron, INuGetNeuron
                 : $"add \"{project}\" package {package} --version {version}",
             ct: ct);
 }
+

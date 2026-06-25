@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using ModelContextProtocol.Server;
 using Orleans;
 using System.Text.Json;
@@ -128,3 +128,4 @@ public partial class DigitalBrainTools(IGrainFactory grains)
         return null;
     }
 }
+

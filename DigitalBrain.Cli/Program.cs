@@ -1,5 +1,5 @@
 // GrokCLI TUI - interactive Text User Interface for DigitalBrain (MCP/CLI proxy to neurons)
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Spectre.Console;
@@ -302,3 +302,4 @@ if (grains != null)
 }
 
 AnsiConsole.MarkupLine("[grey]GrokCLI TUI exited.[/]");
+

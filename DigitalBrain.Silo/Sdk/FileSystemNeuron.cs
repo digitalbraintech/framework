@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -68,3 +68,4 @@ public class FileSystemNeuron : Neuron, IFileSystemNeuron
         return Task.FromResult($"Path '{path}' does not exist.");
     }
 }
+

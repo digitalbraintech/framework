@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,7 +12,7 @@ public class CodeGenNeuron : Neuron, ICodeGenNeuron
     public async Task HandleAsync(GenerateCode cmd)
     {
         var source = await GenerateSourceAsync(cmd);
-        var refs = new[] { "System.Runtime", "DigitalBrain.Protocol" };
+        var refs = new[] { "System.Runtime", "DigitalBrain.Core" };
         await FireAsync(new CodeGenerated(cmd.Spec, source, cmd.Tier, refs));
     }
 
@@ -49,3 +49,4 @@ public class CodeGenNeuron : Neuron, ICodeGenNeuron
         return text.Trim();
     }
 }
+

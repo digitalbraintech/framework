@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using DigitalBrain.Tests.TestSupport;
 using Orleans.TestingHost;
@@ -89,3 +89,4 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
             pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
             pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64, pack.Price)).AsTask();
 }
+

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using System.Globalization;
 using System.Text.Json;
 
@@ -301,3 +301,4 @@ public static class DataChartBuilder
         return chars.Length == 0 ? "chart" : new string(chars);
     }
 }
+

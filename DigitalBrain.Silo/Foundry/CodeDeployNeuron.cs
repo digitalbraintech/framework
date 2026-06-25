@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DigitalBrain.Silo.Foundry;
@@ -51,3 +51,4 @@ public class CodeDeployNeuron : Neuron, ICodeDeployNeuron
         File.WriteAllText(Path.Combine(target, moduleName + ".cs"), source);
     }
 }
+

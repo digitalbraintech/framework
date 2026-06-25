@@ -90,6 +90,39 @@ public static class DigitalBrainBuilderExtensions
         ctx.EnableMcp = true;
         return ctx;
     }
+
+    /// <summary>
+    /// Wires a kernel silo project with the core kernel features out of the box:
+    /// marketplace, dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
+    /// This makes the kernel (company brain) provide built-in capabilities (embodiment, status, tasks, etc.)
+    /// immediately when the silo starts.
+    /// </summary>
+    public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> silo)
+    {
+        silo = silo
+            .WithReference(ctx.Orleans)
+            .WithReference(ctx.ClusteringTable)
+            .WithReference(ctx.GrainBlobs)
+            .WithReference(ctx.JournalBlobs)
+            .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
+            .WithReplicas(ctx.KernelReplicas);
+
+        silo.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
+        silo.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
+
+        // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks)
+        silo.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
+        silo.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
+        silo.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
+            ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
+
+        if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
+        {
+            silo.WithEndpoint(name: "orleans-dashboard", port: ctx.OrleansDashboardPort.Value, isProxied: ctx.KernelReplicas == 1);
+        }
+
+        return silo;
+    }
 }
 
 public sealed class DigitalBrainOptions

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using Xunit;
 
@@ -33,3 +33,4 @@ public class HomeFeedBusTests
         Assert.False(subscription.Reader.TryRead(out _)); // nothing more
     }
 }
+

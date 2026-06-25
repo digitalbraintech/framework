@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.Trust;
@@ -27,3 +27,4 @@ public class PackSignatureTests
         Assert.False(PackSignatureVerifier.VerifyPack(new NeuroPack("Echo", "1.0")));
     }
 }
+

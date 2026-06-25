@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\DigitalBrain.Protocol\DigitalBrain.Protocol.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -21,3 +21,4 @@
   </PropertyGroup>
 
 </Project>
+

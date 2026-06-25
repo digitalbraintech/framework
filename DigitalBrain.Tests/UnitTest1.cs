@@ -1,4 +1,4 @@
-﻿using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.Configuration;
@@ -189,7 +189,7 @@ public class NeuronTests : IAsyncLifetime
         // E2E: signed/unsigned ok in transition -> marketplace install -> embody via ALC -> use fires real IPackBehavior.Respond (not LLM fallback) -> PackEmission in journal.
         // Validates the keystone chain from the review gap.
         const string packCode = """
-            public sealed class Uppercaser : DigitalBrain.Protocol.IPackBehavior
+            public sealed class Uppercaser : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input) => (input ?? string.Empty).ToUpperInvariant();
             }
@@ -348,7 +348,7 @@ public class NeuronTests : IAsyncLifetime
     {
         var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
         var code = """
-            public sealed class EchoPack : DigitalBrain.Protocol.IPackBehavior
+            public sealed class EchoPack : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input) => "ECHO:" + input;
             }
@@ -375,19 +375,19 @@ public class NeuronTests : IAsyncLifetime
     public async Task Installed_Pack_Handles_Typed_Synapse_And_Preserves_Causation()
     {
         const string code = """
-            public sealed class TypedDispatchPack : DigitalBrain.Protocol.IPackBehavior
+            public sealed class TypedDispatchPack : DigitalBrain.Core.IPackBehavior
             {
                 public string Respond(string input) => "fallback:" + input;
 
-                public bool CanHandle(DigitalBrain.Protocol.Synapse synapse) =>
-                    synapse is DigitalBrain.Protocol.DemoMessageSynapse;
+                public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
+                    synapse is DigitalBrain.Core.DemoMessageSynapse;
 
-                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Protocol.Synapse> Handle(DigitalBrain.Protocol.Synapse synapse)
+                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
                 {
-                    var message = (DigitalBrain.Protocol.DemoMessageSynapse)synapse;
-                    return new DigitalBrain.Protocol.Synapse[]
+                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    return new DigitalBrain.Core.Synapse[]
                     {
-                        new DigitalBrain.Protocol.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
+                        new DigitalBrain.Core.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
                     };
                 }
             }
@@ -409,6 +409,71 @@ public class NeuronTests : IAsyncLifetime
         Assert.Equal("typed:typed-input", emission.Output);
         Assert.Equal(input.SynapseId, emission.CausationId);
         Assert.Equal(input.CorrelationId, emission.CorrelationId);
+    }
+
+    [Fact]
+    public async Task Installed_Pack_Handles_Typed_Synapse_And_Emits_Journaled_UiSurface()
+    {
+        const string code = """
+            public sealed class SurfacePack : DigitalBrain.Core.IPackBehavior
+            {
+                public string Respond(string input) => "fallback:" + input;
+
+                public bool CanHandle(DigitalBrain.Core.Synapse synapse) =>
+                    synapse is DigitalBrain.Core.DemoMessageSynapse;
+
+                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Core.Synapse> Handle(DigitalBrain.Core.Synapse synapse)
+                {
+                    var message = (DigitalBrain.Core.DemoMessageSynapse)synapse;
+                    var props = new System.Collections.Generic.Dictionary<string, object?>
+                    {
+                        [DigitalBrain.Core.UiSurfaceKeys.SurfaceId] = "surface-" + message.Text,
+                        [DigitalBrain.Core.UiSurfaceKeys.Emitter] = "SurfacePack",
+                        [DigitalBrain.Core.UiSurfaceKeys.Title] = "Pack surface",
+                        [DigitalBrain.Core.UiSurfaceKeys.Priority] = 10,
+                        [DigitalBrain.Core.UiSurfaceKeys.RequiresInput] = false,
+                        [DigitalBrain.Core.UiSurfaceKeys.Layout] = DigitalBrain.Core.UiSurfaceLayouts.Panel,
+                        ["message"] = message.Text
+                    };
+
+                    return new DigitalBrain.Core.Synapse[]
+                    {
+                        new DigitalBrain.Core.UiSurface(DigitalBrain.Core.UiSurfaceKinds.TaskWindow, props)
+                        {
+                            CorrelationId = "pack-spoofed-correlation",
+                            CausationId = "pack-spoofed-cause",
+                            SynapseId = synapse.SynapseId
+                        }
+                    };
+                }
+            }
+            """;
+
+        var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
+        var pack = PackSignatureVerifier.SignPack(
+            new NeuroPack("SurfacePack", "1.0", OwnerId: "dev", Code: code), priv, pub);
+
+        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-surface-pack");
+        await market.FireAsync(new PublishToMarketplace(
+            pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
+            pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64));
+        await market.FireAsync(new InstallFromMarketplace("SurfacePack", "1.0", BuyerId: "buyer"));
+
+        var generated = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-surfacepack");
+        await generated.FireAsync(new DemoMessageSynapse("task-card"));
+
+        var timeline = await generated.GetOutgoingTimelineAsync();
+        var input = timeline.OfType<DemoMessageSynapse>().Last(message => message.Text == "task-card");
+        var surface = timeline.OfType<UiSurface>().LastOrDefault(result =>
+            result.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var id) && Equals(id, "surface-task-card"));
+
+        Assert.NotNull(surface);
+        Assert.Equal(UiSurfaceKinds.TaskWindow, surface!.Kind);
+        Assert.Equal("task-card", surface.Props["message"]);
+        Assert.Equal(input.SynapseId, surface.CausationId);
+        Assert.Equal(input.CorrelationId, surface.CorrelationId);
+        Assert.NotEqual(input.SynapseId, surface.SynapseId);
+        Assert.Equal("generated-surfacepack", surface.Sender?.Value);
     }
 
     [Fact]

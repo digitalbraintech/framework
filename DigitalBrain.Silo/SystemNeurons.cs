@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo.Foundry;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.AI;
@@ -421,10 +421,19 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         return true;
     }
 
-    private static Synapse NormalizePackOutput(string packName, Synapse output) =>
-        output is PackEmission emission
+    private static Synapse NormalizePackOutput(string packName, Synapse output)
+    {
+        var normalized = output is PackEmission emission
             ? emission with { Pack = packName }
             : output;
+
+        return normalized with
+        {
+            CorrelationId = null,
+            CausationId = null,
+            SynapseId = Guid.NewGuid().ToString("N")
+        };
+    }
 
     private async Task UseExperienceAsync(ExperienceUsed used)
     {

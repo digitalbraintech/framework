@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <!-- Core abstractions package. This is the stable primitive layer (INeuron, Synapse, packs as executable skills, surfaces, journals, distribution contracts) for the company brain. -->
+    <IsPackable>true</IsPackable>
+    <PackageId>DigitalBrain.Core</PackageId>
+    <Version>0.1.0-preview</Version>
+    <Description>Core abstractions (INeuron, Synapse, IPackBehavior + typed dispatch, UiSurfaces, distribution, trust) for DigitalBrain. The universal executable skills primitive.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Orleans.Core.Abstractions" />
+    <PackageReference Include="Microsoft.Orleans.Serialization" />
+  </ItemGroup>
+
+</Project>

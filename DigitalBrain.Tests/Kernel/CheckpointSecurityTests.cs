@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -49,3 +49,4 @@ public class CheckpointSecurityTests
         Assert.Equal("n1", restored.Source.Value);
     }
 }
+

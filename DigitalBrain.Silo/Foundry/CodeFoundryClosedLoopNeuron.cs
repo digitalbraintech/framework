@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo.Foundry;
 
@@ -64,3 +64,4 @@ public class CodeFoundryClosedLoopNeuron : Neuron, ICodeFoundryLoopNeuron
     // The Tier-2 scenario here asserts the CodeBuilt/restart path via the deploy neuron (Task 7);
     // end-to-end restart survival is covered by the manual validation in Task 10.
 }
+

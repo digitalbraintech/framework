@@ -1,13 +1,13 @@
 using System.Reflection;
 using System.Runtime.Loader;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.CodeAnalysis;
 
 namespace DigitalBrain.Silo.Foundry;
 
 // THE KEYSTONE embodiment engine: compile a typed-C# pack -> CapabilityGate -> collectible ALC -> instantiate
 // its IPackBehavior, returning a live, disposable capability the host GeneratedNeuron dispatches to.
-// Harvests v3 GateNeuron's Resolving host-dependency hook (so the pack's reference to DigitalBrain.Protocol
+// Harvests v3 GateNeuron's Resolving host-dependency hook (so the pack's reference to DigitalBrain.Core
 // unifies with the running host, making the IPackBehavior cast valid) and SuppressFlow-for-collectibility,
 // plus v3 InoCompiler's TPA reference resolution. No .ino: the pack IS C#.
 public interface IPackEmbodiment
@@ -89,7 +89,7 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
         return null;
     }
 
-    // Unify shared assemblies (DigitalBrain.Protocol et al.) with the host so the loaded type's IPackBehavior
+    // Unify shared assemblies (DigitalBrain.Core et al.) with the host so the loaded type's IPackBehavior
     // IS the host's IPackBehavior — only then is the cast in Instantiate valid across the ALC boundary.
     private static Assembly? ResolveFromHost(AssemblyLoadContext context, AssemblyName name) =>
         AppDomain.CurrentDomain.GetAssemblies()
@@ -100,3 +100,4 @@ public sealed class PackAlcEmbodier : IPackEmbodiment
 }
 
 public sealed class PackEmbodimentException(string message) : Exception(message);
+

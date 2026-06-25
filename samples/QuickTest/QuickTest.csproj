@@ -10,7 +10,7 @@
   <ItemGroup>
     <!-- Core DigitalBrain -->
     <ProjectReference Include="..\..\DigitalBrain.Silo\DigitalBrain.Silo.csproj" />
-    <ProjectReference Include="..\..\DigitalBrain.Protocol\DigitalBrain.Protocol.csproj" />
+    <ProjectReference Include="..\..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
 
     <!-- For MCP mode -->
     <PackageReference Include="ModelContextProtocol" />

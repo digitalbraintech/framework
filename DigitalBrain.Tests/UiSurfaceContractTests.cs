@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 
 namespace DigitalBrain.Tests;
@@ -219,3 +219,4 @@ public class UiSurfaceContractTests
         Assert.True(action.ContainsKey(UiSurfaceKeys.Props));
     }
 }
+

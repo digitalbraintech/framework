@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Silo.Gateway;
 using DigitalBrain.Tests.TestSupport;
@@ -70,3 +70,4 @@ public class GatewayServiceTests : IAsyncLifetime
             });
     }
 }
+

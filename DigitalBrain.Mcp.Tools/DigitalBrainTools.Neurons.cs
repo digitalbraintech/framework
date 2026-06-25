@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using ModelContextProtocol.Server;
 using Orleans;
 using System.ComponentModel;
@@ -127,3 +127,4 @@ public partial class DigitalBrainTools
         return terminal?.Type ?? "FoundryRequest accepted (no terminal synapse yet).";
     }
 }
+

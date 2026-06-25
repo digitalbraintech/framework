@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Orleans.Journaling;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journaling - only for tests/prototype

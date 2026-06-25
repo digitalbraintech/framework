@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Orleans.Serialization;
 
 namespace DigitalBrain.Silo;
@@ -20,3 +20,4 @@ public sealed class CheckpointProtector(Serializer serializer, INeuronStateProte
         return new Checkpoint(protectedCheckpoint.Source, snapshot.AsReadOnly(), protectedCheckpoint.TakenAt);
     }
 }
+

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using Xunit;
 
@@ -25,3 +25,4 @@ public class PaymentGatewayTests
         Assert.Equal("buyer1", confirmation.UserId);
     }
 }
+

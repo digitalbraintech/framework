@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.Extensions.Configuration;
 using Stripe;
 using Stripe.Checkout;
@@ -95,3 +95,4 @@ public sealed class StripePaymentGateway(IConfiguration configuration, ILogger<S
         return new PaymentConfirmation(false, null, null, null, $"unhandled event '{stripeEvent.Type}'");
     }
 }
+

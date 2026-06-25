@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Silo.Llm;
@@ -29,3 +29,4 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
             });
     }
 }
+

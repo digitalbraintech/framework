@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Orleans.Journaling;
 using Orleans.Runtime;
 
@@ -207,3 +207,4 @@ public abstract class Neuron : DurableGrain, INeuron
     private static bool IsJournalWriterUninitialized(Exception exception) =>
         exception.GetBaseException().Message.Contains("state journal stream writer is not initialized", StringComparison.OrdinalIgnoreCase);
 }
+

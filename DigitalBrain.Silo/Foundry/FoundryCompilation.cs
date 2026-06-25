@@ -14,7 +14,7 @@ public static class FoundryCompilation
         return CSharpCompilation.Create(assemblyName, new[] { tree }, references, options);
     }
 
-    // Compile against the trusted-platform-assemblies set plus explicit extra assemblies (e.g. DigitalBrain.Protocol
+    // Compile against the trusted-platform-assemblies set plus explicit extra assemblies (e.g. DigitalBrain.Core
     // so a pack can implement IPackBehavior). Cleaner + deterministic vs. scanning the runtime dir — harvested from
     // v3's InoCompiler reference resolution.
     public static CSharpCompilation CreateWith(string assemblyName, string source, params Assembly[] extraAssemblies)
@@ -57,3 +57,4 @@ public static class FoundryCompilation
         return refs;
     }
 }
+

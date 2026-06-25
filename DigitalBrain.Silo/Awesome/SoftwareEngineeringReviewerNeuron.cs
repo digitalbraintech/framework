@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -25,3 +25,4 @@ public class SoftwareEngineeringReviewerNeuron : Neuron, ISoftwareEngineeringRev
         await FireAsync(new ReviewResult(request.Target, summary, summary, 0, issues, false));
     }
 }
+

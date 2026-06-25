@@ -194,7 +194,7 @@ Scope: real compilation plus the smallest meaningful test set.
 Examples:
 
 ```sh
-dotnet build DigitalBrain.Protocol/DigitalBrain.Protocol.csproj --no-restore
+dotnet build DigitalBrain.Core/DigitalBrain.Core.csproj --no-restore
 dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --no-build --filter "FullyQualifiedName~NeuronTests"
 ```
 

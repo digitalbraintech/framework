@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
 
@@ -32,3 +32,4 @@ public class RoslynNeuron : Neuron, IRoslynNeuron
         return report;
     }
 }
+

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -16,3 +16,4 @@ public class ShellNeuron : Neuron, IShellNeuron
     public Task<CommandResult> ExecutePowerShellAsync(string command, string? workingDirectory = null, int timeoutMs = 120_000, CancellationToken ct = default)
         => ProcessRunner.PowerShellAsync(command, workingDirectory, timeoutMs, ct);
 }
+

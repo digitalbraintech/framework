@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using ModelContextProtocol.Server;
 using Orleans;
 using System.ComponentModel;
@@ -176,3 +176,4 @@ public partial class DigitalBrainTools
             $"- {p.Name}@{p.Version} (owner: {p.OwnerId}, private: {p.IsPrivate}, comm: {p.CommissionRate:P0})"));
     }
 }
+

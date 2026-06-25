@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -26,3 +26,4 @@ public sealed class SyntheticPaymentGateway : IPaymentGateway
             Reason: "synthetic-completed");
     }
 }
+

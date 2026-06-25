@@ -1,5 +1,5 @@
 using Azure.Storage.Blobs;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Silo.Llm;
@@ -96,7 +96,7 @@ builder.UseOrleans(siloBuilder =>
         siloBuilder.AddAzureBlobGrainStorage("Default", options =>
             options.ConfigureBlobServiceClient(builder.Configuration.GetConnectionString("grainstate")!));
         siloBuilder.AddAzureBlobJournalStorage()
-            .UseJsonJournalFormat(DigitalBrain.Protocol.JournalJsonContext.Default);
+            .UseJsonJournalFormat(DigitalBrain.Core.JournalJsonContext.Default);
     }
 
     siloBuilder.AddFoundry();
@@ -126,3 +126,4 @@ if (grainFactory != null)
 app.Run();
 
 public partial class Program;
+

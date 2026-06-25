@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo.Gateway;
 
@@ -30,3 +30,4 @@ public static class NeuronResolver
         };
     }
 }
+

@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.Protocol;
@@ -36,3 +36,4 @@ public class JournalJsonContextTests
         Assert.Equal("hello", restored.Text);
     }
 }
+

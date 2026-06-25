@@ -1,5 +1,5 @@
 using System.Security.Cryptography;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -56,3 +56,4 @@ public sealed class PassThroughNeuronStateProtector : INeuronStateProtector
     public byte[] Protect(byte[] plaintext) => plaintext;
     public byte[] Unprotect(byte[] ciphertext) => ciphertext;
 }
+

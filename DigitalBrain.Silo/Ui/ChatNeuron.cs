@@ -1,5 +1,5 @@
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -27,3 +27,4 @@ public class ChatNeuron : Neuron, IChatNeuron
     public Task<RfwCard[]> GetConversationAsync()
         => Task.FromResult(OutgoingJournal.OfType<RfwCard>().ToArray());
 }
+

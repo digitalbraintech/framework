@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Silo;
 using Grpc.Core;
@@ -107,3 +107,4 @@ public sealed class GatewayService(
         }
     }
 }
+

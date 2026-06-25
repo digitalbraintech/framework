@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -19,3 +19,4 @@ public class DotNetNeuron : Neuron, IDotNetNeuron
     public Task<string[]> ListProjectsAsync(string directory, CancellationToken ct = default)
         => Task.FromResult(Directory.GetFiles(directory, "*.csproj", SearchOption.AllDirectories));
 }
+

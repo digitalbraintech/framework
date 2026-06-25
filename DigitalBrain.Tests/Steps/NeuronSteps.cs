@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
@@ -283,8 +283,8 @@ public class NeuronSteps : IAsyncDisposable
                 .AddMemoryStreams("Default")
                 .ConfigureServices(services =>
                 {
-                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
-                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Protocol.Synapse>());
+                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Core.Synapse>>("in-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Core.Synapse>());
+                    services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Core.Synapse>>("out-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Core.Synapse>());
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                 });
         }

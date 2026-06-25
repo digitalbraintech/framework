@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -46,3 +46,4 @@ public class GitNeuron : Neuron, IGitNeuron
         return Task.FromResult(new GitMetrics(commits.Count, reverts, last));
     }
 }
+

@@ -1,6 +1,16 @@
 # DigitalBrain / NeuroOS
 
-A self-aware AI kernel built on .NET Aspire, Orleans, and local/cloud LLMs.
+**The company brain.**
+
+Every business has critical know-how scattered across people's heads, old Slack threads, email, support tickets, and databases. Companies only work because humans remember where the knowledge lives and how to apply it.
+
+The NeuroOS is the missing primitive: it pulls fragmented knowledge, structures it, keeps it current, and turns it into executable skills files (typed neurons with synapses, dual journals, causation, and co-located UI surfaces) that AI agents and people can run safely and consistently.
+
+These skills are published as signed typed-C# packs, installed and updated via the marketplace into a running system — exactly like INO and other capabilities.
+
+The kernel (this Aspire package + minimal Orleans silo) is the always-on brain runtime. It ships the core substrate (marketplace, embodiment engine, journals, tasks, self-status) and starts 3 instances by default for stability during self-improvement, pack embodiment, and rolling updates.
+
+Built on .NET Aspire, Orleans, and local/cloud LLMs.
 Licensed under [MIT](LICENSE).
 
 ---

@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.Sdk;
@@ -18,3 +18,4 @@ public class SdkMetadataTests
         Assert.False(string.IsNullOrWhiteSpace(md.Instructions));
     }
 }
+

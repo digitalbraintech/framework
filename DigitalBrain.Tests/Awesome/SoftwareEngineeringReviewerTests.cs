@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Tests.TestSupport;
 using Orleans.TestingHost;
 using Xunit;
@@ -60,3 +60,4 @@ public class SoftwareEngineeringReviewerTests : IAsyncLifetime
         Assert.Equal(1, result.TodoCount);
     }
 }
+

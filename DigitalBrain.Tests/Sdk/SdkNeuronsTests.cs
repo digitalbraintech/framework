@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Tests.TestSupport;
 using Orleans.TestingHost;
 using Xunit;
@@ -113,3 +113,4 @@ public class SdkNeuronsTests : IAsyncLifetime
         }
     }
 }
+

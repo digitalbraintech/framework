@@ -1,4 +1,4 @@
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -20,3 +20,4 @@ public class WingetNeuron : Neuron, IWingetNeuron
     public Task<CommandResult> InstallAsync(string packageId, CancellationToken ct = default)
         => ProcessRunner.RunAsync("winget", $"install --id {packageId} --disable-interactivity --accept-source-agreements --accept-package-agreements", timeoutMs: 600_000, ct: ct);
 }
+

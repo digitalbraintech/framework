@@ -13,14 +13,8 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 .WithOrleansDashboard(8080)
 .WithMcp();
 
-var silo = builder.AddProject<Projects.DigitalBrain_Silo>("silo")
-    .WithReference(ctx.Orleans)
-    .WithReference(ctx.ClusteringTable)
-    .WithReference(ctx.GrainBlobs)
-    .WithReference(ctx.JournalBlobs)
-    .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
-    .WithReplicas(1)  // Set to 1 to allow proxy-less orleans-dashboard endpoint; use closed loops for multi-kernel concerns via Aspire
-    .WithEndpoint(name: "orleans-dashboard", port: ctx.OrleansDashboardPort ?? 8080, isProxied: false);
+var silo = builder.AddProject<Projects.DigitalBrain_Silo>("silo");
+ctx.WireKernelSilo(silo);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
 
 var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient)

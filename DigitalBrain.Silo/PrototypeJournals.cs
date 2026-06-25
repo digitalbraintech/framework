@@ -26,11 +26,12 @@ internal static class DigitalBrainJournalConfig
     {
         siloBuilder.ConfigureServices(services =>
         {
-            services.AddKeyedScoped<IDurableList<DigitalBrain.Protocol.Synapse>>("in-journal",
-                (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
-            services.AddKeyedScoped<IDurableList<DigitalBrain.Protocol.Synapse>>("out-journal",
-                (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Protocol.Synapse>());
+            services.AddKeyedScoped<IDurableList<DigitalBrain.Core.Synapse>>("in-journal",
+                (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Core.Synapse>());
+            services.AddKeyedScoped<IDurableList<DigitalBrain.Core.Synapse>>("out-journal",
+                (_, _) => new InMemoryJournalForPrototype<DigitalBrain.Core.Synapse>());
             services.AddSingleton<IJournaledStateManager, PrototypeJournaledStateManager>();
         });
     }
 }
+

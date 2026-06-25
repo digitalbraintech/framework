@@ -3,7 +3,7 @@
 // Args: kernel | ino | marketplace | tasks | "awesome/example" | gmail-digest
 // The entire system behavior is described via INO (prompts + Reqnroll .feature files) and executed at runtime by the framework (neurons + journals + LLM embodiment of NeuroPacks).
 
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 using DigitalBrain.Silo;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -417,3 +417,4 @@ static async Task<string> LoadAndRunInoSpecAsync(IInoNeuron ino, string relative
     string spec = File.Exists(full) ? await File.ReadAllTextAsync(full) : relativeFeaturePath;
     return await ino.AskAsync($"Load this INO spec (Reqnroll/feature) and execute the described behavior: {spec}");
 }
+

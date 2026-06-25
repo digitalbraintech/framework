@@ -1,6 +1,6 @@
 using System.Text;
 using System.Text.Json;
-using DigitalBrain.Protocol;
+using DigitalBrain.Core;
 
 namespace DigitalBrain.Silo;
 
@@ -74,3 +74,4 @@ public class LicenseNeuron : Neuron, ILicenseNeuron
     private sealed record LicensePayload(string BundleId, string UserId, DateTimeOffset IssuedAt, string Nonce);
     private sealed record LicenseTokenData(string Payload, string Signature);
 }
+
