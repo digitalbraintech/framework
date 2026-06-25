@@ -188,12 +188,12 @@ while (true)
             case "update":
                 Console.WriteLine("Using direct marketplace pack + rolling for kernel self-update (first-class pack embodiment)...");
                 var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
-                var version = "0.3.0";
-                await market.FireAsync(new PublishToMarketplace("kernel", version, "", "digitalbraintech", false, 0.0, "Core kernel substrate. Pre-installed; updatable via marketplace with rolling replica support."));
-                await market.FireAsync(new InstallFromMarketplace("kernel", version, "self"));
+                var version = KernelPack.DefaultVersion;
+                await market.FireAsync(new PublishToMarketplace(KernelPack.Name, version, "", "digitalbraintech", false, 0.0, KernelPack.Description));
+                await market.FireAsync(new InstallFromMarketplace(KernelPack.Name, version, "self"));
 
                 var aspire = grains.GetGrain<IAspireNeuron>("aspire-main");
-                await aspire.FireAsync(new DigitalBrain.Silo.PerformKernelSelfUpdate(version));
+                await aspire.FireAsync(new PerformKernelSelfUpdate(version));
                 Console.WriteLine("Kernel pack installed + rolling update triggered.");
                 break;
 
@@ -322,8 +322,8 @@ static async Task SeedPreExistingAsync(IMarketplaceNeuron market)
 
     // Kernel as pre-installed updatable item in marketplace. Supports get-update while pre-installed, using replicas for HA.
     await market.FireAsync(new PublishToMarketplace(
-        "kernel", "2026.6", "", "digitalbraintech", false, 0.0,
-        "Core kernel substrate. Pre-installed; updatable via orchestrator/marketplace with rolling replica support."));
+        KernelPack.Name, "2026.6", "", "digitalbraintech", false, 0.0,
+        KernelPack.Description));
 
     // One more marketplace experience added via closed loops
     await market.FireAsync(new PublishToMarketplace(
