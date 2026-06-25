@@ -47,7 +47,17 @@ public static class MarketplaceSeeds
             false,
             0.0,
             "Aspire Flutter integration recipe: one default Flutter UI client resource, start/restart descriptors, and rebuild guidance for trusted primitive pack updates.",
-            "Local Flutter client integration pack. Keeps startup to one UI resource by default.")
+            "Local Flutter client integration pack. Keeps startup to one UI resource by default."),
+
+        // Example of reusable packed integration (like Telegram bot): no logic in core, just published pack.
+        new NeuroPack(
+            "Telegram.Bot",
+            "1.0",
+            "digitalbraintech",
+            false,
+            0.05,
+            "Packed Telegram bot integration. No core logic; install via marketplace, configure token, wires via synapses or gRPC. Reusable across brains.",
+            "Installable Telegram bot experience. Aspire-executable or process pack for distribution and reuse.")
     ];
 
     public static IEnumerable<PublishToMarketplace> LocalUiPackPublishCommands() =>
