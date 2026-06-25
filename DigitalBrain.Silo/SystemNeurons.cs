@@ -1,5 +1,6 @@
 using DigitalBrain.Protocol;
 using DigitalBrain.Silo.Foundry;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
@@ -44,9 +45,6 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron
 [GrainType("digitalbrain.marketplace.v1")]
 public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 {
-    // Transition policy: unsigned packs install with a warning. Flip to true before enabling remote/untrusted install.
-    private const bool RejectUnsignedPacks = false;
-
     // In-memory view over published packs (rebuilt from journals on first use / activate; updated incrementally on publish).
     // Avoids O(n) full journal scan on every ListPublished / Find / Install.
     private Dictionary<string, NeuroPack>? _publishedCache;
@@ -88,8 +86,7 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         }
 
         // Trust gate. A PRESENT-but-invalid signature is always rejected. A MISSING signature is warn-only
-        // during the transition (RejectUnsignedPacks=false) so the existing unsigned seeds keep working;
-        // flip to strict before any remote/untrusted install is enabled.
+        // unless DigitalBrain:Marketplace:RejectUnsignedPacks=true is configured for remote/untrusted installs.
         var isSigned = !string.IsNullOrEmpty(pack.AuthorPublicKeyBase64) && !string.IsNullOrEmpty(pack.SignatureBase64);
         if (isSigned)
         {
@@ -176,6 +173,9 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         _publishedCache!.TryGetValue(KeyFor(name, version), out var p);
         return p;
     }
+
+    private bool RejectUnsignedPacks =>
+        ServiceProvider.GetService<IConfiguration>()?.GetValue<bool>("DigitalBrain:Marketplace:RejectUnsignedPacks") ?? false;
 }
 
 [GrainType("digitalbrain.compiler.v1")]
@@ -299,9 +299,9 @@ public class MetaOptimizerNeuron : Neuron, IMetaOptimizerNeuron
 
 // Host for installed packs (keystone embodiment, option b).
 // On install it receives the real NeuroPack and COMPILES pack.Code into a collectible ALC via IPackEmbodiment,
-// holding the live IPackBehavior capability. On use it dispatches to that compiled code for real and fires a
-// PackEmission with the pack's actual output — replacing the old LLM "personality" stub, which now only serves
-// as a fallback for natural-language packs whose Code is not a compilable IPackBehavior.
+// holding the live IPackBehavior capability. Typed-dispatch v2 lets embodied packs handle real Synapse types and
+// emit typed Synapse outputs through this host, while the old Respond(string) path remains as a compatibility
+// fallback for ExperienceUsed and natural-language packs.
 [GrainType("digitalbrain.generated")]
 public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry>
 {
@@ -334,7 +334,16 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         {
             case NeuroPackInstalled installed:
                 TryEmbody(installed.Pack);
-                break;
+                return;
+        }
+
+        if (await TryDispatchEmbodiedAsync(synapse))
+        {
+            return;
+        }
+
+        switch (synapse)
+        {
             case DemoMessageSynapse msg:
                 Logger.LogInformation("Generated handled message: {Text}", msg.Text);
                 break;
@@ -378,6 +387,44 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         if (last is not null)
             TryEmbody(last.Pack);
     }
+
+    private async Task<bool> TryDispatchEmbodiedAsync(Synapse synapse)
+    {
+        EnsureEmbodied();
+        if (_embodied is null || !_embodied.CanHandle(synapse))
+        {
+            return false;
+        }
+
+        IReadOnlyList<Synapse> outputs;
+        try
+        {
+            outputs = _embodied.Handle(synapse);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Embodied pack '{Pack}' failed while handling {SynapseType}.", _embodied.PackName, synapse.Type);
+            await FireAsync(new PackEmission(_embodied.PackName, synapse.Type, "pack-error:" + ex.GetBaseException().Message));
+            return true;
+        }
+
+        foreach (var output in outputs)
+        {
+            await FireAsync(NormalizePackOutput(_embodied.PackName, output));
+        }
+
+        Logger.LogInformation(
+            "GeneratedNeuron dispatched {SynapseType} to embodied pack '{Pack}' and emitted {Count} synapse(s).",
+            synapse.Type,
+            _embodied.PackName,
+            outputs.Count);
+        return true;
+    }
+
+    private static Synapse NormalizePackOutput(string packName, Synapse output) =>
+        output is PackEmission emission
+            ? emission with { Pack = packName }
+            : output;
 
     private async Task UseExperienceAsync(ExperienceUsed used)
     {
@@ -425,6 +472,7 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         var p = last.Pack;
         return ($"{p.Name}@{p.Version}", p.Code, p.Description);
     }
+
 }
 
 [GrainType("digitalbrain.llm.qwen.v1")]
@@ -835,10 +883,12 @@ public class KernelTaskNeuron : Neuron, IKernelTask
     {
         await FireAsync(new KernelTaskCreated(cmd.TaskId, cmd.Description));
         await FireAsync(new KernelTaskStarted(cmd.TaskId));
+        await FireAsync(new KernelTaskProgress(cmd.TaskId, "planning"));
         string result;
         var chat = ServiceProvider.GetService<IChatClient>();
         if (chat != null)
         {
+            await FireAsync(new KernelTaskProgress(cmd.TaskId, "running-llm"));
             var prompt = $"Perform the kernel task and output ONLY the concise result value: {cmd.Description}";
             var response = await chat.GetResponseAsync(prompt);
             result = response.Text.Trim();
@@ -846,8 +896,10 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         }
         else
         {
+            await FireAsync(new KernelTaskProgress(cmd.TaskId, "running-fallback"));
             result = "completed-no-llm:" + cmd.Description;
         }
+        await FireAsync(new KernelTaskProgress(cmd.TaskId, "finalizing"));
         await FireAsync(new KernelTaskCompleted(cmd.TaskId, result));
     }
 

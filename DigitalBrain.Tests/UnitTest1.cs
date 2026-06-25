@@ -1,6 +1,7 @@
 ﻿using DigitalBrain.Protocol;
 using DigitalBrain.Silo.Foundry;
 using DigitalBrain.Tests.TestSupport;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 
@@ -219,6 +220,11 @@ public class NeuronTests : IAsyncLifetime
         var info = await task.GetInfoAsync();
         Assert.Equal("completed", info.Status);
         Assert.Contains("demo work", info.Result ?? "");
+
+        var timeline = await task.GetOutgoingTimelineAsync();
+        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "planning");
+        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "running-fallback");
+        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "finalizing");
     }
 
     [Fact]
@@ -317,6 +323,27 @@ public class NeuronTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Marketplace_Rejects_Unsigned_Packs_When_Strict_Config_Is_Enabled()
+    {
+        var builder = new TestClusterBuilder();
+        builder.AddSiloBuilderConfigurator<StrictMarketplaceTrustSiloConfigurator>();
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+        try
+        {
+            var market = cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-strict-unsigned");
+            await market.FireAsync(new PublishToMarketplace("UnsignedStrict", "1.0", Code: "ok", OwnerId: "dev"));
+            await market.FireAsync(new InstallFromMarketplace("UnsignedStrict", "1.0", BuyerId: "buyer"));
+
+            Assert.DoesNotContain(await market.GetTimelineAsync(), s => s is NeuroPackInstalled);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+        }
+    }
+
+    [Fact]
     public async Task Install_Embodies_Signed_Pack_And_Runs_Real_Compiled_Code()
     {
         var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
@@ -342,6 +369,46 @@ public class NeuronTests : IAsyncLifetime
         Assert.NotNull(emission);                         // proof the install->compile->ALC->dispatch chain ran
         Assert.Equal("EchoPack", emission!.Pack);
         Assert.StartsWith("ECHO:", emission.Output);      // ...the pack's REAL compiled output, not the LLM stub
+    }
+
+    [Fact]
+    public async Task Installed_Pack_Handles_Typed_Synapse_And_Preserves_Causation()
+    {
+        const string code = """
+            public sealed class TypedDispatchPack : DigitalBrain.Protocol.IPackBehavior
+            {
+                public string Respond(string input) => "fallback:" + input;
+
+                public bool CanHandle(DigitalBrain.Protocol.Synapse synapse) =>
+                    synapse is DigitalBrain.Protocol.DemoMessageSynapse;
+
+                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Protocol.Synapse> Handle(DigitalBrain.Protocol.Synapse synapse)
+                {
+                    var message = (DigitalBrain.Protocol.DemoMessageSynapse)synapse;
+                    return new DigitalBrain.Protocol.Synapse[]
+                    {
+                        new DigitalBrain.Protocol.PackEmission("spoofed-pack-name", message.Text, "typed:" + message.Text)
+                    };
+                }
+            }
+            """;
+
+        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-typed-dispatch");
+        await market.FireAsync(new PublishToMarketplace("TypedDispatch", "1.0", Code: code, OwnerId: "dev"));
+        await market.FireAsync(new InstallFromMarketplace("TypedDispatch", "1.0", BuyerId: "buyer"));
+
+        var generated = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-typeddispatch");
+        await generated.FireAsync(new DemoMessageSynapse("typed-input"));
+
+        var timeline = await generated.GetOutgoingTimelineAsync();
+        var input = timeline.OfType<DemoMessageSynapse>().Last(message => message.Text == "typed-input");
+        var emission = timeline.OfType<PackEmission>().LastOrDefault(result => result.Input == "typed-input");
+
+        Assert.NotNull(emission);
+        Assert.Equal("TypedDispatch", emission!.Pack);  // host owns pack identity; pack output cannot spoof it
+        Assert.Equal("typed:typed-input", emission.Output);
+        Assert.Equal(input.SynapseId, emission.CausationId);
+        Assert.Equal(input.CorrelationId, emission.CorrelationId);
     }
 
     [Fact]
@@ -391,6 +458,24 @@ public class NeuronTests : IAsyncLifetime
         };
         using var p = System.Diagnostics.Process.Start(psi)!;
         p.WaitForExit();
+    }
+
+    private sealed class StrictMarketplaceTrustSiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder siloBuilder)
+        {
+            new NeuronTestSiloConfigurator().Configure(siloBuilder);
+            siloBuilder.ConfigureServices(services =>
+            {
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true"
+                    })
+                    .Build();
+                services.AddSingleton<IConfiguration>(configuration);
+            });
+        }
     }
 
     private static void TryDeleteDir(string dir)

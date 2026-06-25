@@ -1,4 +1,5 @@
 using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Protocol;
 using Xunit;
 
 namespace DigitalBrain.Tests.Foundry;
@@ -40,6 +41,38 @@ public class PackAlcEmbodierTests
     [Fact]
     public void Rejects_Code_That_Does_Not_Compile()
         => Assert.Throws<PackEmbodimentException>(() => _embodier.Embody("Bad", "this is not c#"));
+
+    [Fact]
+    public void Embodies_Typed_Synapse_Handler()
+    {
+        const string code = """
+            public sealed class TypedPack : DigitalBrain.Protocol.IPackBehavior
+            {
+                public string Respond(string input) => "fallback:" + input;
+
+                public bool CanHandle(DigitalBrain.Protocol.Synapse synapse) =>
+                    synapse is DigitalBrain.Protocol.DemoMessageSynapse;
+
+                public System.Collections.Generic.IReadOnlyList<DigitalBrain.Protocol.Synapse> Handle(DigitalBrain.Protocol.Synapse synapse)
+                {
+                    var message = (DigitalBrain.Protocol.DemoMessageSynapse)synapse;
+                    return new DigitalBrain.Protocol.Synapse[]
+                    {
+                        new DigitalBrain.Protocol.PackEmission("", message.Text, "typed:" + message.Text)
+                    };
+                }
+            }
+            """;
+
+        var pack = _embodier.Embody("TypedPack", code);
+
+        Assert.True(pack.CanHandle(new DemoMessageSynapse("hello")));
+        var emission = Assert.IsType<PackEmission>(Assert.Single(pack.Handle(new DemoMessageSynapse("hello"))));
+        Assert.Equal("hello", emission.Input);
+        Assert.Equal("typed:hello", emission.Output);
+
+        pack.Dispose();
+    }
 
     [Fact]
     public void Rejects_Pack_Without_IPackBehavior()
