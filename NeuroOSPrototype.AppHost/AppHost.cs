@@ -2,38 +2,11 @@ using Aspire.Hosting.DigitalBrain;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Support "dotnet run --project NeuroOSPrototype.AppHost brain.example.sc" (or dotnet run brain .sc via launcher).
-// .sc declares packed integrations (Telegram.Bot, Flutter as marketplace packs) - no logic inside core, just packed for reuse/distribution.
-// Uses IAspireNeuron (fired from start or inside) to start/orchestrate the Aspire project.
-// Flutter pack contains/uses Aspire integration (AddFlutterClient extension) to start windows/web.
-// 
-// Brainstorm use cases (product/tech):
-// - Reusable integrations: market install Telegram.Bot; any brain .sc includes it as executable resource (packed bot, no core if).
-// - Flutter as pack: install DigitalBrain.UI.AspireFlutter; .sc spins with AddFlutterClient for client + surfaces streaming.
-// - Aspire neuron driven: .sc or brain.cs uses IAspireNeuron.StartDistributedApp for full project start from pack config.
-// - Distribution: packs from marketplace, .sc for local spin with args (like --token for bot).
-// - No logic in core: everything (bot, flutter, custom aspire) is NeuroPack embodied, Aspire resources added declaratively.
-// - brain.cs: future C# script using scripting + IAspire to define custom Aspire model for project.
-var scriptPath = args.Length > 0 && args[0].EndsWith(".sc", StringComparison.OrdinalIgnoreCase) ? args[0] : null;
-bool includeFlutter = true;
-bool includeTelegram = false;
-if (!string.IsNullOrEmpty(scriptPath) && File.Exists(scriptPath))
-{
-    var json = File.ReadAllText(scriptPath);
-    using var doc = System.Text.Json.JsonDocument.Parse(json);
-    var root = doc.RootElement;
-    if (root.TryGetProperty("packs", out var packs) && packs.ValueKind == System.Text.Json.JsonValueKind.Array)
-    {
-        includeFlutter = false;
-        includeTelegram = false;
-        foreach (var p in packs.EnumerateArray())
-        {
-            var name = p.GetProperty("name").GetString();
-            if (name != null && name.Contains("Flutter", StringComparison.OrdinalIgnoreCase)) includeFlutter = true;
-            if (name != null && name.Contains("Telegram", StringComparison.OrdinalIgnoreCase)) includeTelegram = true;
-        }
-    }
-}
+// brain.cs : thin C# for "dotnet run brain.cs" (setup like dotnet run start.cs).
+// Just uses IAspireNeuron to start Aspire project.
+// Integrations (Telegram, Flutter) packed as marketplace NeuroPacks - no logic inside brain.cs .
+// Pack provides the Aspire bits (see AddFlutterClient).
+// Run via the QuickTest setup or equivalent that supports dotnet run brain.cs .
 
 // Unified with fast start.cs path (memory kernel + surfaces) and full distributed here.
 // See framework/start.cs for fast "dotnet run" INO + tasks + marketplace + UiSurfaces (Gmail etc).
@@ -53,32 +26,13 @@ var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient)
     .WithExplicitStart();
 
-// Flutter as marketplace pack. When .sc or market includes DigitalBrain.UI.AspireFlutter (or Flutter), use the Aspire integration.
-// dotnet run brain .sc spins local with packed integrations (no core logic for specific bots/UIs).
-if (includeFlutter)
+// Flutter as marketplace pack (DigitalBrain.UI.AspireFlutter).
+// The pack provides the Aspire integration. Use the extension from the pack's SDK.
+// brain.cs is thin; the pack adds the resource when installed.
+var flutterUiPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "app"));
+if (Directory.Exists(flutterUiPath))
 {
-    var flutterUiPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "app"));
-    if (Directory.Exists(flutterUiPath))
-    {
-        // Use the extension from the Flutter pack's Aspire integration for reuse/distribution.
-        // ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows");
-        // Fallback direct for now:
-        var flutterCommand = builder.Configuration["DigitalBrain:FlutterCommand"]
-            ?? Environment.GetEnvironmentVariable("FLUTTER_COMMAND")
-            ?? "flutter";
-
-        builder.AddExecutable(
-                "flutter-ui",
-                flutterCommand,
-                flutterUiPath,
-                "run",
-                "-d",
-                "windows")
-            .WithReference(ctx.OrleansClient)
-            .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
-            .WithEnvironment("DIGITALBRAIN_UI_PACK", "DigitalBrain.UI.AspireFlutter")
-            .WithEnvironment("DIGITALBRAIN_UI_TIER1_RESTART_REQUIRED", "true");
-    }
+    ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows");
 }
 
 if (ctx.EnableMcp)
@@ -89,18 +43,9 @@ if (ctx.EnableMcp)
         .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm);
 }
 
-// Packed Telegram bot as integration (just like user vision): no logic in core, packed in marketplace pack.
-// When .sc includes it, add as resource. Real pack would use NeuroPack embodiment or AddExecutable to a bot host.
-if (includeTelegram)
-{
-    // Placeholder for packed integration. In full: the pack provides executable or project.
-    builder.AddExecutable(
-            "telegram-bot",
-            "echo",
-            ".",
-            "Telegram.Bot pack installed - configure token and run real bot host here. Reusable, no core logic.")
-        .WithReference(ctx.OrleansClient);
-}
+// Telegram bot as packed marketplace integration (no logic in core or brain.cs).
+// The pack provides it. Use the extension from the pack's integration.
+ctx.AddTelegramBot("telegram-bot");
 
 builder.AddProject<Projects.DigitalBrain_Gateway>("gateway")
     .WithReference(ctx.OrleansClient)

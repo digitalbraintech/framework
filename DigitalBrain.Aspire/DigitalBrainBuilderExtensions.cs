@@ -124,6 +124,51 @@ public static class DigitalBrainBuilderExtensions
 
         return silo;
     }
+
+    /// <summary>
+    /// Flutter as marketplace pack + Aspire integration. Call from AppHost or brain.cs-driven launcher when the Flutter pack (DigitalBrain.UI.AspireFlutter) is installed.
+    /// Starts Flutter (windows or web-server) wired to brain for live surfaces/RfwCards. Enables full packing/distribution/reuse of the UI client as a NeuroPack.
+    /// </summary>
+    public static IResourceBuilder<ExecutableResource> AddFlutterClient(
+        this DigitalBrainContext ctx,
+        string name,
+        string flutterAppPath,
+        string target = "windows")
+    {
+        var cmd = ctx.Resource.ApplicationBuilder.Configuration["DigitalBrain:FlutterCommand"]
+            ?? Environment.GetEnvironmentVariable("FLUTTER_COMMAND")
+            ?? "flutter";
+
+        return ctx.Resource.ApplicationBuilder.AddExecutable(
+                name,
+                cmd,
+                flutterAppPath,
+                "run",
+                "-d",
+                target)
+            .WithReference(ctx.OrleansClient)
+            .WithReference((IResourceBuilder<IResourceWithConnectionString>)ctx.Llm)
+            .WithEnvironment("DIGITALBRAIN_UI_PACK", "DigitalBrain.UI.AspireFlutter")
+            .WithEnvironment("DIGITALBRAIN_UI_TIER1_RESTART_REQUIRED", "true");
+    }
+
+    /// Packed Telegram bot as integration (no logic in core). The marketplace pack provides the bot host.
+    /// Call from the thin brain.cs or AppHost when the Telegram.Bot pack is installed.
+    /// Uses args or config for token etc.
+    public static IResourceBuilder<ExecutableResource> AddTelegramBot(
+        this DigitalBrainContext ctx,
+        string name,
+        string botHostPath = ".")
+    {
+        // The pack would provide the real host exe or project.
+        // Placeholder for the packed integration.
+        return ctx.Resource.ApplicationBuilder.AddExecutable(
+                name,
+                "echo",
+                botHostPath,
+                "Telegram.Bot packed integration from marketplace - no logic in brain.cs. Configure token via env.")
+            .WithReference(ctx.OrleansClient);
+    }
 }
 
 public sealed class DigitalBrainOptions

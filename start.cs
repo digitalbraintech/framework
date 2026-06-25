@@ -11,9 +11,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 var target = args.Length > 0 ? string.Join(' ', args) : "kernel";
+
+// Support for brain.cs : thin C# file. "dotnet run brain.cs" (in the setup that allows dotnet run start.cs, e.g. via QuickTest project) spins using IAspireNeuron to start Aspire project.
+// Integrations are packed marketplace NeuroPacks (no logic inside brain.cs).
+// See brain/brain.cs for the thin implementation.
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.UseDigitalBrainKernel();
@@ -187,10 +192,10 @@ while (true)
             case "update-kernel":
             case "update":
                 Console.WriteLine("Using direct marketplace pack + rolling for kernel self-update (first-class pack embodiment)...");
-                var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
                 var version = KernelPack.DefaultVersion;
-                await market.FireAsync(new PublishToMarketplace(KernelPack.Name, version, "", "digitalbraintech", false, 0.0, KernelPack.Description));
-                await market.FireAsync(new InstallFromMarketplace(KernelPack.Name, version, "self"));
+                await marketGrain.FireAsync(new PublishToMarketplace(KernelPack.Name, version, "", "digitalbraintech", false, 0.0, KernelPack.Description));
+                await marketGrain.FireAsync(new InstallFromMarketplace(KernelPack.Name, version, "self"));
                 // Rolling is automatically triggered by the kernel pack install (see MarketplaceNeuron + PerformKernelSelfUpdate handler).
                 Console.WriteLine("Kernel pack installed (rolling update will be driven by the pack embodiment).");
                 break;
@@ -464,4 +469,9 @@ static async Task CreateCompanySkillAsync(IGrainFactory grains, string processNa
         foreach (var e in emissions) Console.WriteLine($"  {e.Pack}: {e.Input} -> {e.Output}");
     }
 }
+
+// Note: for brain.cs support, the thin C# (brain.cs) can be run like start.cs (e.g. via QuickTest project that links it).
+// The brain.cs just does the IAspireNeuron fire for the Aspire project start.
+// Integrations are packed separately (see MarketplaceSeeds for Telegram.Bot and Flutter Aspire pack).
+// Use CSharpScript if you want to eval a brain.cs dynamically for custom args.
 
