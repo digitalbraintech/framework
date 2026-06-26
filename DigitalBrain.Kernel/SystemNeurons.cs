@@ -354,7 +354,7 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     }
 
     private bool RejectUnsignedPacks =>
-        ServiceProvider.GetService<IConfiguration>()?.GetValue<bool>("DigitalBrain:Marketplace:RejectUnsignedPacks") ?? false;
+        ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:RejectUnsignedPacks", true) ?? true;
 }
 
 [GrainType("digitalbrain.observability.v1")]

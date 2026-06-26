@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using DigitalBrain.Core;
 using DigitalBrain.Tests.TestSupport;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 using Reqnroll;
@@ -374,6 +376,13 @@ public class NeuronSteps : IAsyncDisposable
                     services.AddKeyedScoped<Orleans.Journaling.IDurableList<DigitalBrain.Core.Synapse>>("out-journal", (_, _) => new InMemoryDurableList<DigitalBrain.Core.Synapse>());
                     services.AddScoped<DigitalBrain.Kernel.NeuronJournals>();
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
+                    services.AddSingleton<IConfiguration>(
+                        new ConfigurationBuilder()
+                            .AddInMemoryCollection(new Dictionary<string, string?>
+                            {
+                                ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
+                            })
+                            .Build());
                 });
         }
     }

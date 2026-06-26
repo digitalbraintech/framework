@@ -194,7 +194,8 @@ while (true)
                 Console.WriteLine("Using direct marketplace pack + rolling for kernel self-update (first-class pack embodiment)...");
                 var marketGrain = grains.GetGrain<IMarketplaceNeuron>("market-main");
                 var version = KernelPack.DefaultVersion;
-                await marketGrain.FireAsync(new PublishToMarketplace(KernelPack.Name, version, "", "digitalbraintech", false, 0.0, KernelPack.Description));
+                await marketGrain.FireAsync(DigitalBrain.Core.TrustedPublisher.SignPublishCommand(
+                    new PublishToMarketplace(KernelPack.Name, version, "", "digitalbraintech", false, 0.0, KernelPack.Description)));
                 await marketGrain.FireAsync(new InstallFromMarketplace(KernelPack.Name, version, "self"));
                 // Rolling is automatically triggered by the kernel pack install (see MarketplaceNeuron + PerformKernelSelfUpdate handler).
                 Console.WriteLine("Kernel pack installed (rolling update will be driven by the pack embodiment).");

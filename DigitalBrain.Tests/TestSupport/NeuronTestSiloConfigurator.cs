@@ -1,9 +1,11 @@
+using System.Collections.Generic;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
 using Orleans.TestingHost;
@@ -32,6 +34,13 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
                 services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
                 services.AddSingleton<SkillPackSynthesizer>();
                 services.AddSingleton<HomeFeedBus>();
+                services.AddSingleton<IConfiguration>(
+                    new ConfigurationBuilder()
+                        .AddInMemoryCollection(new Dictionary<string, string?>
+                        {
+                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
+                        })
+                        .Build());
             });
     }
 }

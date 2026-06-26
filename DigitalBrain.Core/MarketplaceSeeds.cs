@@ -64,12 +64,12 @@ public static class MarketplaceSeeds
         LocalUiPacks.Select(ToPublishCommand);
 
     public static PublishToMarketplace ToPublishCommand(NeuroPack pack) =>
-        new(
+        TrustedPublisher.SignPublishCommand(new(
             pack.Name,
             pack.Version,
             pack.Code,
             pack.OwnerId,
             pack.IsPrivate,
             pack.CommissionRate,
-            pack.Description);
+            pack.Description));
 }
