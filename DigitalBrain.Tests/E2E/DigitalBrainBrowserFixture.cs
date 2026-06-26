@@ -15,6 +15,7 @@ public class DigitalBrainBrowserFixture : DigitalBrainAppHostFixture
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
+        if (App is null) return; // base skipped boot (prereqs absent)
 
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
 

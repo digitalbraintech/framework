@@ -19,6 +19,9 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
     public virtual async Task InitializeAsync()
     {
+        if (!(E2EPrerequisites.OptedIn && E2EPrerequisites.WebBundlePresent))
+            return; // Prereqs absent: the [SkippableFact] will skip; don't boot the AppHost.
+
         var testId = Guid.NewGuid().ToString("N")[..8];
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", "true");
