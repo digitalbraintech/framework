@@ -11,7 +11,7 @@ All `az` commands assume you are logged in (`az login`) with Owner or Contributo
 | Tenant ID | `10b9647a-65af-44e0-9e55-d8f9fc93a381` |
 | Resource group | `digitalbrain-rg` |
 | Region | `westeurope` |
-| GitHub repo | `digitalbraintech/framework` |
+| GitHub repo | `digitalbraintech/brain` |
 
 ---
 
@@ -39,18 +39,18 @@ az role assignment create \
 # 1d. Retrieve the app's object ID (needed for federated-credential, different from appId)
 APP_OBJECT_ID=$(az ad app show --id "$APP_ID" --query id -o tsv)
 
-# 1e. Add the federated credential that trusts pushes to the main branch
+# 1e. Add the federated credential that trusts pushes to the master branch
 az ad app federated-credential create \
   --id "$APP_OBJECT_ID" \
   --parameters '{
-    "name": "github-main",
+    "name": "github-master",
     "issuer": "https://token.actions.githubusercontent.com",
-    "subject": "repo:digitalbraintech/framework:ref:refs/heads/main",
+    "subject": "repo:digitalbraintech/brain:ref:refs/heads/master",
     "audiences": ["api://AzureADTokenExchange"]
   }'
 
 # 1f. Also trust workflow_dispatch runs (same subject covers them via branch ref)
-# No additional credential needed — workflow_dispatch on main uses the same subject.
+# No additional credential needed — workflow_dispatch on master uses the same subject.
 ```
 
 > **Note:** `az ad app federated-credential create --id` takes the **object ID** of the app
@@ -74,25 +74,15 @@ Pulumi uses an Azure Blob backend (`azblob://pulumi-state`). The storage account
 globally unique — adjust the suffix if needed.
 
 ```bash
-# 3a. Create storage account (LRS is sufficient for IaC state)
-az storage account create \
-  --name "digitalbainpulumi" \
-  --resource-group digitalbrain-rg \
-  --location westeurope \
-  --sku Standard_LRS \
-  --allow-blob-public-access false
-
-# 3b. Retrieve the account key
-STORAGE_KEY=$(az storage account keys list \
-  --account-name "digitalbainpulumi" \
-  --resource-group digitalbrain-rg \
-  --query "[0].value" -o tsv)
-
-# 3c. Create the blob container Pulumi expects
+# 3a. Use the existing prod storage account (digitalbrainstprod) for Pulumi azblob state.
+#    (Created earlier in the project; do not create a separate one.)
+# 3b. Create the blob container Pulumi expects inside it (idempotent)
 az storage container create \
   --name pulumi-state \
-  --account-name "digitalbainpulumi" \
-  --account-key "$STORAGE_KEY"
+  --account-name digitalbrainstprod \
+  --auth-mode login
+
+# 3c. (No separate key needed when using OIDC + AZURE_STORAGE_ACCOUNT in workflow; the login provides data-plane rights via RBAC.)
 ```
 
 > The `deploy.yml` workflow runs `pulumi login azblob://pulumi-state`.  
@@ -103,11 +93,11 @@ az storage container create \
 > Contributor on this account.
 
 ```bash
-# 3d. Grant the service principal access to the Pulumi state container
+# 3d. Grant the service principal access to the Pulumi state container (on the prod storage)
 az role assignment create \
   --assignee "$APP_ID" \
   --role "Storage Blob Data Contributor" \
-  --scope "/subscriptions/08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9/resourceGroups/digitalbrain-rg/providers/Microsoft.Storage/storageAccounts/digitalbainpulumi"
+  --scope "/subscriptions/08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9/resourceGroups/digitalbrain-rg/providers/Microsoft.Storage/storageAccounts/digitalbrainstprod"
 ```
 
 ---
@@ -129,6 +119,8 @@ gh secret set PULUMI_PASSPHRASE     --body "<choose-a-strong-passphrase>"
 The `deploy.yml` workflow references these as:
 - `vars.AZURE_CLIENT_ID` / `vars.AZURE_TENANT_ID` / `vars.AZURE_SUBSCRIPTION_ID` (repo variables)
 - `secrets.PULUMI_PASSPHRASE` (repo secret, passed as `PULUMI_CONFIG_PASSPHRASE`)
+- `secrets.CHECKPOINT_KEY` (repo secret, injected as DIGITALBRAIN_CHECKPOINT_KEY env)
+- `vars.DOCKERHUB_USERNAME` + `secrets.DOCKERHUB_TOKEN` (for pushing the kernel image)
 
 ---
 
@@ -160,10 +152,9 @@ yet have Azure OpenAI access in this region — submit a capacity request throug
   The GitHub-hosted runner (`ubuntu-latest`) does **not** include Pulumi by default —
   add a `pulumi/actions@v6` setup step (or `curl -fsSL https://get.pulumi.com | sh`) to
   the workflow before the "Provision and deploy" step.
-- [ ] **GHCR pull credentials for ACA:** Azure Container Apps pulls images from GHCR
-  (`ghcr.io/digitalbraintech/*`). Make the packages public, or add registry credentials
-  via `az containerapp registry set` / DeploymentKit's container app configuration before
-  the first `pulumi up` runs.
+- [ ] **Docker Hub push credentials:** The workflow pushes the kernel image to Docker Hub
+  (public repo `vhorbachov/digitalbrain-silo`). The ACA pulls without extra creds because it is public.
+  Provide `DOCKERHUB_USERNAME` (var) + `DOCKERHUB_TOKEN` (secret) so `docker/login-action` + publish succeeds.
 - [ ] **Azure OpenAI quota** confirmed in `westeurope` (Step 5 above)
 - [ ] Run `aspire run` locally first to confirm the local stack boots cleanly before
   attempting a cloud deploy

@@ -53,25 +53,20 @@ The port is shown in the Aspire dashboard next to the `gateway` resource.
 
 ## Deploy to Azure
 
-For a one-time account setup (Entra app, resource group, Pulumi state backend, GitHub variables)
+For a one-time account setup (Entra app + OIDC federated credential for master, resource group, Pulumi state container, GitHub variables/secrets)
 follow **[scripts/bootstrap-azure.md](scripts/bootstrap-azure.md)**.
 
-Once bootstrapped, trigger the workflow manually from the GitHub Actions UI:
+Pushes to `master` (after branch rename) trigger auto-deploy via GH Actions. Use `workflow_dispatch` for manual if needed.
 
-```
-Actions → deploy → Run workflow
-```
+The deploy workflow (`.github/workflows/deploy.yml`) auto-deploys on push to `master` (and supports `workflow_dispatch`).
 
-The deploy workflow (`.github/workflows/deploy.yml`) is set to `workflow_dispatch` — manual
-until the first successful end-to-end deploy is confirmed, at which point it can be switched
-to `push: [main]` for continuous deployment.
-
-The workflow:
+The workflow (ONLY path to production deploys):
 1. Runs `dotnet test`
-2. Publishes container images to GHCR (`ghcr.io/digitalbraintech/digitalbrain-{gateway,silo,mcp}`)
+2. Publishes the kernel image to Docker Hub (`docker.io/vhorbachov/digitalbrain-silo`)
 3. Logs into Azure via OIDC (no long-lived secrets)
-4. Runs `pulumi up` (via `dotnet run --project deploy/DigitalBrain.Deploy.csproj`) to provision
-   ACA, Azure Storage, Azure OpenAI, and Key Vault in `westeurope`
+4. Runs `pulumi up` (via pulumi/actions on work-dir `deploy`, stack `dev`, azblob state backend) to provision the ACA silo + supporting resources (Storage, Azure OpenAI, monitoring, CAE) in `westeurope`.
+
+See [deploy/DEPLOY-STATUS.md](deploy/DEPLOY-STATUS.md) and [scripts/bootstrap-azure.md](scripts/bootstrap-azure.md).
 
 ---
 

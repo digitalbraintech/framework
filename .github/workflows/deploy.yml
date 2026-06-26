@@ -1,10 +1,10 @@
 name: deploy
 
-# Auto-deploy on merge to main. The simplified Pass-1 flow: build+push ONE image (the silo) to Docker Hub,
+# Auto-deploy on merge to master. The simplified Pass-1 flow: build+push ONE image (the silo) to Docker Hub,
 # then `pulumi up` the minimal program (RG, Storage, Azure OpenAI, monitoring, ACA env + silo).
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
     inputs:
       image_tag:
