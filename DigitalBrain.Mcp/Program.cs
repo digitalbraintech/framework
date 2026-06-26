@@ -33,8 +33,10 @@ builder.UseOrleansClient();
 builder.Services
     .AddMcpServer()
     .WithStdioServerTransport()
-    .WithTools<DigitalBrainTools>();
-builder.Services.AddSingleton<DigitalBrainTools>();
+    .WithTools<DigitalBrainReadTools>()
+    .WithTools<DigitalBrainMutationTools>();
+builder.Services.AddSingleton<DigitalBrainReadTools>();
+builder.Services.AddSingleton<DigitalBrainMutationTools>();
 
 var app = builder.Build();
 

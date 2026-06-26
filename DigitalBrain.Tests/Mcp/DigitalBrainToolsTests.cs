@@ -27,16 +27,17 @@ public class DigitalBrainToolsTests : IAsyncLifetime
 
     [Fact]
     public void Ping_Works_Standalone()
-        => Assert.Contains("connected", DigitalBrainTools.PingDigitalBrain(), System.StringComparison.OrdinalIgnoreCase);
+        => Assert.Contains("connected", DigitalBrainReadTools.PingDigitalBrain(), System.StringComparison.OrdinalIgnoreCase);
 
     [Fact]
     public async Task Publish_Then_List_Through_InProcess_GrainFactory()
     {
-        var tools = new DigitalBrainTools(_cluster!.GrainFactory);
+        var mutationTools = new DigitalBrainMutationTools(_cluster!.GrainFactory);
+        var readTools = new DigitalBrainReadTools(_cluster!.GrainFactory);
 
-        await tools.PublishToMarketplace("ToolPack", "1.0", "// code", "owner", isPrivate: false, commissionRate: 0.1);
-        var listing = await tools.ListMarketplace();
+        await mutationTools.PublishToMarketplace("McpPack", "1.0", "public class P {}", "mcp-user", false, 0.15);
+        var listing = await readTools.ListMarketplace();
 
-        Assert.Contains("ToolPack@1.0", listing);
+        Assert.Contains("McpPack@1.0", listing);
     }
 }

@@ -6,17 +6,18 @@ using System.Text.Json;
 
 namespace DigitalBrain.Mcp.Tools;
 
-public partial class DigitalBrainTools
+// Mutating DigitalBrain MCP tools: fire side-effecting synapses, spend LLM tokens, or change marketplace/cluster
+// state. Registered on the stdio transport only (local/trusted); withheld from the kernel's HTTP transport
+// pending a remote auth decision.
+[McpServerToolType]
+public sealed class DigitalBrainMutationTools(IGrainFactory grains) : DigitalBrainToolsBase(grains)
 {
-    [McpServerTool(Name = "ping_digitalbrain"), Description("Simple ping tool to verify MCP connection to DigitalBrain server works. Always returns success.")]
-    public static string PingDigitalBrain() => "DigitalBrain MCP connected successfully. Cluster interaction tools ready when silo is running.";
-
     [McpServerTool(Name = "ask_llm_neuron"), Description("Ask the LLM neuron (powered by local Qwen/Ollama) a question or prompt. Returns the response. Requires the cluster (silo + ollama) to be running.")]
     public async Task<string> AskLlmNeuron(
         [Description("The prompt or question to send to the LLM neuron")] string prompt,
         [Description("Optional preferred model, e.g. 'qwen2.5-coder:1.5b'")] string? preferredModel = null)
     {
-        var llm = grains.GetGrain<ILlmNeuron>("llm-main");
+        var llm = Grains.GetGrain<ILlmNeuron>("llm-main");
         await llm.FireAsync(new LlmPrompt(prompt, preferredModel));
 
         var response = (await llm.GetTimelineAsync()).OfType<LlmResponse>().LastOrDefault();
@@ -35,25 +36,14 @@ public partial class DigitalBrainTools
         return $"Successfully fired DemoMessageSynapse with text '{text}' to neuron '{neuronId}'.";
     }
 
-    [McpServerTool(Name = "get_timeline"), Description("Get recent timeline (synapses) for a neuron. Useful to see history, responses, published packs etc.")]
-    public async Task<string> GetTimeline(
-        [Description("Neuron ID to query, e.g. 'llm-main', 'market-main', 'compiler-main'")] string neuronId,
-        [Description("Max number of recent entries")] int maxEntries = 10)
-    {
-        var neuron = ResolveNeuron(neuronId);
-        var timeline = await neuron.GetTimelineAsync();
-        var lines = timeline.TakeLast(maxEntries).Select(s => $"{s.Timestamp:HH:mm:ss} | {s.Type}: {s}");
-        return string.Join("\n", lines);
-    }
-
     [McpServerTool(Name = "ask_ino"), Description("Ask the INO AI assistant (uses ContextNeuron for smart management).")]
     public Task<string> AskIno([Description("Prompt for INO navigation/assistant")] string prompt)
-        => grains.GetGrain<IInoNeuron>("ino-main").AskAsync(prompt);
+        => Grains.GetGrain<IInoNeuron>("ino-main").AskAsync(prompt);
 
     [McpServerTool(Name = "ino_code_editor"), Description("Interact with the INOCodeEditor neuron for visual editing/running of pack code.")]
     public async Task<string> InoCodeEditor([Description("Editor ID")] string id, [Description("Code or command")] string code)
     {
-        var editor = grains.GetGrain<IInoCodeEditor>("ino-editor-main");
+        var editor = Grains.GetGrain<IInoCodeEditor>("ino-editor-main");
         await editor.FireAsync(new InoCodeEdit(id, code));
         return $"INOCodeEditor received edit for {id}. Run to execute.";
     }
@@ -64,7 +54,7 @@ public partial class DigitalBrainTools
         [Description("Filter key")] string filter,
         [Description("Value")] string val)
     {
-        var context = grains.GetGrain<IContextNeuron>("context-main");
+        var context = Grains.GetGrain<IContextNeuron>("context-main");
         await context.FireAsync(new ContextUpdate("filter:" + view, filter, val));
         await context.FireAsync(new FilterChanged(view, filter, val)); // notify for LLM awareness
         return $"Context+Filter updated for {view}. INO/Context now aware.";
@@ -73,7 +63,7 @@ public partial class DigitalBrainTools
     [McpServerTool(Name = "db_example"), Description("Exercise the DbSupportNeuron (connect + typed query via synapses).")]
     public async Task<string> DbExample([Description("Connection name e.g. northwind")] string name, [Description("Query")] string query)
     {
-        var db = grains.GetGrain<IDbSupportNeuron>("db-main");
+        var db = Grains.GetGrain<IDbSupportNeuron>("db-main");
         await db.FireAsync(new DbConnect(name, "sqlite", "Data Source=:memory:"));
         await db.FireAsync(new DbQuery(name, query));
         return "DB neuron handled connect+query via typed synapses. Check timeline for results.";
@@ -96,7 +86,7 @@ public partial class DigitalBrainTools
         [Description("Loop type: ui | se")] string loopType,
         [Description("Prompt or task for the loop, e.g. inspect editor tree and improve")] string prompt)
     {
-        var loop = grains.GetGrain<IClosedLoopNeuron>("closedloop-main");
+        var loop = Grains.GetGrain<IClosedLoopNeuron>("closedloop-main");
         await loop.FireAsync(new ClosedLoopRequest(loopType, prompt));
         return $"ClosedLoop {loopType} triggered on the marketplace-installed experience.";
     }
@@ -118,7 +108,7 @@ public partial class DigitalBrainTools
             ? TargetTier.Deploy
             : TargetTier.Run;
 
-        var loop = grains.GetGrain<ICodeFoundryLoopNeuron>("foundry-main");
+        var loop = Grains.GetGrain<ICodeFoundryLoopNeuron>("foundry-main");
         await loop.FireAsync(new FoundryRequest(spec, parsedTier, autoApply));
 
         var timeline = await loop.GetOutgoingTimelineAsync();
@@ -133,7 +123,7 @@ public partial class DigitalBrainTools
         [Description("Source identifier")] string sourceId,
         [Description("Raw text content of policy or transcript")] string text)
     {
-        var ck = grains.GetGrain<ICompanyKnowledgeNeuron>("company-main");
+        var ck = Grains.GetGrain<ICompanyKnowledgeNeuron>("company-main");
         await ck.FireAsync(new IngestCompanySource(collection, sourceId, text));
         return $"Ingested {sourceId} into {collection}. Ready for crystallize/skill creation.";
     }
@@ -144,7 +134,7 @@ public partial class DigitalBrainTools
         [Description("Trigger type e.g. RefundRequested")] string triggerType,
         [Description("Simple payload key=value;key2=value2 for the trigger")] string payload)
     {
-        var gen = grains.GetGrain<IGeneratedNeuron>($"skill-{skillName.ToLowerInvariant()}");
+        var gen = Grains.GetGrain<IGeneratedNeuron>($"skill-{skillName.ToLowerInvariant()}");
         // For demo use ExperienceUsed path which always works; typed would need full deserialze.
         await gen.FireAsync(new ExperienceUsed(skillName, $"{triggerType}:{payload}"));
         var tl = await gen.GetOutgoingTimelineAsync();
@@ -157,7 +147,7 @@ public partial class DigitalBrainTools
     [McpServerTool(Name = "create_company_skill"), Description("Run the full automated pipeline: ingest sources, crystallize process spec, synthesize IPackBehavior, publish+install via marketplace, verify execution and return result.")]
     public async Task<string> CreateCompanySkill([Description("Process name e.g. RefundHandling")] string processName)
     {
-        var orchestrator = grains.GetGrain<ICompanySkillOrchestratorNeuron>("company-skill-main");
+        var orchestrator = Grains.GetGrain<ICompanySkillOrchestratorNeuron>("company-skill-main");
         await orchestrator.FireAsync(new CreateCompanySkill(processName));
         var tl = await orchestrator.GetOutgoingTimelineAsync();
         var result = tl.OfType<CompanySkillCreationResult>().LastOrDefault();
@@ -165,5 +155,128 @@ public partial class DigitalBrainTools
             ? $"Create {result.ProcessName}@{result.Version}: Success={result.Success}. {result.Details}"
             : $"Create request for {processName} accepted. Check orchestrator timeline.";
     }
-}
 
+    [McpServerTool(Name = "visualize_data"), Description("Infer a generic data-chart UiSurface from JSON rows and return the generated surface JSON. The Flutter UI renders this dynamically by UiSurface.kind.")]
+    public async Task<string> VisualizeData(
+        [Description("Prompt describing what chart the user wants")] string prompt,
+        [Description("JSON array of row objects, or an object containing rows/data/items")] string dataJson,
+        [Description("Optional chart hint: bar, line, area, scatter, or pie")] string? chartHint = null)
+    {
+        var requestId = "chart-" + Guid.NewGuid().ToString("N")[..10];
+        var chart = Grains.GetGrain<IDataVisualizationNeuron>("chart-main");
+        await chart.FireAsync(new VisualizeDataRequest(prompt, dataJson, chartHint, requestId));
+
+        var timeline = await chart.GetTimelineAsync();
+        var failed = timeline.OfType<DataChartFailed>().LastOrDefault(result => result.RequestId == requestId);
+        if (failed is not null)
+        {
+            return $"Data chart generation failed: {failed.Reason}";
+        }
+
+        var generated = timeline.OfType<DataChartGenerated>().LastOrDefault(result => result.RequestId == requestId);
+        return generated is null
+            ? $"VisualizeDataRequest accepted as {requestId}, but no chart result was found yet."
+            : JsonSerializer.Serialize(generated.Surface, SurfaceJsonOptions);
+    }
+
+    [McpServerTool(Name = "fire_ui_action"), Description("Execute a UiSurface action descriptor by mapping synapseType and props to existing DigitalBrain command contracts.")]
+    public async Task<string> FireUiAction(
+        [Description("Action descriptor JSON with actionId, label, synapseType, and props")] string actionJson,
+        [Description("Fallback neuron id for generic/demo actions")] string defaultNeuronId = "ino-main")
+    {
+        using var document = JsonDocument.Parse(actionJson);
+        var action = document.RootElement;
+        var synapseType = ReadString(action, UiSurfaceKeys.SynapseType);
+        if (string.IsNullOrWhiteSpace(synapseType))
+        {
+            return "Action descriptor missing synapseType.";
+        }
+
+        var props = ReadObject(action, UiSurfaceKeys.Props);
+
+        switch (synapseType)
+        {
+            case "RunKernelTask":
+            {
+                // UI action string kept as "RunKernelTask" for surface compat; message type is now the generic core protocol
+                var taskId = ReadString(props, "taskId") ?? "task-" + Guid.NewGuid().ToString("N")[..8];
+                var description = ReadString(props, "description") ?? ReadString(props, "prompt") ?? "Run task";
+                await Grains.GetGrain<INeuron>(taskId).FireAsync(new RunTask(taskId, description));
+                return $"Fired RunTask for {taskId}.";
+            }
+            case "CancelKernelTask":
+            {
+                var taskId = ReadString(props, "taskId");
+                if (string.IsNullOrWhiteSpace(taskId)) return "CancelTask action requires props.taskId.";
+                await Grains.GetGrain<INeuron>(taskId).FireAsync(new CancelTask(taskId));
+                return $"Fired CancelTask for {taskId}.";
+            }
+            case nameof(InoRequest):
+            {
+                var prompt = ReadString(props, "prompt") ?? ReadString(props, "text");
+                if (string.IsNullOrWhiteSpace(prompt)) return "InoRequest action requires props.prompt.";
+                var sessionId = ReadString(props, "sessionId");
+                await Grains.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, sessionId));
+                return "Fired InoRequest.";
+            }
+            case nameof(InstallFromMarketplace):
+            {
+                var packName = ReadString(props, "packName");
+                var version = ReadString(props, "version") ?? "0.1.0";
+                var buyerId = ReadString(props, "buyerId") ?? "current-user";
+                if (string.IsNullOrWhiteSpace(packName)) return "InstallFromMarketplace action requires props.packName.";
+                await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(packName, version, buyerId));
+                return $"Fired InstallFromMarketplace for {packName}@{version}.";
+            }
+            case nameof(ListPublished):
+                await Grains.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new ListPublished());
+                return "Fired ListPublished.";
+            case nameof(RestartResource):
+            {
+                var resourceName = ReadString(props, "resourceName");
+                if (string.IsNullOrWhiteSpace(resourceName)) return "RestartResource action requires props.resourceName.";
+                await Grains.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new RestartResource(resourceName));
+                return $"Fired RestartResource for {resourceName}.";
+            }
+            case nameof(ClosedLoopRequest):
+            {
+                var loopType = ReadString(props, "loopType") ?? "ui";
+                var prompt = ReadString(props, "prompt") ?? "Run installed closed loop";
+                await Grains.GetGrain<IClosedLoopNeuron>("closedloop-main").FireAsync(new ClosedLoopRequest(loopType, prompt));
+                return $"Fired ClosedLoopRequest for {loopType}.";
+            }
+            default:
+            {
+                var target = ReadString(props, "neuronId") ?? defaultNeuronId;
+                await ResolveNeuron(target).FireAsync(new DemoMessageSynapse(actionJson));
+                return $"Forwarded unrecognized UI action '{synapseType}' to {target} as DemoMessageSynapse.";
+            }
+        }
+    }
+
+    [McpServerTool(Name = "publish_to_marketplace"), Description("Publish a pack/experience (e.g. generated neuron code) to the marketplace. Supports private and commission rate.")]
+    public async Task<string> PublishToMarketplace(
+        [Description("Pack name")] string packName,
+        [Description("Version, e.g. '0.1-dev'")] string version,
+        [Description("The code or content of the pack")] string code,
+        [Description("Owner ID")] string ownerId = "mcp-user",
+        [Description("Is private pack?")] bool isPrivate = false,
+        [Description("Commission rate e.g. 0.15 for 15%")] double commissionRate = 0.15)
+    {
+        var market = Grains.GetGrain<IMarketplaceNeuron>("market-main");
+        await market.FireAsync(new PublishToMarketplace(packName, version, code, ownerId, isPrivate, commissionRate));
+        return $"Published '{packName}@{version}' to marketplace (private={isPrivate}, commission={commissionRate:P0}).";
+    }
+
+    [McpServerTool(Name = "install_from_marketplace"), Description("Install a pack from the marketplace. Triggers commission.")]
+    public async Task<string> InstallFromMarketplace(
+        [Description("Pack name to install")] string packName,
+        [Description("Version")] string version,
+        [Description("Buyer ID for commission tracking")] string buyerId = "mcp-buyer")
+    {
+        var market = Grains.GetGrain<IMarketplaceNeuron>("market-main");
+        await GetPublishedPacksWithLocalSeedsAsync(market);
+        await market.FireAsync(new InstallFromMarketplace(packName, version, buyerId));
+        return $"Installed '{packName}@{version}' for buyer '{buyerId}'. Commission should have been taken.";
+    }
+}

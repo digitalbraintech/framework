@@ -40,14 +40,13 @@ builder.Services.AddGrpc();
 // Server-driven UI fanout: neurons broadcast RfwCards; WatchHomeFeed gRPC subscribers stream them.
 builder.Services.AddSingleton<HomeFeedBus>();
 
-// Co-host the MCP tool surface in-process: the tools resolve grains via the silo's own IGrainFactory,
-// eliminating the cross-process Orleans-client hop the standalone stdio server incurs. Internal-only — no
-// External ingress is wired (remote exposure awaits an auth decision before mutation tools go outside).
+// Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
+// mutation tools are stdio-only (local/trusted) pending a remote auth decision.
 builder.Services
     .AddMcpServer()
     .WithHttpTransport()
-    .WithTools<DigitalBrain.Mcp.Tools.DigitalBrainTools>();
-builder.Services.AddSingleton<DigitalBrain.Mcp.Tools.DigitalBrainTools>();
+    .WithTools<DigitalBrain.Mcp.Tools.DigitalBrainReadTools>();
+builder.Services.AddSingleton<DigitalBrain.Mcp.Tools.DigitalBrainReadTools>();
 
 if (isAspireHosted)
 {

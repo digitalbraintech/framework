@@ -1,27 +1,26 @@
 using DigitalBrain.Core;
-using ModelContextProtocol.Server;
 using Orleans;
 using System.Text.Json;
 
 namespace DigitalBrain.Mcp.Tools;
 
-// MCP tool surface over the DigitalBrain neuron cluster. Reached through an in-process IGrainFactory when
-// co-hosted inside the silo (HTTP transport) and through the Orleans-client IGrainFactory when run as the
-// standalone stdio server — the tools are transport- and topology-agnostic. Split into partial files by concern;
-// shared helpers live here. No fabricated/[SIMULATED]/[DEMO] fallbacks: real responses or honest errors only.
-[McpServerToolType]
-public partial class DigitalBrainTools(IGrainFactory grains)
+// Shared, transport-agnostic helpers for the DigitalBrain MCP tool surfaces. Reached through an in-process
+// IGrainFactory when co-hosted in the silo (HTTP) and the Orleans-client IGrainFactory in the stdio server.
+// No fabricated fallbacks: real responses or honest errors only.
+public abstract class DigitalBrainToolsBase(IGrainFactory grains)
 {
-    private static readonly JsonSerializerOptions SurfaceJsonOptions = new(JsonSerializerDefaults.Web)
+    protected IGrainFactory Grains { get; } = grains;
+
+    protected static readonly JsonSerializerOptions SurfaceJsonOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
     };
 
-    private static IEnumerable<string> SplitIds(string value) =>
+    protected static IEnumerable<string> SplitIds(string value) =>
         value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(id => !string.IsNullOrWhiteSpace(id));
 
-    private static async Task<IReadOnlyList<NeuroPack>> GetPublishedPacksWithLocalSeedsAsync(IMarketplaceNeuron marketplace)
+    protected async Task<IReadOnlyList<NeuroPack>> GetPublishedPacksWithLocalSeedsAsync(IMarketplaceNeuron marketplace)
     {
         await marketplace.FireAsync(new ListPublished());
         var published = await ReadLatestPublishedPacksAsync(marketplace);
@@ -44,15 +43,15 @@ public partial class DigitalBrainTools(IGrainFactory grains)
         return await ReadLatestPublishedPacksAsync(marketplace);
     }
 
-    private static async Task<IReadOnlyList<NeuroPack>> ReadLatestPublishedPacksAsync(IMarketplaceNeuron marketplace)
+    protected static async Task<IReadOnlyList<NeuroPack>> ReadLatestPublishedPacksAsync(IMarketplaceNeuron marketplace)
     {
         var timeline = await marketplace.GetTimelineAsync();
         return timeline.OfType<PublishedList>().LastOrDefault()?.Packs ?? Array.Empty<NeuroPack>();
     }
 
-    private static string PackKey(NeuroPack pack) => $"{pack.Name}@{pack.Version}";
+    protected static string PackKey(NeuroPack pack) => $"{pack.Name}@{pack.Version}";
 
-    private static string Explain(Exception exception)
+    protected static string Explain(Exception exception)
     {
         var root = exception.GetBaseException();
         return root.Message == exception.Message
@@ -60,40 +59,40 @@ public partial class DigitalBrainTools(IGrainFactory grains)
             : $"{exception.Message} ({root.Message})";
     }
 
-    private INeuron ResolveNeuron(string neuronId)
+    protected INeuron ResolveNeuron(string neuronId)
     {
         if (neuronId.StartsWith("task-", StringComparison.OrdinalIgnoreCase))
         {
-            return grains.GetGrain<INeuron>(neuronId);
+            return Grains.GetGrain<INeuron>(neuronId);
         }
 
         return neuronId switch
         {
-            "aspire-main" => grains.GetGrain<IAspireNeuron>(neuronId),
-            "closedloop-main" => grains.GetGrain<IClosedLoopNeuron>(neuronId),
-            "compiler-main" => grains.GetGrain<ICompiler>(neuronId),
-            "context-main" => grains.GetGrain<IContextNeuron>(neuronId),
-            "company-main" => grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
-            "company-skill-main" => grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
-            "chart-main" => grains.GetGrain<IDataVisualizationNeuron>(neuronId),
-            "db-main" => grains.GetGrain<IDbSupportNeuron>(neuronId),
-            "foundry-main" => grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
-            "ino-editor-main" => grains.GetGrain<IInoCodeEditor>(neuronId),
-            "ino-main" => grains.GetGrain<IInoNeuron>(neuronId),
-            "llm-main" => grains.GetGrain<ILlmNeuron>(neuronId),
-            "market-main" => grains.GetGrain<IMarketplaceNeuron>(neuronId),
-            "status-main" => grains.GetGrain<ISystemStatus>(neuronId),
-            _ => grains.GetGrain<IDemoNeuron>(neuronId)
+            "aspire-main" => Grains.GetGrain<IAspireNeuron>(neuronId),
+            "closedloop-main" => Grains.GetGrain<IClosedLoopNeuron>(neuronId),
+            "compiler-main" => Grains.GetGrain<ICompiler>(neuronId),
+            "context-main" => Grains.GetGrain<IContextNeuron>(neuronId),
+            "company-main" => Grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
+            "company-skill-main" => Grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
+            "chart-main" => Grains.GetGrain<IDataVisualizationNeuron>(neuronId),
+            "db-main" => Grains.GetGrain<IDbSupportNeuron>(neuronId),
+            "foundry-main" => Grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
+            "ino-editor-main" => Grains.GetGrain<IInoCodeEditor>(neuronId),
+            "ino-main" => Grains.GetGrain<IInoNeuron>(neuronId),
+            "llm-main" => Grains.GetGrain<ILlmNeuron>(neuronId),
+            "market-main" => Grains.GetGrain<IMarketplaceNeuron>(neuronId),
+            "status-main" => Grains.GetGrain<ISystemStatus>(neuronId),
+            _ => Grains.GetGrain<IDemoNeuron>(neuronId)
         };
     }
 
-    private static JsonElement ReadObject(JsonElement element, string propertyName)
+    protected static JsonElement ReadObject(JsonElement element, string propertyName)
     {
         var value = ReadElement(element, propertyName);
         return value.HasValue && value.Value.ValueKind == JsonValueKind.Object ? value.Value : default;
     }
 
-    private static string? ReadString(JsonElement element, string propertyName)
+    protected static string? ReadString(JsonElement element, string propertyName)
     {
         var value = ReadElement(element, propertyName);
         if (!value.HasValue)
@@ -111,7 +110,7 @@ public partial class DigitalBrainTools(IGrainFactory grains)
         };
     }
 
-    private static JsonElement? ReadElement(JsonElement element, string propertyName)
+    protected static JsonElement? ReadElement(JsonElement element, string propertyName)
     {
         if (element.ValueKind != JsonValueKind.Object)
         {
@@ -130,4 +129,3 @@ public partial class DigitalBrainTools(IGrainFactory grains)
         return null;
     }
 }
-
