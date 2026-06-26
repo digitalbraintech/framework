@@ -70,3 +70,25 @@ Expanded coverage for UI surfaces in update flows.
 
 Continued: update kernel self-update to use seeded pack version/desc from MarketplaceSeeds.
 Verifs: build clean, tests pass.
+## 2026-06-26: proper OTEL for GenAI (neuron + LLM)
+
+Changes under brain/:
+* NeuroOSPrototype.ServiceDefaults/Extensions.cs: registered .AddSource("DigitalBrain.Neuron") + .AddMeter("DigitalBrain.Neuron") in ConfigureOpenTelemetry.
+* DigitalBrain.Kernel/Llm/DigitalBrainChat.cs: wrapped Ollama and AzureOpenAI IChatClient registrations with new ChatClientBuilder(raw).UseOpenTelemetry(sourceName: "DigitalBrain.Neuron").Build() before AddChatClient.
+* DigitalBrain.Kernel/Neuron.cs: added using for Diagnostics; introduced public static NeuronInstrumentation (ActivitySource + Meter + db.synapses.in/out + db.handle.duration); instrumented DeliverAsync (StartActivity + tags + handleStopwatch + records) and FireAsync (out counter).
+
+All direct IChatClient sites now get GenAI-instrumented clients. Neuron dispatch/fire now emit traceable spans + db.* metrics. LLM calls produce full gen_ai.* semantic conv spans (nested under neuron traces) matching Projects/final + Projects/ino/IAW.
+
+Commit: b9659e1 feat(brain): proper OpenTelemetry for GenAI + neuron instrumentation
+
+Verification performed after edits:
+- Context7 used for Microsoft.Extensions.AI (ChatClientBuilder.UseOpenTelemetry + gen_ai emission), OpenTelemetry .NET (AddSource/AddMeter), Aspire (ServiceDefaults/ConfigureOpenTelemetry) — before any edit.
+- dotnet build (kernel + AppHost + tests) clean.
+- High-severity targeted tests (ChatClientRegistration + neuron/llm/ino/company/ checkpoint filters): 68+ passed, 0 failures.
+- aspire__doctor (MCP): 4/4 pass.
+- aspire MCP tools (select, list_resources, doctor, rebuilds via execute_resource_command) used.
+- Relative paths only. Self-explanatory names throughout (ollamaClient, chatClient, handleStopwatch, NeuronInstrumentation.*). No vacuous summaries or default comments added. Latest central packages respected.
+
+Refs: research of Projects/ino/IAW (AgentTelemetry + UseOpenTelemetry in LlmRegistration) + Projects/final (NeuronInstrumentation + LlmNeuron wrapping).
+
+Continued after commit...

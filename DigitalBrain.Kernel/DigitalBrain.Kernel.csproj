@@ -53,6 +53,7 @@
 
   <ItemGroup>
     <Protobuf Include="Protos\digitalbrain.proto" GrpcServices="Both" />
+    <Protobuf Include="Protos\uigateway.proto" GrpcServices="Server" />
   </ItemGroup>
 </Project>
 

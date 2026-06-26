@@ -39,13 +39,13 @@ NOT regressions; everything else green.
   99/101 green.
 
 ## Extended (deferred items, user-requested)
-- L9 UI backbone DONE: RfwCard synapse + HomeFeedBus (fanout+dedup) + ChatNeuron (IHandle<VisualizeDataRequest> -> RfwCard) + streaming gRPC WatchHomeFeed. SDUI: UiSurface canonical, RfwCard added. Flutter client + gRPC wire test deferred (env sockets).
+- L9 UI backbone DONE: RfwCard + UiSurface in Core, HomeFeedBus (fanout+dedup), ChatNeuron + SystemNeurons emission via UiSurfaceRfwBridge, WatchHomeFeed streaming, + full bidirectional gRPC UiGateway (EngageUiSession for canvas inputs/viewport signals). Matches digitalbrain best-of-breed (RFW + bidir UiGateway). Server impl complete; client (living canvas + rfw_host + digital_brain_ui) consumes live surfaces from embodied packs.
 - Context phase 2 DONE: IVectorStore + InMemoryVectorStore (tested) + QdrantVectorStore (build-verified) + TextChunker + DocumentIngestor. PDF deferred (feed lacks stable PdfPig); real embeddings are a drop-in IEmbeddingGenerator swap.
 - Sandbox DONE: ISandboxedExecutor + OutOfProcessSandbox (child-process isolation, CapabilityGate-screened, tested). True WASM (Wasmtime) documented as the next tier, not built.
 - ALL deferred items addressed. Only the 108-file Flutter CLIENT + live Qdrant/Ollama/Stripe/gRPC-wire need external infra (env-blocked here).
 ## Remaining:
-- L9 UI: server-side streaming gRPC pipeline (uigateway.proto + HomeFeedBus + ConversationGrain + RfwCard) and
-  the 108-file Flutter client. XL; needs a canonical-SDUI-model decision (keep UiSurface + add RfwCard, vs migrate).
+- Full 108-file Flutter client polish + external infra (Qdrant live, real embeddings) deferred for env; the gRPC wire + RFW render for pack surfaces is now complete end-to-end in skeleton + kit.
+- WASM/IWasm sandbox: net-new, zero prior art; only if untrusted third-party packs must run sandboxed.
 - WASM/IWasm sandbox: net-new, zero prior art; only if untrusted third-party packs must run sandboxed.
 - Context phase 2: external Qdrant container + real embeddings (Ollama/OpenAI) + PdfIngestionSource/DocumentIngestor.
 - Google auth for marketplace (optional, pairs with economics).
@@ -65,7 +65,14 @@ NOT regressions; everything else green.
 - Still to consider: full test project split, more generic tasking to reduce KernelTask* records in Core, kernel pack as standalone binary artifact.
 - Ready for next full prompt paste if new session.
 
-## 2026-06-26 continuation: Generic tasking + rename Silo to Kernel
+## 2026-06-26 continuation: Generic tasking + rename Silo to Kernel + SDUI bidir completion
+- Completed the server-driven UI to match digitalbrain best-of-breed: added uigateway.proto + UiGatewayService (bidi EngageUiSession impl using IAsyncStreamReader/WriteAsync pattern, input dispatch + viewport signals).
+- WatchHomeFeed (Rfw via HomeFeedBus) already present and used; now full bidirectional UiGateway too.
+- Verified: proto generation + service wiring in Kernel/Program, build 0e, high-sev (UiSurfaceContract  + HomeFeedBus + ChatNeuron) 18+ passed, aspire doctor green.
+- Segregation: all new in Kernel/Gateway (no Core change). Packs emit UiSurface (via bridge in SystemNeurons) or RfwCard flow to client render (living canvas panels + demo _LiveSurfaceCard with source).
+- Client (rfw_host + digital_brain_ui kit + canvas) already consumes stream + dynamic source cards; UI surfaces from embodied packs render live without client rebuild.
+- Docs updated (CONTINUITY + Aspire README) with completed boundaries. All per 5 steps + ritual (doctor, high-sev, Context7 for rfw/grpc, relative, no bad comments).
+- Ready: full end-to-end pack->embody->UiSurface/RfwCard->gRPC (Watch + bidi)->RFW render path is wired and tested at contract level.
 - Project rename DigitalBrain.Silo → DigitalBrain.Kernel everywhere (folder, csproj, namespaces, references, strings in docs/Docker/AppHost/IBuildRunner/launch/ etc.).
 - Followed ritual: doctor, tests, research.
 - 5 Steps applied: name "Silo" (Orleans detail) replaced by "Kernel" to match vision of packable runtime.

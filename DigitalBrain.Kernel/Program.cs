@@ -108,6 +108,7 @@ builder.UseOrleans(siloBuilder =>
 var app = builder.Build();
 
 app.MapGrpcService<DigitalBrain.Kernel.Gateway.GatewayService>();
+app.MapGrpcService<DigitalBrain.Kernel.Gateway.UiGatewayService>();
 
 if (!isAspireHosted)
 {

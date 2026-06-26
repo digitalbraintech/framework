@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package digitalbrain.ui;
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "DigitalBrain.Runtime.Grpc.Ui";
+
+// Bidirectional UI gateway for rich server-driven experiences.
+// Complements the simpler WatchHomeFeed (RfwCardEnvelope) on the main gateway.
+// Used by living canvas for interactive sessions (viewport feedback, input events from RFW surfaces).
+service UiGateway {
+  rpc EngageUiSession(stream UiInputSynapse) returns (stream UiStateSignal);
+}
+
+message UiInputSynapse {
+  string brain_id = 1;
+  string element_id = 2;
+  string target_neuron_id = 3;
+  UiInputSynapse_InteractionType interaction = 4;
+  string input_payload = 5;
+  Point3D coordinates = 6;
+  google.protobuf.Timestamp client_time = 7;
+}
+
+message Point3D {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+enum UiInputSynapse_InteractionType {
+  CLICK = 0;
+  HOVER_ENTER = 1;
+  HOVER_EXIT = 2;
+  DOUBLE_CLICK = 3;
+  TEXT_INPUT = 4;
+  KEY_PRESS = 5;
+  DRAG_NODE = 6;
+}
+
+message UiStateSignal {
+  oneof payload {
+    RfwCardProto rfw_card = 1;
+    UiViewportSignal viewport = 2;
+    UiSoundSignal sound = 3;
+  }
+}
+
+message UiViewportSignal {
+  double zoom_depth = 1;
+  double center_x = 2;
+  double center_y = 3;
+  double center_z = 4;
+}
+
+message UiSoundSignal {
+  string sound_id = 1;
+  string payload = 2;
+}
+
+message RfwCardProto {
+  string brain_id = 1;
+  string neuron_id = 2;
+  string surface_id = 3;
+  string library_uri = 4;
+  string root_widget = 5;
+  bytes data_json = 6;
+  RfwCardProto_RfwLayoutProto layout = 7;
+  RfwCardProto_RfwLockProto lock_state = 8;
+  string required_action_id = 9;
+  google.protobuf.Timestamp at = 10;
+}
+
+enum RfwCardProto_RfwLayoutProto {
+  CARD = 0;
+  PANEL = 1;
+  MODAL = 2;
+  INLINE = 3;
+  CANVAS = 4;
+}
+
+enum RfwCardProto_RfwLockProto {
+  IDLE = 0;
+  BUSY = 1;
+  MODAL_LOCK = 2;
+}

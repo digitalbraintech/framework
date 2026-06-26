@@ -39,7 +39,7 @@ The returned context + resource enable future With* extensions while keeping the
 - Marketplace (journal-driven publish/install of signed typed-C# packs) + collectible ALC embodiment host (GeneratedNeuron) that turns packs into live typed-Synapse handlers.
 - KernelTask with journal-derived progress.
 - SystemStatus + self-diagnosis (MCP to own Aspire + checkpoint-based simulation).
-- HomeFeedBus + RfwCard/UiSurface streaming for dynamic UI that travels with packs.
+- HomeFeedBus + RfwCard/UiSurface streaming + bidirectional UiGateway (EngageUiSession) for dynamic UI that travels with packs (RFW + perf-oriented bidi per best-of-breed).
 
 Higher-level capabilities (INO, specific closed loops, domain experiences, custom UI surfaces) are published to the marketplace and embodied on demand. They receive updates independently of the kernel substrate.
 
