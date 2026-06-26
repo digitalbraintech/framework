@@ -105,7 +105,7 @@ namespace DigitalBrain.Tests.Features
         
         private static global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages InitializeCucumberMessages()
         {
-            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 12);
+            return new global::Reqnroll.Formatters.RuntimeSupport.FeatureLevelCucumberMessages("Features/NeuronCore.feature.ndjson", 13);
         }
         
         async global::System.Threading.Tasks.Task global::Xunit.IAsyncLifetime.InitializeAsync()
@@ -564,6 +564,55 @@ this.ScenarioInitialize(scenarioInfo, ruleInfo);
 #line hidden
 #line 79
   await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-rolling-complete\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+            }
+            await this.ScenarioCleanupAsync();
+        }
+        
+        [global::Xunit.SkippableFactAttribute(DisplayName="Kernel treated as first-class versioned pack emits only segregated surfaces (core" +
+            " stays universal)")]
+        [global::Xunit.TraitAttribute("FeatureTitle", "DigitalBrain Neuron Core")]
+        [global::Xunit.TraitAttribute("Description", "Kernel treated as first-class versioned pack emits only segregated surfaces (core" +
+            " stays universal)")]
+        public async global::System.Threading.Tasks.Task KernelTreatedAsFirst_ClassVersionedPackEmitsOnlySegregatedSurfacesCoreStaysUniversal()
+        {
+            string[] tagsOfScenario = ((string[])(null));
+            global::System.Collections.Specialized.OrderedDictionary argumentsOfScenario = new global::System.Collections.Specialized.OrderedDictionary();
+            string pickleIndex = "10";
+            global::Reqnroll.ScenarioInfo scenarioInfo = new global::Reqnroll.ScenarioInfo("Kernel treated as first-class versioned pack emits only segregated surfaces (core" +
+                    " stays universal)", null, tagsOfScenario, argumentsOfScenario, featureTags, pickleIndex);
+            string[] tagsOfRule = ((string[])(null));
+            global::Reqnroll.RuleInfo ruleInfo = null;
+#line 82
+this.ScenarioInitialize(scenarioInfo, ruleInfo);
+#line hidden
+            if ((global::Reqnroll.TagHelper.ContainsIgnoreTag(scenarioInfo.CombinedTags) || global::Reqnroll.TagHelper.ContainsIgnoreTag(featureTags)))
+            {
+                await testRunner.SkipScenarioAsync();
+            }
+            else
+            {
+                await this.ScenarioStartAsync();
+#line 83
+  await testRunner.GivenAsync("a marketplace neuron \"market-kseg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 84
+  await testRunner.GivenAsync("an aspire orchestrator neuron \"aspire-kseg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "Given ");
+#line hidden
+#line 85
+  await testRunner.WhenAsync("I publish pack \"kernel\" version \"0.3.0\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "When ");
+#line hidden
+#line 86
+  await testRunner.AndAsync("I download/install the pack \"kernel\" version \"0.3.0\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 87
+  await testRunner.AndAsync("I fire a StartDistributedApp for \"kernel-seg\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
+#line hidden
+#line 88
+  await testRunner.ThenAsync("the timeline contains a NeuroPackInstalled", ((string)(null)), ((global::Reqnroll.Table)(null)), "Then ");
+#line hidden
+#line 89
+  await testRunner.AndAsync("the timeline contains a UiSurface of kind \"kernel-dashboard\"", ((string)(null)), ((global::Reqnroll.Table)(null)), "And ");
 #line hidden
             }
             await this.ScenarioCleanupAsync();

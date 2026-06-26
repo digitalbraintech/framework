@@ -65,4 +65,23 @@ NOT regressions; everything else green.
 - Still to consider: full test project split, more generic tasking to reduce KernelTask* records in Core, kernel pack as standalone binary artifact.
 - Ready for next full prompt paste if new session.
 
-Previous (2026-06-25) boundaries remain; this continues the segregation and "kernel as first-class updatable pack".
+## 2026-06-26 session (this prompt continuation)
+Applied Elon's 5 Steps strictly:
+1. Requirements less dumb: questioned why KernelTask* (protocol used by MCP/INO) named/prefixed in Core (shared because Mcp refs only Core); folder Kernel/ in Core for protector was ownership smell; primitive string TaskId everywhere (real need for causal ids like NeuronId).
+2. Deleted: removed brain/DigitalBrain.Core/Kernel/ subdir entirely (moved INeuronStateProtector.cs + ProtectedCheckpoint.cs to root; no more Kernel/ folder in pure Core). Removed magic version "2026.6" literal for kernel pack publish (now uses KernelPack.DefaultVersion).
+3. Simplified/optimized remaining: introduced TaskId (modeled on NeuronId) in Core; updated 7 task synapse records + KernelTaskInfo + usages to use typed id instead of string (kills primitive obsession for task ids; implicit conversions keep call sites clean).
+4. Accelerated: every edit followed by targeted build + high-sev test filter (core/kernel/ui/rolling) + aspire doctor (MCP) + relevant asp mcp.
+5. Automate last (none yet; boundaries first).
+
+Changes:
+- Core now contains zero kernel/ subfolder and no kernel-dashboard or kernel-only kinds (UiSurfaceKinds remain universal; KernelUiSurfaceKinds + KernelPack + PerformKernelSelfUpdate + rolling emission in Silo).
+- KernelTask* protocol remains in Core (required by Mcp.Tools + broad use) but cleaned with TaskId; comment updated.
+- Reqnroll expanded: new scenario "Kernel treated as first-class versioned pack emits only segregated surfaces" exercising publish/install + dashboard (asserts segregation).
+- High-sev tests (incl full rolling + new seg scenario) green (11+ passing in filter).
+- Packaging: kernel remains first-class "kernel" marketplace pack (publish/install -> auto Perform via MarketplaceNeuron in Silo); Core IsPackable stable minimal; versions aligned via const.
+- Verifs: build clean, tests pass, aspire doctor (4/4 pass) multiple times; relative paths only; Context7 used for Orleans/Reqnroll APIs before edits.
+- Boundaries reinforced: Core = pure INeuron/Synapse/IPackBehavior/IHandle + universal (UiSurface base, task ids, checkpoints protector, marketplace seeds for UI). Kernel (Silo + Aspire) owns runtime, dashboard/rolling surfaces, HA logic, own kinds, self-update trigger.
+
+Success: Core pure; kernel packable/self-updatable via marketplace; primitive reduced; Reqnroll expanded; tests segregated by concern (Kernel/ sub in tests + Silo refs); all green.
+
+Next session: paste full user prompt again. Paste this CONTINUITY too if needed.

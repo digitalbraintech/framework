@@ -78,3 +78,13 @@ Scenario: Kernel self-update publishes as pre-installed pack then performs expli
   And the timeline contains a UiSurface of kind "kernel-rolling-verify"
   And the timeline contains a UiSurface of kind "kernel-rolling-complete"
   # Pack install + trigger for reliability in tests; auto via Marketplace for kernel installs in production; handler produces surfaces.
+
+Scenario: Kernel treated as first-class versioned pack emits only segregated surfaces (core stays universal)
+  Given a marketplace neuron "market-kseg"
+  Given an aspire orchestrator neuron "aspire-kseg"
+  When I publish pack "kernel" version "0.3.0"
+  And I download/install the pack "kernel" version "0.3.0"
+  And I fire a StartDistributedApp for "kernel-seg"
+  Then the timeline contains a NeuroPackInstalled
+  And the timeline contains a UiSurface of kind "kernel-dashboard"
+  # Verification: kernel-dashboard / rolling-* kinds defined in Silo (KernelUiSurfaceKinds), never in Core UiSurfaceKinds or samples. Core has only base UiSurface + universal kinds.

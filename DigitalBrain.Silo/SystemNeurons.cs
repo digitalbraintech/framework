@@ -1154,7 +1154,8 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         if (created != null)
             return Task.FromResult(new KernelTaskInfo(created.TaskId, "created", null));
         var id = this.GetPrimaryKeyString() ?? "task";
-        return Task.FromResult(new KernelTaskInfo(id, "created", null));
+        TaskId idTask = id;
+        return Task.FromResult(new KernelTaskInfo(idTask, "created", null));
     }
 }
 

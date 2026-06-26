@@ -325,7 +325,7 @@ static async Task SeedPreExistingAsync(IMarketplaceNeuron market)
 
     // Kernel as pre-installed updatable item in marketplace. Supports get-update while pre-installed, using replicas for HA.
     await market.FireAsync(new PublishToMarketplace(
-        KernelPack.Name, "2026.6", "", "digitalbraintech", false, 0.0,
+        KernelPack.Name, KernelPack.DefaultVersion, "", "digitalbraintech", false, 0.0,
         KernelPack.Description));
 
     // One more marketplace experience added via closed loops
