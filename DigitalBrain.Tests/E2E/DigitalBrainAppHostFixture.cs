@@ -6,6 +6,7 @@ using Google.Protobuf;
 using Grpc.Net.Client;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
 using Xunit;
 
 namespace DigitalBrain.Tests.E2E;
@@ -23,6 +24,8 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         Environment.SetEnvironmentVariable("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", "true");
         Environment.SetEnvironmentVariable("DIGITALBRAIN_SURFACES_ENABLED", "true");
         Environment.SetEnvironmentVariable("DigitalBrain__ClusterId", $"e2e-{testId}");
+        Environment.SetEnvironmentVariable("DIGITALBRAIN_KERNEL_REPLICAS", "1");
+        Environment.SetEnvironmentVariable("DIGITALBRAIN_WEBROOT", E2EPrerequisites.WebBundleDir);
 
         // Resolve the AppHost entry point type from the referenced assembly without pulling duplicate Program symbols into global scope.
         var appHostAssembly = Assembly.Load("NeuroOSPrototype.AppHost");
@@ -40,27 +43,17 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         App = await builder.BuildAsync();
         await App.StartAsync();
 
-        await App.ResourceNotifications.WaitForResourceHealthyAsync("gateway");
-        await App.ResourceNotifications.WaitForResourceHealthyAsync("silo");
+        using var startupCts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
+        await App.ResourceNotifications.WaitForResourceHealthyAsync("gateway", startupCts.Token);
+        await App.ResourceNotifications.WaitForResourceHealthyAsync("kernel", startupCts.Token);
 
-        // Resolve an external http(s) endpoint for the browser target. The exact names depend on the Aspire model (gateway/silo + AddDigitalBrain wiring).
+        // Prefer the kernel web endpoint (Flutter bundle origin); fall back to gateway.
         string url = "https://localhost:8080";
-        try
-        {
-            url = App.GetEndpoint("gateway", "https").ToString();
-        }
+        try { url = App.GetEndpoint("kernel", "web").ToString(); }
         catch
         {
-            try { url = App.GetEndpoint("gateway", "http").ToString(); }
-            catch
-            {
-                try { url = App.GetEndpoint("silo", "https").ToString(); }
-                catch
-                {
-                    try { url = App.GetEndpoint("silo", "http").ToString(); }
-                    catch { /* keep default; E2E will still exercise boot + playwright launch */ }
-                }
-            }
+            try { url = App.GetEndpoint("gateway", "https").ToString(); }
+            catch { try { url = App.GetEndpoint("gateway", "http").ToString(); } catch { } }
         }
         GatewayHttpsUrl = url;
     }
