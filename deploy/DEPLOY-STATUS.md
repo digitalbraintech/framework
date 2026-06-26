@@ -61,8 +61,56 @@ pulumi destroy --stack dev --cwd framework/deploy     # tear down
 ```
 
 ## Follow-ups
-- **DNS:** remove the dangling `api` / `asuid.api` records at the registrar — the gateway they pointed to is deleted.
-- **CI (`deploy.yml`):** flipped to `push:[main]` → `pulumi up`, but it targets `azblob://pulumi-state`
-  while the live stack is on the **local file backend**. Migrate the stack state to azblob (or point CI at
-  the same backend) and add repo `DOCKERHUB_USERNAME` (var) + `DOCKERHUB_TOKEN` (secret) before enabling auto-deploy.
-- No interaction path is live yet (silo is a worker; the gateway is gone) — journal entries require neuron activity.
+
+### (2026-06-26) SP1 CI standardization
+- **Ingress:** The kernel container app (`digitalbrain-jobs`) now serves the public interaction path: an **external** ingress with `Transport="Auto"` (HTTP/1.1 + HTTP/2 on port 8080) carrying browser gRPC-Web and native gRPC through the kernel's co-hosted `DigitalBrainGateway`/`UiGateway`. This supersedes the Pre-SP1 "no interaction path is live" state below.
+- **CI state backend:** CI (`deploy.yml`) now explicitly declares `cloud-url: azblob://pulumi-state`. Stack state must be migrated from the local file backend to Azure Blob Storage; this is a runbook step (Task 5).
+- **Secret requirement:** `DigitalBrain:Checkpoint:Key` (base64 AES key for checkpoint encryption — `AddKernelSecurity` fail-fasts without it in Production) is now a Container App secret. The Pulumi program reads it from env `DIGITALBRAIN_CHECKPOINT_KEY` (CI injects it from the repo secret `CHECKPOINT_KEY`, never committed) or falls back to local `pulumi config set --secret checkpointKey`.
+
+### (2026-06-26) CI auto-deploy bootstrap — PROGRESS + REMAINING (OIDC app reg requires privileged Entra account)
+All changes committed and pushed to **master** (default branch renamed from main; workflows, docs, and READMEs updated). Deploys now happen **ONLY via GitHub Actions**.
+
+**Completed in this session (via gh cli + az cli + pulumi full-exe):**
+- `.github/workflows/deploy.yml` and `ci.yml` updated to `master` (and ci ignores master).
+- `deploy/DEPLOY-STATUS.md`, `deploy/README.md`, `scripts/bootstrap-azure.md`, root `README.md` refreshed (DeploymentKit history noted, commands accurate, master refs).
+- GitHub repo default branch set to `master`; old `main` deleted.
+- GH Actions vars set: DOCKERHUB_USERNAME=vhorbachov, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID (CLIENT_ID is placeholder until app reg created).
+- GH Actions secrets set: PULUMI_PASSPHRASE, CHECKPOINT_KEY (fresh 32B), DOCKERHUB_TOKEN (placeholder — rotate with real write-capable Docker Hub token immediately).
+- pulumi-state container created in digitalbrainstprod.
+- RBAC: current user granted Storage Blob Data Contributor on storage (for migration).
+- Pulumi state fully migrated: `pulumi stack export` (file://) → `azblob://pulumi-state` `dev` stack (now 10 resources preserved).
+- Commit + push on master performed.
+
+**Remaining (one-time, run with privileged az login that can create app regs + assign Owner/UserAccessAdmin):**
+1. **Azure OIDC identity** (run the commands below with a capable account):
+   ```pwsh
+   $APP_ID = (az ad app create --display-name 'digitalbrain-github-deploy' --query appId -o tsv)
+   az ad sp create --id $APP_ID
+   $APP_OBJ = (az ad app show --id $APP_ID --query id -o tsv)
+   az ad app federated-credential create --id $APP_OBJ --parameters '{
+     "name": "github-master",
+     "issuer": "https://token.actions.githubusercontent.com",
+     "subject": "repo:digitalbraintech/brain:ref:refs/heads/master",
+     "audiences": ["api://AzureADTokenExchange"]
+   }'
+   az role assignment create --assignee $APP_ID --role Contributor --scope /subscriptions/08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9/resourceGroups/digitalbrain-rg
+   az role assignment create --assignee $APP_ID --role "Storage Blob Data Contributor" --scope /subscriptions/08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9/resourceGroups/digitalbrain-rg/providers/Microsoft.Storage/storageAccounts/digitalbrainstprod
+   # Then set the var:
+   # gh variable set AZURE_CLIENT_ID --body "$APP_ID"
+   ```
+   Capture and set AZURE_CLIENT_ID (and rotate if needed).
+
+2. **Rotate secrets** (if not already real values):
+   - `gh secret set DOCKERHUB_TOKEN` (must allow push to vhorbachov/digitalbrain-silo)
+   - Optionally rotate CHECKPOINT_KEY / PULUMI_PASSPHRASE and re-set.
+
+3. **Trigger/verify first run on master**:
+   - The push that created master + this commit already queued a deploy run (tag ~ commit sha).
+   - Use `gh run list --workflow deploy.yml --limit 3` and `gh run watch` to observe.
+   - After green: verify container boots (no checkpoint crash), gRPC-Web CORS preflight returns ACA *, Health over the FQDN.
+
+NOTE: Because state is in azblob and OIDC + image push will use the GH secrets, **all future deploys (incl. imageTag changes) MUST go through `git push origin master` or workflow_dispatch. No local `pulumi up` for prod.**
+
+### Pre-SP1 (2026-06-23) — superseded where noted by the SP1 entry above
+- **DNS:** remove the dangling `api` / `asuid.api` records at the registrar — they pointed to the old deleted gateway. SP2 attaches a fresh `api.digitalbrain.tech` custom domain to the now-public kernel ingress.
+- **CI (`deploy.yml`):** auto-deploy on `push:[master]` → `pulumi up`. Requires the azblob state migration above plus repo `DOCKERHUB_USERNAME` (var) + `DOCKERHUB_TOKEN` (secret) before enabling.

@@ -1,10 +1,10 @@
 name: deploy
 
-# Auto-deploy on merge to main. The simplified Pass-1 flow: build+push ONE image (the silo) to Docker Hub,
+# Auto-deploy on merge to master. The simplified Pass-1 flow: build+push ONE image (the silo) to Docker Hub,
 # then `pulumi up` the minimal program (RG, Storage, Azure OpenAI, monitoring, ACA env + silo).
 on:
   push:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -38,9 +38,9 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Publish silo image
+      - name: Publish kernel image
         run: |
-          dotnet publish DigitalBrain.Silo/DigitalBrain.Silo.csproj -c Release /t:PublishContainer \
+          dotnet publish DigitalBrain.Kernel/DigitalBrain.Kernel.csproj -c Release /t:PublishContainer \
             -p:ContainerRegistry=docker.io \
             -p:ContainerRepository=vhorbachov/digitalbrain-silo \
             -p:ContainerImageTag="${TAG}"
@@ -57,6 +57,12 @@ jobs:
         env:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_PASSPHRASE }}
           DIGITALBRAIN_IMAGE_TAG: "${{ env.TAG }}"
+          # AES checkpoint-encryption key, injected from a repo secret (never committed). The program reads
+          # DIGITALBRAIN_CHECKPOINT_KEY and fails the deploy if absent (kernel fail-fasts in Production without it).
+          DIGITALBRAIN_CHECKPOINT_KEY: ${{ secrets.CHECKPOINT_KEY }}
+          # azblob://pulumi-state backend needs the storage account; the OIDC login above provides Azure AD auth
+          # (the deploy identity needs Storage Blob Data Contributor on this account).
+          AZURE_STORAGE_ACCOUNT: digitalbrainstprod
         with:
           command: up
           stack-name: dev

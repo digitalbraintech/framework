@@ -15,8 +15,9 @@ namespace DigitalBrain.Deploy;
 
 // Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
 // a resource group, one StorageV2 account (Orleans Table clustering + Blob grain/journal), Azure OpenAI
-// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, and a single silo
-// container app with an internal Http2 ingress (gRPC gateway on port 8080). Replaces the vendored DeploymentKit.
+// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, and a single kernel
+// container app with an external Auto-transport ingress (browser gRPC-Web + native gRPC on port 8080).
+// Replaces the vendored DeploymentKit.
 internal static class Program
 {
     private const string Region = "westeurope";
@@ -31,6 +32,7 @@ internal static class Program
     // Container App secret names backing the NeuroOS runtime contract.
     private const string StorageConnectionSecret = "digitalbrain-storage-connection";
     private const string OpenAiKeySecret = "digitalbrain-openai-key";
+    private const string CheckpointKeySecret = "digitalbrain-checkpoint-key";
 
     // The env + silo were previously created under DeploymentKit's "app-runtime" component. Alias to that old
     // parent URN so Pulumi re-parents them to the stack root in place instead of replacing the live resources.
@@ -45,6 +47,15 @@ internal static class Program
         var imageTag = config.Get("imageTag")
             ?? System.Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? "latest";
+
+        // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
+        // never lives in git; local runs can instead use `pulumi config set --secret checkpointKey ...`.
+        var checkpointKeyEnv = System.Environment.GetEnvironmentVariable("DIGITALBRAIN_CHECKPOINT_KEY");
+        var checkpointKey = config.GetSecret("checkpointKey")
+            ?? (string.IsNullOrEmpty(checkpointKeyEnv) ? null : Output.CreateSecret(checkpointKeyEnv))
+            ?? throw new System.InvalidOperationException(
+                "Checkpoint key required: set env DIGITALBRAIN_CHECKPOINT_KEY (CI secret) " +
+                "or `pulumi config set --secret digitalbrain-deploy:checkpointKey <base64-32-bytes>` (local).");
 
         var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
         {
@@ -178,14 +189,15 @@ internal static class Program
             {
                 Ingress = new AppInputs.IngressArgs
                 {
-                    External = false,
+                    External = true,
                     TargetPort = 8080,
-                    Transport = "Http2"
+                    Transport = "Auto"
                 },
                 Secrets =
                 {
                     new AppInputs.SecretArgs { Name = StorageConnectionSecret, Value = storageConnectionString },
-                    new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey }
+                    new AppInputs.SecretArgs { Name = OpenAiKeySecret, Value = openAiKey },
+                    new AppInputs.SecretArgs { Name = CheckpointKeySecret, Value = checkpointKey }
                 }
             },
             Template = new AppInputs.TemplateArgs
@@ -199,6 +211,8 @@ internal static class Program
                         Resources = new AppInputs.ContainerResourcesArgs { Cpu = 1.0, Memory = "2Gi" },
                         Env =
                         {
+                            new AppInputs.EnvironmentVarArgs { Name = "ASPNETCORE_ENVIRONMENT", Value = "Production" },
+                            new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_WEB_PORT", Value = "8080" },
                             new AppInputs.EnvironmentVarArgs { Name = "DIGITALBRAIN_ENV", Value = "cloud" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Provider", Value = "azureopenai" },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__Model", Value = ChatDeploymentName },
@@ -206,7 +220,8 @@ internal static class Program
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__grainstate", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "ConnectionStrings__journal", SecretRef = StorageConnectionSecret },
                             new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIEndpoint", Value = openAiEndpoint },
-                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret }
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Llm__AzureOpenAIKey", SecretRef = OpenAiKeySecret },
+                            new AppInputs.EnvironmentVarArgs { Name = "DigitalBrain__Checkpoint__Key", SecretRef = CheckpointKeySecret }
                         }
                     }
                 },
