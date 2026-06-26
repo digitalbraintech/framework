@@ -65,7 +65,20 @@ pulumi destroy --stack dev --cwd framework/deploy     # tear down
 ### (2026-06-26) SP1 CI standardization
 - **Ingress:** The kernel container app (`digitalbrain-jobs`) now serves the public interaction path: an **external** ingress with `Transport="Auto"` (HTTP/1.1 + HTTP/2 on port 8080) carrying browser gRPC-Web and native gRPC through the kernel's co-hosted `DigitalBrainGateway`/`UiGateway`. This supersedes the Pre-SP1 "no interaction path is live" state below.
 - **CI state backend:** CI (`deploy.yml`) now explicitly declares `cloud-url: azblob://pulumi-state`. Stack state must be migrated from the local file backend to Azure Blob Storage; this is a runbook step (Task 5).
-- **Secret requirement:** `DigitalBrain:Checkpoint:Key` (base64 AES key for checkpoint encryption — `AddKernelSecurity` fail-fasts without it in Production) is now required in the Container App secrets, injected from Pulumi secret config `digitalbrain-deploy:checkpointKey` (Task 3).
+- **Secret requirement:** `DigitalBrain:Checkpoint:Key` (base64 AES key for checkpoint encryption — `AddKernelSecurity` fail-fasts without it in Production) is now a Container App secret. The Pulumi program reads it from env `DIGITALBRAIN_CHECKPOINT_KEY` (CI injects it from the repo secret `CHECKPOINT_KEY`, never committed) or falls back to local `pulumi config set --secret checkpointKey`.
+
+### (2026-06-26) CI auto-deploy bootstrap — REMAINING (one-time, needs credentials this session's az login lacks)
+The `deploy.yml` code is complete (publishes `DigitalBrain.Kernel`, OIDC login, `pulumi up` on `azblob://pulumi-state` with `AZURE_STORAGE_ACCOUNT=digitalbrainstprod`, checkpoint key from `CHECKPOINT_KEY` secret). To make `push:[main] → live deploy` actually work, complete these once:
+
+1. **Azure OIDC identity** (BLOCKED for the current az account `…@tripradar.io` — "Insufficient privileges" to create app registrations; needs an account with AD app-reg rights + Owner/User-Access-Admin on sub `08e2e8fa-…`):
+   - Create an app registration (e.g. `digitalbrain-github-deploy`); add a **federated credential** for `repo:digitalbraintech/brain:ref:refs/heads/main` (and `:environment:` if used).
+   - Assign the SP **Contributor** on RG `digitalbrain-rg` (provisions ACA/etc.) and **Storage Blob Data Contributor** on `digitalbrainstprod` (so the azblob state backend can read/write).
+   - Capture `appId` (→ `AZURE_CLIENT_ID`), tenant (→ `AZURE_TENANT_ID`), sub (→ `AZURE_SUBSCRIPTION_ID`).
+2. **GitHub repo secrets/vars** (digitalbraintech/brain → Settings → Secrets and variables → Actions):
+   - Variables: `DOCKERHUB_USERNAME`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`.
+   - Secrets: `DOCKERHUB_TOKEN`, `PULUMI_PASSPHRASE` (= `digitalbrain-dryrun` unless rotated), `CHECKPOINT_KEY` (a fresh base64 32-byte AES key).
+3. **Pulumi state → azblob** (storage data-plane; the current az account CAN do this): create container `pulumi-state` in `digitalbrainstprod`; `pulumi stack export` from the local file backend, then `pulumi login azblob://pulumi-state` (with `AZURE_STORAGE_ACCOUNT=digitalbrainstprod`), `pulumi stack init dev`, `pulumi stack import`. NOTE: state lives in the same account the program manages — acceptable for first-cut (we never `destroy`); SP3 may move it to a dedicated account.
+4. **First run:** merge `hardening/bucket-d` + `prod/sp1-public-backend` to `main` (SP1 depends on bucket-d's gRPC-Web foundation, absent on `main`). The push triggers the deploy. First `pulumi up` flips `digitalbrain-jobs` ingress to **external/public** and deploys the new image — verify boot + a gRPC-Web preflight against the `*.azurecontainerapps.io` FQDN.
 
 ### Pre-SP1 (2026-06-23) — superseded where noted by the SP1 entry above
 - **DNS:** remove the dangling `api` / `asuid.api` records at the registrar — they pointed to the old deleted gateway. SP2 attaches a fresh `api.digitalbrain.tech` custom domain to the now-public kernel ingress.
