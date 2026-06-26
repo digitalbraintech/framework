@@ -14,7 +14,7 @@
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
     <ProjectReference Include="..\DigitalBrain.Aspire\DigitalBrain.Aspire.csproj" IsAspireProjectResource="false" />
     <ProjectReference Include="..\DigitalBrain.Gateway\DigitalBrain.Gateway.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Silo\DigitalBrain.Silo.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
     <ProjectReference Include="..\DigitalBrain.Cli\DigitalBrain.Cli.csproj" />
   </ItemGroup>
 

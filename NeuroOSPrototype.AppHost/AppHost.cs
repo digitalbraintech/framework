@@ -19,8 +19,8 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 .WithOrleansDashboard(8080)
 .WithMcp();
 
-var silo = builder.AddProject<Projects.DigitalBrain_Silo>("silo");
-ctx.WireKernelSilo(silo);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
+var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
+ctx.WireKernelSilo(kernel);  // Provides kernel cool features out of box (marketplace, surfaces, journals, 3 replicas HA, LLM for built-ins) via the Aspire package.
 
 var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient)
@@ -52,18 +52,18 @@ builder.AddProject<Projects.DigitalBrain_Gateway>("gateway")
     .WithReference(ctx.ClusteringTable)
     .WithExternalHttpEndpoints();
 
-silo.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
-silo.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
+kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
+kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
-// Inject Ollama LLM config so AddDigitalBrainChat registers IChatClient in the Aspire-hosted silo.
+// Inject Ollama LLM config so AddDigitalBrainChat registers IChatClient in the Aspire-hosted kernel.
 // Cloud path: override DigitalBrain__Llm__Provider=azureopenai via DIGITALBRAIN_ENV or appsettings.
-silo.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
-silo.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
-silo.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
+kernel.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
+kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
+kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
     ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
 if (ctx.EnableOrleansDashboard)
 {
-    silo.WithEnvironment("ORLEANS_DASHBOARD_PORT", (ctx.OrleansDashboardPort ?? 8080).ToString());
+    kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", (ctx.OrleansDashboardPort ?? 8080).ToString());
 }
 
 builder.Build().Run();

@@ -2,7 +2,7 @@
 // An Orleans CLIENT (like DigitalBrain.Cli) that exposes cluster interactions as MCP tools (DigitalBrain.Mcp.Tools).
 // Requires the cluster (silo + redis/table + ollama) to be running — the tools operate on real grains, so there is
 // no degraded no-cluster mode (fail-fast). For an in-process, remote-reachable variant the silo co-hosts the same
-// tools over HTTP (see DigitalBrain.Silo/Program.cs).
+// tools over HTTP (see DigitalBrain.Kernel/Program.cs).
 
 using DigitalBrain.Mcp.Tools;
 using Microsoft.Extensions.DependencyInjection;

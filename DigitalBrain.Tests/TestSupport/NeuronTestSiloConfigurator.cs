@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
-using DigitalBrain.Silo;
-using DigitalBrain.Silo.Company;
-using DigitalBrain.Silo.Foundry;
-using DigitalBrain.Silo.Llm;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Company;
+using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;

@@ -4,7 +4,7 @@
 // The entire system behavior is described via INO (prompts + Reqnroll .feature files) and executed at runtime by the framework (neurons + journals + LLM embodiment of NeuroPacks).
 
 using DigitalBrain.Core;
-using DigitalBrain.Silo;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
@@ -347,7 +347,7 @@ static async Task ShowTasksViewAsync(IGrainFactory grains, IInoNeuron ino, List<
     {
         var demoTask = "task-demo-" + Guid.NewGuid().ToString("N")[..8];
         var kt = grains.GetGrain<IKernelTask>(demoTask);
-        await kt.FireAsync(new RunKernelTask(demoTask, "Generate quick status summary of the running kernel"));
+        await kt.FireAsync(new RunTask(demoTask, "Generate quick status summary of the running kernel"));
         var info = await kt.GetInfoAsync();
         Console.WriteLine($"Demo task spawned: {info.TaskId} status={info.Status} result={info.Result}");
         known?.Add(demoTask);

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using DigitalBrain.Core;
-using DigitalBrain.Silo;
+using DigitalBrain.Kernel;
 using DigitalBrain.Tests.TestSupport;
 using Orleans.TestingHost;
 using Xunit;

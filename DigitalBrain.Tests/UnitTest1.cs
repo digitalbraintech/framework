@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -215,16 +215,16 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task KernelTask_Runs_And_Recovers_Status()
     {
-        var task = _cluster!.GrainFactory.GetGrain<DigitalBrain.Silo.IKernelTask>("task-test-1");
-        await task.FireAsync(new RunKernelTask("task-test-1", "demo work"));
+        var task = _cluster!.GrainFactory.GetGrain<DigitalBrain.Kernel.IKernelTask>("task-test-1");
+        await task.FireAsync(new RunTask("task-test-1", "demo work"));
         var info = await task.GetInfoAsync();
         Assert.Equal("completed", info.Status);
         Assert.Contains("demo work", info.Result ?? "");
 
         var timeline = await task.GetOutgoingTimelineAsync();
-        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "planning");
-        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "running-fallback");
-        Assert.Contains(timeline.OfType<KernelTaskProgress>(), progress => progress.Detail == "finalizing");
+        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "planning");
+        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "running-fallback");
+        Assert.Contains(timeline.OfType<TaskProgress>(), progress => progress.Detail == "finalizing");
     }
 
     [Fact]

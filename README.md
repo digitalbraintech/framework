@@ -94,7 +94,7 @@ sets them as Azure Container Apps environment variables via the Pulumi IaC progr
 ```
 framework/
 ├── DigitalBrain.Aspire/      # Aspire hosting SDK (AddDigitalBrain extension)
-├── DigitalBrain.Silo/        # Orleans kernel — neurons, marketplace, closed loops
+├── DigitalBrain.Kernel/        # Orleans kernel runtime — neurons, marketplace, closed loops, self-update
 ├── DigitalBrain.Gateway/     # HTTP gateway (ASP.NET Core)
 ├── DigitalBrain.Mcp/         # MCP server
 ├── DigitalBrain.Tests/       # Integration tests

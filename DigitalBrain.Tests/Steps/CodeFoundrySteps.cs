@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
@@ -183,7 +183,7 @@ public class CodeFoundrySteps : IAsyncDisposable
                 {
                     services.AddKeyedScoped<Orleans.Journaling.IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
                     services.AddKeyedScoped<Orleans.Journaling.IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                    services.AddScoped<DigitalBrain.Silo.NeuronJournals>();
+                    services.AddScoped<DigitalBrain.Kernel.NeuronJournals>();
                     services.AddSingleton<Orleans.Journaling.IJournaledStateManager, TestJournaledStateManager>();
                     services.AddSingleton<ICodeExecutor, InProcessAlcExecutor>();
                     services.AddSingleton<IBuildRunner>(runner);

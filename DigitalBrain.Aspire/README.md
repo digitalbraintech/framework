@@ -5,7 +5,7 @@ Aspire hosting package for the DigitalBrain **Kernel** — the minimal Orleans s
 ## Layering (structure + distribution)
 
 - **Core** (DigitalBrain.Core): stable abstractions — INeuron, Synapse (with SynapseId/CausationId/CorrelationId), dual journals, Checkpoint/Branch/Restore, IPackBehavior + typed dispatch, UiSurface/RfwCard as first-class synapses, trust, distribution contracts. This is the non-negotiable center. Everything is expressed through neurons and synapses.
-- **Kernel** (this package + DigitalBrain.Silo base): the Aspire-orchestrated minimal Orleans silo(s) + built-in kernel features (journaled marketplace substrate, collectible-ALC embodiment host, kernel tasks, system status/self-healing via checkpoints, foundry for compile/embody, core orchestration). AddDigitalBrain wires clustering, durable journals (blobs), LLM, etc.
+- **Kernel** (this package + DigitalBrain.Kernel base): the Aspire-orchestrated minimal Orleans kernel runtime + built-in kernel features (journaled marketplace substrate, collectible-ALC embodiment host, kernel tasks, system status/self-healing via checkpoints, foundry for compile/embody, core orchestration). AddDigitalBrain wires clustering, durable journals (blobs), LLM, etc.
 - **Experiences / INO / domain features**: published to the marketplace as signed typed-C# packs. Installed and updated into a running kernel exactly like any other pack. The kernel itself stays the stable base (3 replicas by default enable rolling updates and self-improvement without full downtime).
 
 The kernel starts 3 instances by default (see DigitalBrainOptions.KernelReplicas) so the substrate remains available while packs are embodied, behaviors updated, or resources restarted.
@@ -22,8 +22,8 @@ var ctx = builder.AddDigitalBrain("digitalbrain", options =>
 
 // Wire the kernel silo using the context — this provides the cool built-in kernel features
 // (marketplace, embodiment, journals with causation, UI surfaces, tasks, self-status, 3-replica HA) out of the box.
-var silo = builder.AddProject<Projects.DigitalBrain_Silo>("silo");
-ctx.WireKernelSilo(silo);
+var kernel = builder.AddProject<Projects.DigitalBrain_Kernel>("kernel");
+ctx.WireKernelSilo(kernel);
 
 var clientApp = builder.AddProject<Projects.YourClient>("client")
     .WithReference(ctx.OrleansClient);

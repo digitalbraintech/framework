@@ -192,31 +192,32 @@ public record Checkpoint(NeuronId Source, IReadOnlyList<Synapse> Snapshot, DateT
 [GenerateSerializer]
 public record BranchCreated(NeuronId Source, string BranchId) : Synapse(nameof(BranchCreated), DateTimeOffset.UtcNow);
 
-// Task protocol messages (recoverable task lifecycle for INO, MCP actions, orchestration). Grain IKernelTask and kernel-specific handling live in kernel layer.
+// Task protocol messages (recoverable task lifecycle for INO, MCP actions, orchestration).
+// The durable grain impl (IKernelTask) lives in the kernel layer; these messages are universal core protocol.
 [GenerateSerializer]
-public record KernelTaskCreated(TaskId TaskId, string Description) : Synapse(nameof(KernelTaskCreated), DateTimeOffset.UtcNow);
+public record TaskCreated(TaskId TaskId, string Description) : Synapse(nameof(TaskCreated), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record KernelTaskStarted(TaskId TaskId) : Synapse(nameof(KernelTaskStarted), DateTimeOffset.UtcNow);
+public record TaskStarted(TaskId TaskId) : Synapse(nameof(TaskStarted), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record KernelTaskProgress(TaskId TaskId, string Detail) : Synapse(nameof(KernelTaskProgress), DateTimeOffset.UtcNow);
+public record TaskProgress(TaskId TaskId, string Detail) : Synapse(nameof(TaskProgress), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record KernelTaskCompleted(TaskId TaskId, string? Result = null) : Synapse(nameof(KernelTaskCompleted), DateTimeOffset.UtcNow);
+public record TaskCompleted(TaskId TaskId, string? Result = null) : Synapse(nameof(TaskCompleted), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record KernelTaskCancelled(TaskId TaskId) : Synapse(nameof(KernelTaskCancelled), DateTimeOffset.UtcNow);
+public record TaskCancelled(TaskId TaskId) : Synapse(nameof(TaskCancelled), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record RunKernelTask(TaskId TaskId, string Description) : Synapse(nameof(RunKernelTask), DateTimeOffset.UtcNow);
+public record RunTask(TaskId TaskId, string Description) : Synapse(nameof(RunTask), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record CancelKernelTask(TaskId TaskId) : Synapse(nameof(CancelKernelTask), DateTimeOffset.UtcNow);
+public record CancelTask(TaskId TaskId) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
 
-// Rich task state returned by kernel task grain.
+// Rich task state returned by the task grain.
 [GenerateSerializer]
-public record KernelTaskInfo(
+public record TaskInfo(
     [property: Id(0)] TaskId TaskId,
     [property: Id(1)] string Status,
     [property: Id(2)] string? Result = null

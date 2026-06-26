@@ -1,4 +1,4 @@
-using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Core;
 using Xunit;
 

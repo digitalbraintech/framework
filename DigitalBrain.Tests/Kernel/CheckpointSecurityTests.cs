@@ -1,5 +1,5 @@
 using DigitalBrain.Core;
-using DigitalBrain.Silo;
+using DigitalBrain.Kernel;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Xunit;

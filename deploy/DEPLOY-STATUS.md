@@ -49,7 +49,7 @@ export PULUMI_CONFIG_PASSPHRASE=digitalbrain-dryrun
 export ARM_SUBSCRIPTION_ID=08e2e8fa-a9bf-4a1a-be54-56664d2c6cc9
 export ARM_TENANT_ID=10b9647a-65af-44e0-9e55-d8f9fc93a381   # also AZURE_TENANT_ID
 E:/tools/pulumi/pulumi/bin/pulumi.exe login file://E:/tools/pulumi-state
-# stack dev. Silo image: dotnet publish DigitalBrain.Silo -t:PublishContainer --os linux --arch x64
+# stack dev. Kernel image: dotnet publish DigitalBrain.Kernel -t:PublishContainer --os linux --arch x64
 #   -p:ContainerRepository=vhorbachov/digitalbrain-silo -p:ContainerImageTag=<tag>  then docker push.
 ```
 

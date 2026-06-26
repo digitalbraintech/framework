@@ -92,14 +92,14 @@ public static class DigitalBrainBuilderExtensions
     }
 
     /// <summary>
-    /// Wires a kernel silo project with the core kernel features out of the box:
+    /// Wires a kernel project with the core kernel features out of the box:
     /// marketplace, dynamic UI surfaces, journals, clustering, LLM, and replica count for HA.
     /// This makes the kernel (company brain) provide built-in capabilities (embodiment, status, tasks, etc.)
     /// immediately when the silo starts.
     /// </summary>
-    public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> silo)
+    public static IResourceBuilder<ProjectResource> WireKernelSilo(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
-        silo = silo
+        kernel = kernel
             .WithReference(ctx.Orleans)
             .WithReference(ctx.ClusteringTable)
             .WithReference(ctx.GrainBlobs)
@@ -108,21 +108,21 @@ public static class DigitalBrainBuilderExtensions
             .WithEndpoint(name: "grpc", scheme: "http", env: "ASPNETCORE_HTTP_PORTS", isProxied: true)
             .WithReplicas(ctx.KernelReplicas);
 
-        silo.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
-        silo.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
+        kernel.WithEnvironment("DIGITALBRAIN_USE_LOCAL_MARKETPLACE", ctx.UseLocalMarketplace ? "true" : "false");
+        kernel.WithEnvironment("DIGITALBRAIN_SURFACES_ENABLED", "true");
 
         // LLM for kernel built-ins (INO, status diagnosis, code gen, tasks)
-        silo.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
-        silo.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
-        silo.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
+        kernel.WithEnvironment("DigitalBrain__Llm__Provider", "ollama");
+        kernel.WithEnvironment("DigitalBrain__Llm__Model", ctx.LlmModel);
+        kernel.WithEnvironment("DigitalBrain__Llm__OllamaEndpoint",
             ReferenceExpression.Create($"http://{ctx.OllamaEndpoint.Property(EndpointProperty.Host)}:{ctx.OllamaEndpoint.Property(EndpointProperty.Port)}"));
 
         if (ctx.EnableOrleansDashboard && ctx.OrleansDashboardPort.HasValue)
         {
-            silo.WithEnvironment("ORLEANS_DASHBOARD_PORT", ctx.OrleansDashboardPort.Value.ToString());
+            kernel.WithEnvironment("ORLEANS_DASHBOARD_PORT", ctx.OrleansDashboardPort.Value.ToString());
         }
 
-        return silo;
+        return kernel;
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-using DigitalBrain.Silo.Llm;
+using DigitalBrain.Kernel.Llm;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

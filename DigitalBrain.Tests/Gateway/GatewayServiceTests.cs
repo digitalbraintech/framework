@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
-using DigitalBrain.Silo;
-using DigitalBrain.Silo.Foundry;
-using DigitalBrain.Silo.Gateway;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Tests.TestSupport;
 using Grpc.Core;
 using Microsoft.Extensions.Configuration;

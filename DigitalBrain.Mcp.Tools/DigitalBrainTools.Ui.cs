@@ -85,17 +85,18 @@ public partial class DigitalBrainTools
         {
             case "RunKernelTask":
             {
+                // UI action string kept as "RunKernelTask" for surface compat; message type is now the generic core protocol
                 var taskId = ReadString(props, "taskId") ?? "task-" + Guid.NewGuid().ToString("N")[..8];
-                var description = ReadString(props, "description") ?? ReadString(props, "prompt") ?? "Run kernel task";
-                await grains.GetGrain<INeuron>(taskId).FireAsync(new RunKernelTask(taskId, description));
-                return $"Fired RunKernelTask for {taskId}.";
+                var description = ReadString(props, "description") ?? ReadString(props, "prompt") ?? "Run task";
+                await grains.GetGrain<INeuron>(taskId).FireAsync(new RunTask(taskId, description));
+                return $"Fired RunTask for {taskId}.";
             }
             case "CancelKernelTask":
             {
                 var taskId = ReadString(props, "taskId");
-                if (string.IsNullOrWhiteSpace(taskId)) return "CancelKernelTask action requires props.taskId.";
-                await grains.GetGrain<INeuron>(taskId).FireAsync(new CancelKernelTask(taskId));
-                return $"Fired CancelKernelTask for {taskId}.";
+                if (string.IsNullOrWhiteSpace(taskId)) return "CancelTask action requires props.taskId.";
+                await grains.GetGrain<INeuron>(taskId).FireAsync(new CancelTask(taskId));
+                return $"Fired CancelTask for {taskId}.";
             }
             case nameof(InoRequest):
             {

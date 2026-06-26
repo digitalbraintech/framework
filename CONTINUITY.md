@@ -65,6 +65,29 @@ NOT regressions; everything else green.
 - Still to consider: full test project split, more generic tasking to reduce KernelTask* records in Core, kernel pack as standalone binary artifact.
 - Ready for next full prompt paste if new session.
 
+## 2026-06-26 continuation: Generic tasking + rename Silo to Kernel
+- Project rename DigitalBrain.Silo → DigitalBrain.Kernel everywhere (folder, csproj, namespaces, references, strings in docs/Docker/AppHost/IBuildRunner/launch/ etc.).
+- Followed ritual: doctor, tests, research.
+- 5 Steps applied: name "Silo" (Orleans detail) replaced by "Kernel" to match vision of packable runtime.
+- All builds/tests green post-rename.
+Applied after the commit. Started with full ritual (doctor green, high-sev 29+ passed, greps/reads of all usages).
+
+5 Steps:
+1. Dumb: Kernel-prefixed records in Core protocol layer.
+2. Delete: Renamed all 7 + Info to plain Task* (TaskCreated, RunTask, TaskInfo...).
+3. Simplify: Universal task messages now.
+4/5. Accelerate + later automate.
+
+Changes:
+- DigitalBrain.Core/Synapse.cs: records now Task* family (KernelTask* names removed from Core).
+- Interface + KernelTaskNeuron updated to use generics.
+- All call sites (Mcp keeps legacy UI case strings for compat; emits generic), Ino, start, tests, JournalJsonContext updated.
+- Build clean 0w/0e. Tests (incl. task + rolling Reqnroll) green. aspire doctor + list tools green.
+
+Outcome: Core has no KernelTask* record definitions left. Task protocol is now clean universal core abstraction. Kernel grain name stays (correct ownership).
+
+All verifs repeated post-change. Ready.
+
 ## 2026-06-26 session (this prompt continuation)
 Applied Elon's 5 Steps strictly:
 1. Requirements less dumb: questioned why KernelTask* (protocol used by MCP/INO) named/prefixed in Core (shared because Mcp refs only Core); folder Kernel/ in Core for protector was ownership smell; primitive string TaskId everywhere (real need for causal ids like NeuronId).
@@ -74,13 +97,13 @@ Applied Elon's 5 Steps strictly:
 5. Automate last (none yet; boundaries first).
 
 Changes:
-- Core now contains zero kernel/ subfolder and no kernel-dashboard or kernel-only kinds (UiSurfaceKinds remain universal; KernelUiSurfaceKinds + KernelPack + PerformKernelSelfUpdate + rolling emission in Silo).
+- Core now contains zero kernel/ subfolder and no kernel-dashboard or kernel-only kinds (UiSurfaceKinds remain universal; KernelUiSurfaceKinds + KernelPack + PerformKernelSelfUpdate + rolling emission in Kernel).
 - KernelTask* protocol remains in Core (required by Mcp.Tools + broad use) but cleaned with TaskId; comment updated.
 - Reqnroll expanded: new scenario "Kernel treated as first-class versioned pack emits only segregated surfaces" exercising publish/install + dashboard (asserts segregation).
 - High-sev tests (incl full rolling + new seg scenario) green (11+ passing in filter).
-- Packaging: kernel remains first-class "kernel" marketplace pack (publish/install -> auto Perform via MarketplaceNeuron in Silo); Core IsPackable stable minimal; versions aligned via const.
+- Packaging: kernel remains first-class "kernel" marketplace pack (publish/install -> auto Perform via MarketplaceNeuron in Kernel); Core IsPackable stable minimal; versions aligned via const.
 - Verifs: build clean, tests pass, aspire doctor (4/4 pass) multiple times; relative paths only; Context7 used for Orleans/Reqnroll APIs before edits.
-- Boundaries reinforced: Core = pure INeuron/Synapse/IPackBehavior/IHandle + universal (UiSurface base, task ids, checkpoints protector, marketplace seeds for UI). Kernel (Silo + Aspire) owns runtime, dashboard/rolling surfaces, HA logic, own kinds, self-update trigger.
+- Boundaries reinforced: Core = pure INeuron/Synapse/IPackBehavior/IHandle + universal (UiSurface base, task ids, checkpoints protector, marketplace seeds for UI). Kernel owns runtime, dashboard/rolling surfaces, HA logic, own kinds, self-update trigger.
 
 Success: Core pure; kernel packable/self-updatable via marketplace; primitive reduced; Reqnroll expanded; tests segregated by concern (Kernel/ sub in tests + Silo refs); all green.
 

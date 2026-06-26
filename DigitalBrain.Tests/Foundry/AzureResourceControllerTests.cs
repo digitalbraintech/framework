@@ -1,4 +1,4 @@
-using DigitalBrain.Silo.Foundry;
+using DigitalBrain.Kernel.Foundry;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

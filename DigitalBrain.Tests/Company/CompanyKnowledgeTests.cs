@@ -1,8 +1,8 @@
 using DigitalBrain.Core;
-using DigitalBrain.Silo;
-using DigitalBrain.Silo.Company;
-using DigitalBrain.Silo.Foundry;
-using DigitalBrain.Silo.Llm;
+using DigitalBrain.Kernel;
+using DigitalBrain.Kernel.Company;
+using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Tests.TestSupport;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
