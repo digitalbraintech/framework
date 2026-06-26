@@ -22,6 +22,13 @@ What is missing for a *browser* render E2E (mapped during brainstorming):
 
 These collapse the original 6 gaps to **4 real ones**: gRPC-Web, static serving, RFW semantics identifiers, and the gated test.
 
+## Planning refinements (discovered while writing the implementation plan)
+
+- **Host topology: full Aspire AppHost, forced to a single kernel replica, with a dedicated HTTP/1 web endpoint.** The Aspire-hosted kernel binds **HTTP/2-only** (`Program.cs` Kestrel `ConfigureEndpointDefaults`), but a browser needs HTTP/1.1 for both static files and gRPC-Web while native gRPC clients need h2c — so the browser surface gets its **own** `Http1AndHttp2` endpoint (separate from the existing h2 `grpc` endpoint). Additionally, `WireKernelSilo` runs **3 replicas** but `HomeFeedBus` is a per-silo singleton, so a browser's `WatchHomeFeed` stream and the pack's emission could land on different replicas and never meet; the render E2E therefore boots the AppHost with **1 replica** (the AppHost reads the replica count from `DIGITALBRAIN_KERNEL_REPLICAS`, and the fixture sets it to `1`). The normal AppHost run keeps its 3-replica HA default.
+- **xUnit is v2.9.3** (the `3.1.5` in the manifest is the VSTest *adapter*), so dynamic skipping uses the **`Xunit.SkippableFact`** package (`[SkippableFact]` + `Skip.IfNot(condition, reason)`) — **not** the v3-only `Assert.Skip`.
+- **Render assertion uses both `identifier` and `label`.** The RFW host sets `Semantics(identifier: <id>, label: <marker>)`; Playwright waits for `[flt-semantics-identifier="<id>"]` with the aria-label as a backup matcher, hedging against the exact DOM-attribute spelling.
+- **Force-enable semantics** uses the confirmed API `SemanticsBinding.instance.ensureSemantics()` (guarded by `kIsWeb`), invoked only under the `DIGITALBRAIN_E2E` dart-define.
+
 ## Architecture
 
 Single-origin render path:
@@ -59,7 +66,7 @@ The kernel becomes the single browser-facing origin for the test: it serves `ind
 - **Fix the fixture** (`DigitalBrainAppHostFixture.cs`): `WaitForResourceHealthyAsync("silo")` → `"kernel"`, with a **bounded timeout** (CancellationToken) so a future rename surfaces as a fast failure, not a 5-minute hang.
 - **Tag the collection** `[Trait("Category","E2E")]` on `DigitalBrainE2ECollection` (or the test classes) so `Category!=E2E` cleanly excludes the whole E2E surface from the default high-sev run.
 - **Wire the bundle:** the fixture sets the kernel resource's `DIGITALBRAIN_WEBROOT` env to the absolute `app/build/web` path before building the AppHost.
-- **Gating / skip:** before booting heavy resources, the test skips (xUnit v3 dynamic `Assert.Skip`) unless `RUN_FLUTTER_E2E=true` **and** `app/build/web/index.html` exists, with a message naming the remediation (`flutter build web --release --dart-define=DIGITALBRAIN_E2E=true`).
+- **Gating / skip:** before booting heavy resources, the test skips (`Xunit.SkippableFact` `Skip.IfNot`) unless `RUN_FLUTTER_E2E=true` **and** `app/build/web/index.html` exists, with a message naming the remediation (`flutter build web --release --dart-define=DIGITALBRAIN_E2E=true`).
 - **Real render proof:** publish + install a real `IPackBehavior` pack whose embodiment emits a **renderable** surface — one that passes the app's `_isRenderableSurface` filter (non-empty `dataJson` with an RFW `source` / ui-layout tree, not a `synapse-broadcast`) and carries a unique marker. Then:
   1. (Optional backend checkpoint) the .NET client asserts the matching `RfwCard` arrives on the `WatchHomeFeed` stream.
   2. Playwright navigates to the kernel's HTTP URL, waits for `flt-semantics-identifier=<marker>` (bounded timeout), asserts it is present, and screenshots for the artifact.
