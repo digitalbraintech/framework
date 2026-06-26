@@ -43,6 +43,16 @@ builder.WebHost.ConfigureKestrel(options =>
 
 builder.Services.AddGrpc();
 
+var corsOrigins = builder.Configuration
+    .GetSection("DigitalBrain:Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "https://digitalbrain.tech" };
+
+builder.Services.AddCors(options => options.AddPolicy("browser", policy => policy
+    .WithOrigins(corsOrigins)
+    .AllowAnyMethod()
+    .AllowAnyHeader()
+    .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
+
 // Server-driven UI fanout: neurons broadcast RfwCards; WatchHomeFeed gRPC subscribers stream them.
 builder.Services.AddSingleton<HomeFeedBus>();
 
@@ -113,6 +123,7 @@ builder.UseOrleans(siloBuilder =>
 var app = builder.Build();
 
 app.UseRouting();
+app.UseCors("browser");
 app.UseGrpcWeb(new GrpcWebOptions { DefaultEnabled = true });
 
 var webRoot = builder.Configuration["DIGITALBRAIN_WEBROOT"];
