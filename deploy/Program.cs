@@ -15,8 +15,9 @@ namespace DigitalBrain.Deploy;
 
 // Minimal Pulumi program for DigitalBrain / NeuroOS. Provisions only what the runtime actually uses:
 // a resource group, one StorageV2 account (Orleans Table clustering + Blob grain/journal), Azure OpenAI
-// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, and a single silo
-// container app with an internal Http2 ingress (gRPC gateway on port 8080). Replaces the vendored DeploymentKit.
+// (gpt-4o-mini "chat"), Log Analytics + App Insights, an ACA managed environment, and a single kernel
+// container app with an external Auto-transport ingress (browser gRPC-Web + native gRPC on port 8080).
+// Replaces the vendored DeploymentKit.
 internal static class Program
 {
     private const string Region = "westeurope";
