@@ -48,10 +48,14 @@ internal static class Program
             ?? System.Environment.GetEnvironmentVariable("DIGITALBRAIN_IMAGE_TAG")
             ?? "latest";
 
+        // CI injects the AES checkpoint-encryption key as a secret env var (from a GitHub Actions secret) so it
+        // never lives in git; local runs can instead use `pulumi config set --secret checkpointKey ...`.
+        var checkpointKeyEnv = System.Environment.GetEnvironmentVariable("DIGITALBRAIN_CHECKPOINT_KEY");
         var checkpointKey = config.GetSecret("checkpointKey")
+            ?? (string.IsNullOrEmpty(checkpointKeyEnv) ? null : Output.CreateSecret(checkpointKeyEnv))
             ?? throw new System.InvalidOperationException(
-                "Pulumi config 'digitalbrain-deploy:checkpointKey' is required. " +
-                "Set it once: pulumi config set --secret digitalbrain-deploy:checkpointKey <base64-32-bytes>.");
+                "Checkpoint key required: set env DIGITALBRAIN_CHECKPOINT_KEY (CI secret) " +
+                "or `pulumi config set --secret digitalbrain-deploy:checkpointKey <base64-32-bytes>` (local).");
 
         var resourceGroup = new ResourceGroup(ResourceGroupName, new ResourceGroupArgs
         {
