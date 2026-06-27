@@ -52,7 +52,11 @@ public record WiringOptimizationProposed(string Proposal, string FromNeuron) : S
 public record DemoMessageSynapse(string Text) : Synapse(nameof(DemoMessageSynapse), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record ExperienceUsed(string Pack, string Action) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
+public record ExperienceUsed(
+    string Pack,
+    string Action,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
 // Core system neuron interfaces (everything is a Neuron)
 public interface IAspire : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
@@ -254,7 +258,8 @@ public record PublishToMarketplace(
 public record InstallFromMarketplace(
     string PackName, 
     string Version, 
-    string BuyerId = "anonymous"
+    string BuyerId = "anonymous",
+    string? SessionId = null
 ) : Synapse(nameof(InstallFromMarketplace), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -299,10 +304,17 @@ public record TaskCompleted(TaskId TaskId, string? Result = null) : Synapse(name
 public record TaskCancelled(TaskId TaskId) : Synapse(nameof(TaskCancelled), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record RunTask(TaskId TaskId, string Description) : Synapse(nameof(RunTask), DateTimeOffset.UtcNow);
+public record RunTask(
+    TaskId TaskId,
+    string Description,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(RunTask), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record CancelTask(TaskId TaskId) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
+public record CancelTask(
+    TaskId TaskId,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
 
 // Rich task state returned by the task grain.
 [GenerateSerializer]

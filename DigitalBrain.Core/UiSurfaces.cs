@@ -375,12 +375,14 @@ public static class UiSurfaceSamples
                 ["installAction"] = SynapseAction("install-pack", "Install", nameof(InstallFromMarketplace), new Dictionary<string, object?>
                 {
                     ["version"] = "0.1.0",
-                    ["buyerId"] = "current-user"
+                    ["buyerId"] = "anonymous",
+                    ["userId"] = "anonymous"
                 }),
                 ["updateAction"] = SynapseAction("update-pack", "Update", nameof(InstallFromMarketplace), new Dictionary<string, object?>
                 {
                     ["version"] = "0.1.0",
-                    ["buyerId"] = "current-user"
+                    ["buyerId"] = "anonymous",
+                    ["userId"] = "anonymous"
                 })
             }));
 
@@ -537,6 +539,7 @@ public static class UiSurfaceSamples
             priority: 6,
             props: new Dictionary<string, object?>
             {
+                [UiSurfaceKeys.ChartSpec] = spec.ToProps(),
                 ["graphicSpec"] = spec.ToProps(),
                 ["data"] = spec.Data,
                 ["summary"] = spec.Summary
@@ -588,15 +591,18 @@ public static class UiSurfaceLiveData
         IReadOnlyList<NeuroPack> installedPacks,
         IReadOnlyList<Synapse> timelineEvents,
         int maxEvents = 20,
-        IReadOnlyList<Synapse>? chartTimeline = null)
+        IReadOnlyList<Synapse>? chartTimeline = null,
+        string userId = "anonymous",
+        string? sessionId = null)
     {
+        userId = EffectiveUserId(userId);
         // Universal surfaces only. Kernel-specific surfaces (dashboard, tasks, rolling) are emitted by kernel-owned code.
         var surfaces = new List<UiSurface>
         {
-            InstalledBundlesFromPacks(publishedPacks, installedPacks),
+            InstalledBundlesFromPacks(publishedPacks, installedPacks, userId, sessionId),
             ActivityGraphFromTimeline(graphTimeline, maxEvents),
-            MarketplaceListFromPacks(publishedPacks, installedPacks),
-            TaskManagerFromTasks(taskTimelines.SelectMany(t => t.Timeline).ToList(), maxEvents)
+            MarketplaceListFromPacks(publishedPacks, installedPacks, userId, sessionId),
+            TaskManagerFromTasks(taskTimelines.SelectMany(t => t.Timeline).ToList(), maxEvents, userId, sessionId)
         };
 
         surfaces.AddRange(ChartSurfacesFromTimeline(chartTimeline ?? timelineEvents, maxEvents));
@@ -654,8 +660,11 @@ public static class UiSurfaceLiveData
 
     public static UiSurface MarketplaceListFromPacks(
         IReadOnlyList<NeuroPack> publishedPacks,
-        IReadOnlyList<NeuroPack> installedPacks)
+        IReadOnlyList<NeuroPack> installedPacks,
+        string userId = "anonymous",
+        string? sessionId = null)
     {
+        userId = EffectiveUserId(userId);
         var installedKeys = installedPacks
             .Select(PackKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -683,6 +692,8 @@ public static class UiSurfaceLiveData
                 priority: 4,
                 props: new Dictionary<string, object?>
                 {
+                    ["userId"] = userId,
+                    ["sessionId"] = sessionId,
                     ["packs"] = packs,
                     ["installAction"] = UiSurfaceSamples.SynapseAction(
                         "install-pack",
@@ -690,7 +701,9 @@ public static class UiSurfaceLiveData
                         nameof(InstallFromMarketplace),
                         new Dictionary<string, object?>
                         {
-                            ["buyerId"] = "current-user"
+                            ["buyerId"] = userId,
+                            ["userId"] = userId,
+                            ["sessionId"] = sessionId
                         }),
                     ["updateAction"] = UiSurfaceSamples.SynapseAction(
                         "update-pack",
@@ -698,15 +711,20 @@ public static class UiSurfaceLiveData
                         nameof(InstallFromMarketplace),
                         new Dictionary<string, object?>
                         {
-                            ["buyerId"] = "current-user"
+                            ["buyerId"] = userId,
+                            ["userId"] = userId,
+                            ["sessionId"] = sessionId
                         })
                 }));
     }
 
     public static UiSurface InstalledBundlesFromPacks(
         IReadOnlyList<NeuroPack> publishedPacks,
-        IReadOnlyList<NeuroPack> installedPacks)
+        IReadOnlyList<NeuroPack> installedPacks,
+        string userId = "anonymous",
+        string? sessionId = null)
     {
+        userId = EffectiveUserId(userId);
         var installedKeys = installedPacks
             .Select(PackKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -717,7 +735,7 @@ public static class UiSurfaceLiveData
                 pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal) ||
                 pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase)))
             .GroupBy(PackKey, StringComparer.OrdinalIgnoreCase)
-            .Select(group => BundleRow(group.First()))
+            .Select(group => BundleRow(group.First(), userId, sessionId))
             .ToArray();
 
         var experiences = bundles
@@ -728,7 +746,7 @@ public static class UiSurfaceLiveData
                     : Array.Empty<IReadOnlyDictionary<string, object?>>())
             .ToArray();
 
-        var launcherTree = BuildInstalledLauncherTree(bundles);
+        var launcherTree = BuildInstalledLauncherTree(bundles, userId, sessionId);
         return new UiSurface(
             UiSurfaceKinds.InstalledBundles,
             WithCommon(
@@ -739,14 +757,20 @@ public static class UiSurfaceLiveData
                 priority: 11,
                 props: new Dictionary<string, object?>
                 {
+                    ["userId"] = userId,
+                    ["sessionId"] = sessionId,
                     ["bundles"] = bundles,
                     ["experiences"] = experiences,
                     ["tree"] = launcherTree
                 }));
     }
 
-    public static UiWidgetTree BuildInstalledLauncherTree(IReadOnlyList<IReadOnlyDictionary<string, object?>> bundles)
+    public static UiWidgetTree BuildInstalledLauncherTree(
+        IReadOnlyList<IReadOnlyDictionary<string, object?>> bundles,
+        string userId = "anonymous",
+        string? sessionId = null)
     {
+        userId = EffectiveUserId(userId);
         var kids = new List<UiWidgetTree>();
         if (bundles != null)
         {
@@ -768,7 +792,9 @@ public static class UiSurfaceLiveData
                     [UiSurfaceKeys.SynapseType] = nameof(ExperienceUsed),
                     ["packName"] = name,
                     ["action"] = "open",
-                    ["targetSurfaceKind"] = name
+                    ["targetSurfaceKind"] = name,
+                    ["userId"] = userId,
+                    ["sessionId"] = sessionId
                 }));
                 foreach (var ex in exps.Take(2))
                 {
@@ -778,13 +804,19 @@ public static class UiSurfaceLiveData
                     var st = (act != null && act.TryGetValue(UiSurfaceKeys.SynapseType, out var stv)) ? stv?.ToString() ?? nameof(ExperienceUsed) : nameof(ExperienceUsed);
                     var pName = name;
                     var pAction = (act != null && act.TryGetValue(UiSurfaceKeys.Props, out var pv) && pv is IReadOnlyDictionary<string, object?> pmap && pmap.TryGetValue("action", out var av2)) ? av2?.ToString() ?? "run" : (ex.TryGetValue("experienceId", out var eid) ? eid?.ToString() ?? "run" : "run");
-                    var btnP = new Dictionary<string, object?>
+                    var btnP = act != null && act.TryGetValue(UiSurfaceKeys.Props, out var btnProps) && btnProps is IReadOnlyDictionary<string, object?> btnPropMap
+                        ? new Dictionary<string, object?>(btnPropMap)
+                        : new Dictionary<string, object?>();
+                    btnP["label"] = lbl;
+                    btnP[UiSurfaceKeys.SynapseType] = st;
+                    btnP["packName"] = pName;
+                    btnP["action"] = pAction;
+                    btnP["userId"] = userId;
+                    btnP["sessionId"] = sessionId;
+                    if (act != null)
                     {
-                        ["label"] = lbl,
-                        [UiSurfaceKeys.SynapseType] = st,
-                        ["packName"] = pName,
-                        ["action"] = pAction
-                    };
+                        btnP["actionDescriptor"] = ScopedAction(act, userId, sessionId);
+                    }
                     actionKids.Add(new UiWidgetTree("fbutton", btnP));
                 }
                 var row = new UiWidgetTree("row", new Dictionary<string, object?>(), actionKids);
@@ -852,8 +884,13 @@ public static class UiSurfaceLiveData
             .ToArray();
     }
 
-    public static UiSurface TaskManagerFromTasks(IReadOnlyList<Synapse> taskEvents, int maxEvents = 10)
+    public static UiSurface TaskManagerFromTasks(
+        IReadOnlyList<Synapse> taskEvents,
+        int maxEvents = 10,
+        string userId = "anonymous",
+        string? sessionId = null)
     {
+        userId = EffectiveUserId(userId);
         var created = taskEvents.OfType<TaskCreated>().ToList();
         var progresses = taskEvents.OfType<TaskProgress>().ToList();
         var completed = taskEvents.OfType<TaskCompleted>().ToList();
@@ -868,16 +905,34 @@ public static class UiSurfaceLiveData
                 : cancelled.Any(x => x.TaskId == c.TaskId) ? "cancelled"
                 : latest != null ? "running:" + latest.Detail : "created";
 
-            return new Dictionary<string, object?>
+            var row = new Dictionary<string, object?>
             {
+                ["taskId"] = c.TaskId.Value,
                 ["correlationId"] = c.SynapseId,
                 ["shortHash"] = c.TaskId.Value.Length > 8 ? c.TaskId.Value[..8] : c.TaskId.Value,
                 ["originNeuron"] = c.Sender?.Value ?? "kernel",
                 ["originIcon"] = "task",
                 ["ageMs"] = (int)(DateTimeOffset.UtcNow - c.Timestamp).TotalMilliseconds,
                 ["edgeCount"] = 1,
-                ["status"] = status
+                ["status"] = status,
+                ["userId"] = userId,
+                ["sessionId"] = sessionId
             };
+            if (!completed.Any(x => x.TaskId == c.TaskId) && !cancelled.Any(x => x.TaskId == c.TaskId))
+            {
+                row["cancelAction"] = UiSurfaceSamples.SynapseAction(
+                    "cancel-task",
+                    "Cancel",
+                    nameof(CancelTask),
+                    new Dictionary<string, object?>
+                    {
+                        ["taskId"] = c.TaskId.Value,
+                        ["userId"] = userId,
+                        ["sessionId"] = sessionId
+                    });
+            }
+
+            return row;
         }).ToArray();
 
         var totals = new Dictionary<string, object?>
@@ -897,19 +952,32 @@ public static class UiSurfaceLiveData
                 priority: 20,
                 props: new Dictionary<string, object?>
                 {
+                    ["userId"] = userId,
+                    ["sessionId"] = sessionId,
                     ["totals"] = totals,
-                    ["tasks"] = taskRows
+                    ["tasks"] = taskRows,
+                    ["runAction"] = UiSurfaceSamples.SynapseAction(
+                        "run-task",
+                        "Run Task",
+                        nameof(RunTask),
+                        new Dictionary<string, object?>
+                        {
+                            ["userId"] = userId,
+                            ["sessionId"] = sessionId
+                        })
                 }));
     }
 
-    private static Dictionary<string, object?> BundleRow(NeuroPack pack)
+    private static Dictionary<string, object?> BundleRow(NeuroPack pack, string userId, string? sessionId)
     {
-        var experiences = ExperiencesForPack(pack).ToArray();
+        var experiences = ExperiencesForPack(pack, userId, sessionId).ToArray();
         return new Dictionary<string, object?>
         {
             ["name"] = pack.Name,
             ["version"] = pack.Version,
             ["ownerId"] = pack.OwnerId,
+            ["userId"] = userId,
+            ["sessionId"] = sessionId,
             ["installed"] = true,
             ["hasUi"] = true,
             ["status"] = experiences.Length == 0 ? "installed" : "ready",
@@ -920,7 +988,7 @@ public static class UiSurfaceLiveData
         };
     }
 
-    private static IEnumerable<IReadOnlyDictionary<string, object?>> ExperiencesForPack(NeuroPack pack)
+    private static IEnumerable<IReadOnlyDictionary<string, object?>> ExperiencesForPack(NeuroPack pack, string userId, string? sessionId)
     {
         if (pack.Name.Equals("DigitalBrain.UI.Workbench", StringComparison.OrdinalIgnoreCase))
         {
@@ -938,7 +1006,9 @@ public static class UiSurfaceLiveData
                     {
                         ["prompt"] = "Open the DigitalBrain workbench experience.",
                         ["sessionId"] = "workbench"
-                    }));
+                    }),
+                userId,
+                sessionId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.Graph3D", StringComparison.OrdinalIgnoreCase))
         {
@@ -956,7 +1026,9 @@ public static class UiSurfaceLiveData
                     {
                         ["prompt"] = "Open the live cluster graph experience.",
                         ["sessionId"] = "workbench"
-                    }));
+                    }),
+                userId,
+                sessionId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.CreatorSurfaces", StringComparison.OrdinalIgnoreCase))
         {
@@ -974,7 +1046,9 @@ public static class UiSurfaceLiveData
                     {
                         ["prompt"] = "Create a new DigitalBrain UI surface from the installed CreatorSurfaces bundle.",
                         ["sessionId"] = "workbench"
-                    }));
+                    }),
+                userId,
+                sessionId);
         }
         else if (pack.Name.Equals("DigitalBrain.UI.AspireFlutter", StringComparison.OrdinalIgnoreCase))
         {
@@ -991,7 +1065,9 @@ public static class UiSurfaceLiveData
                     new Dictionary<string, object?>
                     {
                         ["resourceName"] = "flutter-ui"
-                    }));
+                    }),
+                userId,
+                sessionId);
         }
         else if (pack.Name.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase))
         {
@@ -1010,7 +1086,9 @@ public static class UiSurfaceLiveData
                     {
                         ["loopType"] = loopType,
                         ["prompt"] = "Run installed bundle " + pack.Name
-                    }));
+                    }),
+                userId,
+                sessionId);
         }
         else if (pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase) || pack.Name.Contains("DevPack", StringComparison.OrdinalIgnoreCase))
         {
@@ -1024,7 +1102,9 @@ public static class UiSurfaceLiveData
                     "dummy-self-test",
                     "Run self-test",
                     nameof(ExperienceUsed),
-                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "self-test" }));
+                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "self-test" }),
+                userId,
+                sessionId);
             yield return ExperienceRow(
                 pack,
                 "emit-test-surface",
@@ -1035,7 +1115,9 @@ public static class UiSurfaceLiveData
                     "dummy-emit-surface",
                     "Emit test surface",
                     nameof(ExperienceUsed),
-                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }));
+                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }),
+                userId,
+                sessionId);
         }
         else
         {
@@ -1050,7 +1132,9 @@ public static class UiSurfaceLiveData
                     "run-" + ExperienceSlug(pack, "experience"),
                     "Run",
                     nameof(ExperienceUsed),
-                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "run" }));
+                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "run" }),
+                userId,
+                sessionId);
             yield return ExperienceRow(
                 pack,
                 "emit-test-surface",
@@ -1061,7 +1145,9 @@ public static class UiSurfaceLiveData
                     "emit-" + ExperienceSlug(pack, "surface"),
                     "Emit surface",
                     nameof(ExperienceUsed),
-                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }));
+                    new Dictionary<string, object?> { ["packName"] = pack.Name, ["action"] = "emit-test-surface" }),
+                userId,
+                sessionId);
         }
     }
 
@@ -1071,16 +1157,49 @@ public static class UiSurfaceLiveData
         string name,
         string kind,
         string summary,
-        IReadOnlyDictionary<string, object?> action) => new Dictionary<string, object?>
+        IReadOnlyDictionary<string, object?> action,
+        string userId,
+        string? sessionId) => new Dictionary<string, object?>
         {
             ["experienceId"] = ExperienceSlug(pack, suffix),
             ["bundleName"] = pack.Name,
+            ["userId"] = userId,
+            ["sessionId"] = sessionId,
             ["name"] = name,
             ["kind"] = kind,
             ["status"] = "ready",
             ["summary"] = summary,
-            ["action"] = action
+            ["action"] = ScopedAction(action, userId, sessionId)
         };
+
+    private static string EffectiveUserId(string? userId) =>
+        string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim();
+
+    private static IReadOnlyDictionary<string, object?> ScopedAction(
+        IReadOnlyDictionary<string, object?> action,
+        string userId,
+        string? sessionId)
+    {
+        var scopedAction = new Dictionary<string, object?>(action);
+        var props = action.TryGetValue(UiSurfaceKeys.Props, out var value) &&
+            value is IReadOnlyDictionary<string, object?> existingProps
+                ? new Dictionary<string, object?>(existingProps)
+                : new Dictionary<string, object?>();
+
+        props["userId"] = EffectiveUserId(userId);
+        props["sessionId"] = sessionId;
+
+        if (string.Equals(action.TryGetValue(UiSurfaceKeys.SynapseType, out var type) ? type?.ToString() : null,
+                nameof(InstallFromMarketplace),
+                StringComparison.Ordinal) &&
+            !props.ContainsKey("buyerId"))
+        {
+            props["buyerId"] = EffectiveUserId(userId);
+        }
+
+        scopedAction[UiSurfaceKeys.Props] = props;
+        return scopedAction;
+    }
 
     private static string ExperienceSlug(NeuroPack pack, string suffix) =>
         (pack.Name + "-" + pack.Version + "-" + suffix)

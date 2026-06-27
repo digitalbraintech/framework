@@ -33,9 +33,12 @@ public sealed class GatewayService(
                 var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
                 var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
                 var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
-                var buyer = p.TryGetValue("buyerId", out var b) ? b?.ToString() ?? "current-user" : "current-user";
+                var buyer = p.TryGetValue("buyerId", out var b)
+                    ? b?.ToString()
+                    : p.TryGetValue("userId", out var uid) ? uid?.ToString() : null;
+                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
                 if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
-                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer));
+                await market.FireAsync(new InstallFromMarketplace(packName, ver, string.IsNullOrWhiteSpace(buyer) ? "anonymous" : buyer, sessionId));
                 return request;
             }
 

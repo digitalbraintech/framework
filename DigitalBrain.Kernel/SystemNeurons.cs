@@ -331,7 +331,11 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         var gspec = new GraphicSpec(
             Title: "Demo Sales Trend (live chart)",
             Data: demoChartData,
-            Variables: new Dictionary<string, object?> { ["month"] = new { type = "ordinal" }, ["sales"] = new { type = "linear" } },
+            Variables: new Dictionary<string, object?>
+            {
+                ["month"] = new Dictionary<string, object?> { ["type"] = "ordinal" },
+                ["sales"] = new Dictionary<string, object?> { ["type"] = "linear" }
+            },
             Marks: new[] { new Dictionary<string, object?> { ["kind"] = "line", ["position"] = "month*sales" } as IReadOnlyDictionary<string, object?> },
             Summary: "4 months. Click points or use commands to filter/transform.");
         var chartSurface = UiSurfaceSamples.Chart("surface.chart.demo", Self.Value, gspec);
@@ -617,13 +621,13 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         var generated = GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
         // Deliver the full pack (with Code) so the host neuron can compile + embody it; then trigger a use.
         await generated.DeliverAsync(new NeuroPackInstalled(pack));
-        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated"));
+        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated", cmd.BuyerId, cmd.SessionId));
 
         // Refresh installed bundles surface (and marketplace list) so UI sees update live via kit.
         // (Real query uses journals/cache; seeds + this pack for immediate.)
         var pub = new List<NeuroPack> { pack };
         var inst = new List<NeuroPack> { pack };
-        var refInst = UiSurfaceLiveData.InstalledBundlesFromPacks(pub, inst);
+        var refInst = UiSurfaceLiveData.InstalledBundlesFromPacks(pub, inst, cmd.BuyerId, cmd.SessionId);
         await FireAsync(refInst);
         var bus2 = ServiceProvider.GetService<HomeFeedBus>();
         if (bus2 != null)
@@ -1510,7 +1514,7 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent);
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new
@@ -1530,7 +1534,7 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         if (bus != null)
         {
             var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
-            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent);
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
 
             var directData = System.Text.Json.JsonSerializer.Serialize(new

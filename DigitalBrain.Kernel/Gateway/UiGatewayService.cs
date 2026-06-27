@@ -114,14 +114,14 @@ public sealed class UiGatewayService(
             case nameof(InstallFromMarketplace):
                 var pack = GetProp(props, "packName") ?? GetProp(props, "name") ?? "";
                 var ver = GetProp(props, "version") ?? "0.1.0";
-                var buyer = GetProp(props, "buyerId") ?? "current-user";
-                await grainFactory.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(pack, ver, buyer));
+                var buyer = GetUserId(props, GetProp(props, "buyerId"));
+                await grainFactory.GetGrain<IMarketplaceNeuron>("market-main").FireAsync(new InstallFromMarketplace(pack, ver, buyer, GetProp(props, "sessionId")));
                 return;
             case nameof(PublishToMarketplace):
                 var pName = GetProp(props, "packName") ?? GetProp(props, "name") ?? "";
                 var pVer = GetProp(props, "version") ?? "1.0.0";
                 var pCode = GetProp(props, "code") ?? "";
-                var pOwner = GetProp(props, "ownerId") ?? "current-user";
+                var pOwner = GetProp(props, "ownerId") ?? GetUserId(props);
                 var pPrivate = bool.TryParse(GetProp(props, "isPrivate"), out var priv) && priv;
                 var pComm = double.TryParse(GetProp(props, "commissionRate"), out var comm) ? comm : 0.0;
                 var pDesc = GetProp(props, "description") ?? "";
@@ -139,12 +139,28 @@ public sealed class UiGatewayService(
             case nameof(ExperienceUsed):
                 var expPack = GetProp(props, "packName") ?? GetProp(props, "name") ?? GetProp(props, "bundleName") ?? "";
                 var expAct = GetProp(props, "action") ?? GetProp(props, "prompt") ?? "run";
+                var expUser = GetUserId(props);
+                var expSession = GetProp(props, "sessionId");
                 if (!string.IsNullOrWhiteSpace(expPack))
                 {
-                    await grainFactory.GetGrain<IGeneratedNeuron>("generated-" + expPack.ToLowerInvariant()).FireAsync(new ExperienceUsed(expPack, expAct));
+                    await grainFactory.GetGrain<IGeneratedNeuron>("generated-" + expPack.ToLowerInvariant()).FireAsync(new ExperienceUsed(expPack, expAct, expUser, expSession));
                     return;
                 }
-                await grainFactory.GetGrain<IGeneratedNeuron>("generated-dummy").FireAsync(new ExperienceUsed("dummy", expAct));
+                await grainFactory.GetGrain<IGeneratedNeuron>("generated-dummy").FireAsync(new ExperienceUsed("dummy", expAct, expUser, expSession));
+                return;
+            case nameof(RunTask):
+                var taskId = GetProp(props, "taskId") ?? "ui-" + Guid.NewGuid().ToString("N");
+                var description = GetProp(props, "description") ?? GetProp(props, "prompt") ?? GetProp(props, "text") ?? "Run UI task";
+                var taskUser = GetUserId(props);
+                var taskSession = GetProp(props, "sessionId");
+                await grainFactory.GetGrain<IKernelTask>(taskId).FireAsync(new RunTask(new TaskId(taskId), description, taskUser, taskSession));
+                return;
+            case nameof(CancelTask):
+                var cancelTaskId = GetProp(props, "taskId");
+                if (!string.IsNullOrWhiteSpace(cancelTaskId))
+                {
+                    await grainFactory.GetGrain<IKernelTask>(cancelTaskId).FireAsync(new CancelTask(new TaskId(cancelTaskId), GetUserId(props), GetProp(props, "sessionId")));
+                }
                 return;
             default:
                 var target = GetProp(props, "neuronId") ?? "ino-main";
@@ -155,4 +171,10 @@ public sealed class UiGatewayService(
 
     private static string? GetProp(Dictionary<string, object?> p, string key) =>
         p.TryGetValue(key, out var v) ? v?.ToString() : null;
+
+    private static string GetUserId(Dictionary<string, object?> props, string? preferred = null)
+    {
+        var userId = preferred ?? GetProp(props, "userId") ?? GetProp(props, "buyerId");
+        return string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim();
+    }
 }

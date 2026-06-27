@@ -66,6 +66,7 @@ public sealed class UserSessionNeuron : Neuron, IUserSessionNeuron
 
         // Reuse the existing product-surface startup path after a real session exists.
         await GrainFactory.GetGrain<IAspireNeuron>("aspire-main").FireAsync(new StartDistributedApp("digitalbrain"));
+        await BroadcastProductHomeAsync(user, sessionId);
     }
 
     public async Task HandleAsync(LogoutRequest request)
@@ -123,6 +124,94 @@ public sealed class UserSessionNeuron : Neuron, IUserSessionNeuron
 
     public Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null) =>
         Task.FromResult(UiSurfaceSamples.Login(clientId: string.IsNullOrWhiteSpace(clientId) ? "flutter" : clientId));
+
+    private async Task BroadcastProductHomeAsync(LocalUserRegistered user, string sessionId)
+    {
+        var userId = user.UserId.Value;
+        var taskEvents = OutgoingJournal.Concat(IncomingJournal).ToList();
+        var surfaces = new[]
+        {
+            BuildSignedInShellSurface(user, sessionId),
+            UiSurfaceLiveData.InstalledBundlesFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
+            UiSurfaceLiveData.MarketplaceListFromPacks(MarketplaceSeeds.LocalUiPacks, Array.Empty<NeuroPack>(), userId, sessionId),
+            UiSurfaceLiveData.TaskManagerFromTasks(taskEvents, userId: userId, sessionId: sessionId)
+        };
+
+        foreach (var surface in surfaces)
+        {
+            await FireAsync(surface);
+            Broadcast(surface);
+        }
+    }
+
+    private UiSurface BuildSignedInShellSurface(LocalUserRegistered user, string sessionId)
+    {
+        var menuItems = new[]
+        {
+            MenuItem("Installed", UiSurfaceKinds.InstalledBundles),
+            MenuItem("Marketplace", UiSurfaceKinds.MarketplaceList),
+            MenuItem("Tasks", UiSurfaceKinds.TaskManager),
+            MenuItem("INO Chat", "chat"),
+            new UiWidgetTree(NeuronUiKit.Divider, new Dictionary<string, object?>()),
+            new UiWidgetTree(NeuronUiKit.MenuItem, new Dictionary<string, object?>
+            {
+                ["label"] = "Sign Out",
+                ["action"] = UiSurfaceSamples.SynapseAction(
+                    "logout",
+                    "Sign Out",
+                    nameof(LogoutRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["sessionId"] = sessionId,
+                        ["clientId"] = "flutter"
+                    })
+            })
+        };
+
+        var tree = new UiWidgetTree(
+            NeuronUiKit.Scaffold,
+            new Dictionary<string, object?>
+            {
+                ["title"] = "DigitalBrain",
+                ["activeContent"] = UiSurfaceKinds.InstalledBundles,
+                ["userId"] = user.UserId.Value,
+                ["sessionId"] = sessionId
+            },
+            new List<UiWidgetTree>
+            {
+                new(NeuronUiKit.Header, new Dictionary<string, object?>
+                {
+                    ["title"] = "DigitalBrain",
+                    ["subtitle"] = user.DisplayName
+                }),
+                new("forui:sidebar", new Dictionary<string, object?> { ["title"] = user.DisplayName }, menuItems),
+                new("content", new Dictionary<string, object?>
+                {
+                    ["defaultView"] = UiSurfaceKinds.InstalledBundles
+                })
+            });
+
+        return new UiSurface(UiSurface.WidgetTreeKind, new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            [UiSurfaceKeys.SurfaceId] = "surface.shell." + user.UserId.Value,
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "DigitalBrain",
+            [UiSurfaceKeys.Priority] = 100,
+            [UiSurfaceKeys.RequiresInput] = false,
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["userId"] = user.UserId.Value,
+            ["displayName"] = user.DisplayName,
+            ["sessionId"] = sessionId
+        });
+    }
+
+    private static UiWidgetTree MenuItem(string label, string targetSurfaceKind) =>
+        new(NeuronUiKit.MenuItem, new Dictionary<string, object?>
+        {
+            ["label"] = label,
+            ["targetSurfaceKind"] = targetSurfaceKind
+        });
 
     private async Task RejectAsync(string username, string reason, string clientId)
     {

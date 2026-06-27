@@ -128,8 +128,12 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
         var type = DataChartBuilder.ChooseChartType(prompt, hint);
         var (x, y, ser) = DataChartBuilder.InferEncoding(rows, type);
 
-        var vars = new Dictionary<string, object?> { [x] = new { type = "ordinal" }, [y] = new { type = "linear" } };
-        if (ser != null) vars[ser] = new { type = "nominal" };
+        var vars = new Dictionary<string, object?>
+        {
+            [x] = new Dictionary<string, object?> { ["type"] = "ordinal" },
+            [y] = new Dictionary<string, object?> { ["type"] = "linear" }
+        };
+        if (ser != null) vars[ser] = new Dictionary<string, object?> { ["type"] = "nominal" };
 
         var marks = new List<IReadOnlyDictionary<string, object?>>
         {
