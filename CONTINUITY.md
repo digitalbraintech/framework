@@ -199,6 +199,7 @@ Neurons (System, UI kit pack, embodied packs) are the authors of the shell. Clie
 - Small follow: titles in renderer now prefer server-provided (from props or children data) instead of literals in all paths.
 - Added minimal coverage: NeuronUiKit const stability + app-shell tree using Menu/MenuItem in UiSurfaceContractTests (2 new facts).
 - Next focused one-by-one: Added support for neuron:Header (FHeader from kit) in renderer (exact match) and used it in app-shell emission + composition (header child preferred over prop title). Context7 for ForUI FHeader before edit. This makes more chrome (header) neuron-described.
-- Verification (header kit step): msbuild CoreCompile, Ui tests 16/16 --no-build, Aspire doctor 4/4 via MCP, flutter analyze clean, flutter-ui restart via execute_resource_command.
-- All one by one: changes, ritual (Aspire MCP + tests + builds), CONTINUITY, commits where applicable.
-- Next: dynamic menu items from real neuron data (e.g. installed experiences), or further shell state reduction.
+- Follow-up one-by-one (same focused area): Wired header child extraction in ForuiAppShell (mirrors sidebar walk) so the actual mounted FScaffold header comes from the kit tree when emitted. Pre-existing warnings only.
+- Verification (full header step): flutter analyze clean (preexist only), Aspire doctor 4/4, flutter-ui MCP restart.
+- All one by one: changes + ritual + CONTINUITY + commit.
+- Next: dynamic menu (server lists real neurons/experiences as MenuItems instead of C# literals), reduce remaining shell maps if possible.
