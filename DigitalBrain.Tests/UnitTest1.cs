@@ -298,6 +298,37 @@ public class NeuronTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GmailInsights_Experience_Emits_Summary_Surface_And_User_Scoped_Chart()
+    {
+        var generated = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("generated-digitalbrain.experience.gmailinsights");
+
+        await generated.FireAsync(new ExperienceUsed(
+            "DigitalBrain.Experience.GmailInsights",
+            "gmail:last-100-chart",
+            "alice",
+            "session-1"));
+
+        var timeline = await generated.GetTimelineAsync();
+        var emission = timeline.OfType<PackEmission>().LastOrDefault(e => e.Pack == "DigitalBrain.Experience.GmailInsights");
+        Assert.NotNull(emission);
+        Assert.Contains("100", emission.Output);
+
+        var surface = timeline.OfType<UiSurface>().LastOrDefault(s => s.Kind == "gmail-insights");
+        Assert.NotNull(surface);
+        Assert.Equal("alice", surface.Props["userId"]);
+        Assert.Equal("session-1", surface.Props["sessionId"]);
+        Assert.Equal(100, surface.Props["emailCount"]);
+
+        var chart = _cluster.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-gmail-last-100-alice");
+        var chartTimeline = await chart.GetTimelineAsync();
+        var chartGenerated = chartTimeline.OfType<DataChartGenerated>().LastOrDefault(g => g.RequestId == "gmail-last-100-alice");
+        Assert.NotNull(chartGenerated);
+        Assert.Equal("alice", chartGenerated.Surface.Props["userId"]);
+        Assert.Equal("session-1", chartGenerated.Surface.Props["sessionId"]);
+        Assert.True(chartGenerated.Surface.Props.ContainsKey(UiSurfaceKeys.ChartSpec));
+    }
+
+    [Fact]
     public async Task ChartNeuron_Handles_Visualize_With_GraphicSpec()
     {
         var chart = _cluster!.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-cmd-test");

@@ -49,6 +49,15 @@ public static class MarketplaceSeeds
             "Aspire Flutter integration recipe: one default Flutter UI client resource, start/restart descriptors, and rebuild guidance for trusted primitive pack updates.",
             "Local Flutter client integration pack. Keeps startup to one UI resource by default."),
 
+        new NeuroPack(
+            "DigitalBrain.Experience.GmailInsights",
+            "0.1.0",
+            "digitalbraintech",
+            false,
+            0.0,
+            "",
+            "Preinstalled Gmail insights experience. Retrieves the last 100 Gmail-shaped messages from the local connector/sample path, summarizes them with the local Ollama model, and emits a chart surface."),
+
         // Example of reusable packed integration (like Telegram bot): no logic in core, just published pack.
         new NeuroPack(
             "Telegram.Bot",

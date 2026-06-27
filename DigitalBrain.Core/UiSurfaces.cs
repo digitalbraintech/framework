@@ -678,7 +678,7 @@ public static class UiSurfaceLiveData
                 ["private"] = pack.IsPrivate,
                 ["commissionRate"] = pack.CommissionRate,
                 ["description"] = pack.Description,
-                ["installed"] = installedKeys.Contains(PackKey(pack)) || pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal)
+                ["installed"] = installedKeys.Contains(PackKey(pack)) || IsPreinstalledLocalPack(pack)
             })
             .ToArray();
 
@@ -732,8 +732,7 @@ public static class UiSurfaceLiveData
         var bundles = installedPacks
             .Concat(publishedPacks.Where(pack =>
                 installedKeys.Contains(PackKey(pack)) ||
-                pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal) ||
-                pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase)))
+                IsPreinstalledLocalPack(pack)))
             .GroupBy(PackKey, StringComparer.OrdinalIgnoreCase)
             .Select(group => BundleRow(group.First(), userId, sessionId))
             .ToArray();
@@ -1069,6 +1068,26 @@ public static class UiSurfaceLiveData
                 userId,
                 sessionId);
         }
+        else if (pack.Name.Equals("DigitalBrain.Experience.GmailInsights", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "gmail-last-100-chart",
+                "Gmail Insights",
+                "experience",
+                "Retrieve the last 100 Gmail messages, summarize them locally, and visualize message categories.",
+                UiSurfaceSamples.SynapseAction(
+                    "gmail-last-100-chart",
+                    "Run",
+                    nameof(ExperienceUsed),
+                    new Dictionary<string, object?>
+                    {
+                        ["packName"] = pack.Name,
+                        ["action"] = "gmail:last-100-chart"
+                    }),
+                userId,
+                sessionId);
+        }
         else if (pack.Name.Contains("ClosedLoop", StringComparison.OrdinalIgnoreCase))
         {
             var loopType = pack.Name.Contains("Software", StringComparison.OrdinalIgnoreCase) ? "se" : "ui";
@@ -1253,6 +1272,11 @@ public static class UiSurfaceLiveData
         };
 
     private static string PackKey(NeuroPack pack) => pack.Name + "@" + pack.Version;
+
+    private static bool IsPreinstalledLocalPack(NeuroPack pack) =>
+        pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal) ||
+        pack.Name.StartsWith("DigitalBrain.Experience", StringComparison.Ordinal) ||
+        pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyDictionary<string, object?> WithCommon(
         string surfaceId,

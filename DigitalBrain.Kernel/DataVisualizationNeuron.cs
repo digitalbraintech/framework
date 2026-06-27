@@ -34,7 +34,7 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
         session.OriginalRows = rows;
 
         var spec = BuildGraphicSpec(session, request.Prompt, request.ChartHint);
-        var surface = UiSurfaceSamples.Chart(surfaceId, Self.Value, spec);
+        var surface = ScopeSurface(UiSurfaceSamples.Chart(surfaceId, Self.Value, spec), request.UserId, request.SessionId);
 
         await FireAsync(new DataChartGenerated(surfaceId, surface));
         await BroadcastRfwCard(surface);
@@ -146,6 +146,17 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
         var g = new GraphicSpec(title, rows, vars, marks, null, sum);
         ses.Current = g;
         return g;
+    }
+
+    private static UiSurface ScopeSurface(UiSurface surface, string? userId, string? sessionId)
+    {
+        var props = new Dictionary<string, object?>(surface.Props)
+        {
+            ["userId"] = string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim(),
+            ["sessionId"] = sessionId
+        };
+
+        return surface with { Props = props };
     }
 
     private async Task BroadcastRfwCard(UiSurface surface)

@@ -1010,6 +1010,12 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
 
     private async Task UseExperienceAsync(ExperienceUsed used)
     {
+        if (IsGmailInsightsExperience(used))
+        {
+            await RunGmailInsightsExperienceAsync(used);
+            return;
+        }
+
         EnsureEmbodied();
 
         // Real path: the pack's compiled code runs and we emit its actual output.
@@ -1070,6 +1076,167 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
                 bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
             }
         }
+    }
+
+    private async Task RunGmailInsightsExperienceAsync(ExperienceUsed used)
+    {
+        var userId = EffectiveUserId(used.UserId);
+        var emails = BuildGmailSampleRows(100);
+        var categoryRows = emails
+            .GroupBy(row => row["category"]?.ToString() ?? "Other", StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .Select(group => new Dictionary<string, object?>
+            {
+                ["category"] = group.Key,
+                ["count"] = group.Count()
+            })
+            .ToArray();
+
+        var summary = await SummarizeGmailRowsAsync(emails);
+        var chartRequestId = "gmail-last-100-" + StableKey(userId);
+        await FireAsync(new PackEmission(used.Pack, used.Action, summary));
+
+        var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
+        await FireAsync(surface);
+        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+
+        var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
+        await chart.FireAsync(new VisualizeDataRequest(
+            "Gmail last 100 emails by category",
+            System.Text.Json.JsonSerializer.Serialize(categoryRows),
+            "bar",
+            chartRequestId,
+            userId,
+            used.SessionId));
+    }
+
+    private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails)
+    {
+        var fallback = $"Local Gmail Insights analyzed {emails.Count} messages. Top categories: " +
+            string.Join(", ", emails
+                .GroupBy(row => row["category"]?.ToString() ?? "Other", StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .Take(3)
+                .Select(group => group.Key + " " + group.Count()));
+
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat is null)
+        {
+            return fallback;
+        }
+
+        var sample = string.Join("\n", emails.Take(20).Select(row =>
+            "- " + row["from"] + " | " + row["subject"] + " | " + row["category"]));
+        try
+        {
+            var response = await chat.GetResponseAsync(
+                "You are the local DigitalBrain Gmail insights experience. " +
+                "Summarize these recent Gmail messages in two concise bullets and name the dominant categories.\n" +
+                sample);
+            var text = response.Text.Trim();
+            return string.IsNullOrWhiteSpace(text) ? fallback : text;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Local LLM Gmail summary failed; using deterministic fallback.");
+            return fallback;
+        }
+    }
+
+    private UiSurface BuildGmailInsightsSurface(ExperienceUsed used, string summary, int emailCount, string chartRequestId)
+    {
+        var tree = new UiWidgetTree(
+            "fcard",
+            new Dictionary<string, object?>
+            {
+                ["title"] = "Gmail Insights",
+                ["subtitle"] = emailCount + " messages analyzed locally"
+            },
+            new List<UiWidgetTree>
+            {
+                new("text", new Dictionary<string, object?> { ["text"] = summary }),
+                new("text", new Dictionary<string, object?> { ["text"] = "Chart request: " + chartRequestId })
+            });
+
+        return new UiSurface("gmail-insights", new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = "surface.gmail-insights." + chartRequestId,
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "Gmail Insights",
+            [UiSurfaceKeys.Priority] = 30,
+            [UiSurfaceKeys.RequiresInput] = false,
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["pack"] = used.Pack,
+            ["action"] = used.Action,
+            ["userId"] = EffectiveUserId(used.UserId),
+            ["sessionId"] = used.SessionId,
+            ["emailCount"] = emailCount,
+            ["summary"] = summary,
+            ["chartRequestId"] = chartRequestId,
+            ["source"] = "local-sample",
+            ["tree"] = tree
+        });
+    }
+
+    private static bool IsGmailInsightsExperience(ExperienceUsed used) =>
+        used.Pack.Equals("DigitalBrain.Experience.GmailInsights", StringComparison.OrdinalIgnoreCase) ||
+        used.Action.StartsWith("gmail:", StringComparison.OrdinalIgnoreCase);
+
+    private static string EffectiveUserId(string? userId) =>
+        string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim();
+
+    private static string StableKey(string value)
+    {
+        var chars = value
+            .Select(ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '-')
+            .ToArray();
+        var key = new string(chars).Trim('-');
+        return string.IsNullOrWhiteSpace(key) ? "anonymous" : key;
+    }
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> BuildGmailSampleRows(int count)
+    {
+        string[] senders =
+        [
+            "alerts@github.com",
+            "billing@cloud.local",
+            "calendar@google.com",
+            "team@digitalbrain.local",
+            "newsletter@aiweekly.example",
+            "support@customer.example",
+            "security@accounts.google.com",
+            "noreply@stripe.com"
+        ];
+        string[] categories = ["Engineering", "Billing", "Calendar", "Team", "Newsletter", "Support", "Security", "Payments"];
+        string[] subjects =
+        [
+            "Build completed for kernel runtime",
+            "Invoice available for review",
+            "Meeting moved to tomorrow",
+            "Product surface review notes",
+            "Local AI tooling digest",
+            "Customer follow-up requested",
+            "Security alert for account access",
+            "Payment receipt"
+        ];
+
+        var now = DateTimeOffset.UtcNow;
+        var rows = new List<IReadOnlyDictionary<string, object?>>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var ix = i % categories.Length;
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["id"] = "gmail-local-" + (i + 1).ToString("000"),
+                ["receivedAt"] = now.AddMinutes(-37 * i).ToString("O"),
+                ["from"] = senders[ix],
+                ["subject"] = subjects[ix] + " #" + (i + 1),
+                ["category"] = categories[ix],
+                ["importance"] = ix is 0 or 5 or 6 ? "high" : "normal"
+            });
+        }
+
+        return rows;
     }
 
     private (string Key, string Code, string Description)? LastInstalledPack()

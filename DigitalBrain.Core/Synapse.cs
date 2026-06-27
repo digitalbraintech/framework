@@ -423,7 +423,9 @@ public record VisualizeDataRequest(
     string Prompt,
     string DataJson,
     string? ChartHint = null,
-    string? RequestId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
+    string? RequestId = null,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
 
 // Company brain skill knowledge ingestion (narrow for process playbooks + transcripts).
 // Used to feed raw domain knowledge into context for crystallization.

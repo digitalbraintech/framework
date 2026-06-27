@@ -167,6 +167,7 @@ public class UiSurfaceContractTests
         Assert.Contains(bundles, b => Equals(b["name"], "Dummy.BehaviorPack") || Equals(b["name"], "Dummy.DevPack"));
         Assert.Contains(experiences, e => Equals(e["name"], "Run self-test"));
         Assert.Contains(experiences, e => Equals(e["name"], "Emit test surface"));
+        Assert.Contains(experiences, e => Equals(e["name"], "Gmail Insights"));
     }
 
     [Fact]
