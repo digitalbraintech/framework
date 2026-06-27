@@ -196,6 +196,8 @@ public class UiSurfaceContractTests
         Assert.Equal("neuron:MenuItem", DigitalBrain.Core.NeuronUiKit.MenuItem);
         Assert.Equal("neuron:ActionButton", DigitalBrain.Core.NeuronUiKit.ActionButton);
         Assert.Equal("neuron:NeuronButton", DigitalBrain.Core.NeuronUiKit.NeuronButton);
+        Assert.Equal("neuron:Header", DigitalBrain.Core.NeuronUiKit.Header);
+        Assert.Equal("neuron:Divider", DigitalBrain.Core.NeuronUiKit.Divider);
     }
 
     [Fact]
@@ -206,22 +208,27 @@ public class UiSurfaceContractTests
             new Dictionary<string, object?> { ["activeContent"] = "marketplace-list" },
             new List<DigitalBrain.Core.UiWidgetTree>
             {
+                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
                 new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Menu, new Dictionary<string, object?>(),
                     new[]
                     {
                         new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Marketplace", ["targetSurfaceKind"] = "marketplace-list" }),
+                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>()),
                         new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
                             new Dictionary<string, object?> { ["label"] = "Tasks", ["targetSurfaceKind"] = "task-manager" })
                     })
             });
 
         Assert.Equal("app-shell", shell.Type);
-        var menu = Assert.Single(shell.Children!);
+        // header + menu
+        Assert.Equal(2, shell.Children!.Count);
+        var menu = shell.Children[1];
         Assert.Equal(DigitalBrain.Core.NeuronUiKit.Menu, menu.Type);
-        Assert.Equal(2, menu.Children!.Count);
+        Assert.Equal(3, menu.Children!.Count); // item + divider + item
         Assert.Equal(DigitalBrain.Core.NeuronUiKit.MenuItem, menu.Children[0].Type);
         Assert.Equal("Marketplace", menu.Children[0].Props["label"]);
+        Assert.Equal(DigitalBrain.Core.NeuronUiKit.Divider, menu.Children[1].Type);
     }
 }
 
