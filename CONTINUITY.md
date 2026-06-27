@@ -202,4 +202,6 @@ Neurons (System, UI kit pack, embodied packs) are the authors of the shell. Clie
 - Follow-up one-by-one (same focused area): Wired header child extraction in ForuiAppShell (mirrors sidebar walk) so the actual mounted FScaffold header comes from the kit tree when emitted. Pre-existing warnings only.
 - Verification (full header step): flutter analyze clean (preexist only), Aspire doctor 4/4, flutter-ui MCP restart.
 - All one by one: changes + ritual + CONTINUITY + commit.
-- Next: dynamic menu (server lists real neurons/experiences as MenuItems instead of C# literals), reduce remaining shell maps if possible.
+- Continued one-by-one: Added neuron:Divider support (maps to FDivider) in renderer; inserted example in emission menu. Context7 for FDivider before. Extends official kit for separators in shell.
+- Verification: builds, tests 16/16, doctor 4/4, analyze clean, flutter-ui MCP restart.
+- Next: dynamic menu population from real data (e.g. installed packs as neuron:MenuItem or NeuronButton list).

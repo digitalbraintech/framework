@@ -179,6 +179,7 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
                             ["label"] = "Marketplace",
                             ["targetSurfaceKind"] = UiSurfaceKinds.MarketplaceList
                         }),
+                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>()),
                         new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
                         {
                             ["label"] = "Tasks",
