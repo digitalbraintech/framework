@@ -190,3 +190,10 @@ Neurons (System, UI kit pack, embodied packs) are the authors of the shell. Clie
 - No client hardcoded chrome/menus; no "marketplace" awareness in Dart. Kit nodes + actions drive everything. Delete > add in shell. Relative paths.
 - Next focused: server enrichment for dynamic menu (list interesting neurons), full action dispatch in UiGateway if needed (review flagged UiInput -> typed IHandle not automatic for arbitrary kit actions), neuron:Header/NeuronButton emission examples, exact type match already tightened, reduce shell state. Update tests if tree contract expands.
 - Post-impl review (subagent feature-dev:code-reviewer) executed: foundation solid (kit emission, renderer map, legacy delete, ritual, Core Law direction), flagged dispatch gap + heuristic (addressed) + residual titles + shell state. No critical introduced by this delta. Re-ran doctor + MCP flutter restart + analyze clean.
+
+2026-06-27 continued one-by-one (commits + dispatch fix):
+- 4 focused git commits (one logical change each): 1. core NeuronUiKit definition; 2. kernel emission of neuron:Menu+MenuItems (brain/); 3. app renderer kit support; 4. app shell delete of legacy builder + nav fallback (app/). All relative, clean messages, followed by ritual where applicable.
+- Focused fix for review critical: UiGatewayService now parses action descriptors (synapseType + props) from UiInputSynapse payloads (the path used by shell's kit buttons and _handleSurfaceEvent). Dispatches real typed synapses (InoRequest, InstallFromMarketplace, RestartResource) instead of always DemoMessageSynapse. Uses Json + NeuronResolver + direct grain FireAsync for the known cases. Fallbacks safe. Context7 for gRPC streaming patterns done pre-edit.
+- Verification ritual (this change): msbuild Kernel /t:CoreCompile (no errors from edit); UiSurfaceContractTests 16/16 --no-build; aspire doctor (MCP) 4/4.
+- Commits + this dispatch = full roundtrip for kit actions now produces IHandle'able typed synapses.
+- Next (one by one): clean residual titles in renderer, reduce ForuiAppShell state, add kit const + tree test coverage, commit each.
