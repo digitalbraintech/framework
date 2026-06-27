@@ -92,6 +92,26 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
         }
 
+        // Server enrichment (#5): emit task-manager surface carrying a UiWidgetTree (list primitive) for pure renderer body.
+        var taskItems = taskSurface.Props.TryGetValue("tasks", out var tk) ? tk : null;
+        var taskTree = new UiWidgetTree(
+            "list",
+            new Dictionary<string, object?> { ["items"] = taskItems });
+        var taskTreeSurface = new UiSurface(
+            UiSurfaceKinds.TaskManager,
+            new Dictionary<string, object?>
+            {
+                ["tree"] = taskTree,
+                [UiSurfaceKeys.Title] = taskSurface.Props.TryGetValue(UiSurfaceKeys.Title, out var tt) ? tt : "Tasks",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                ["tasks"] = taskItems
+            });
+        await FireAsync(taskTreeSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(taskTreeSurface, Self.Value));
+        }
+
         // Seed a visible startup task so the manager shows real work item right away.
         var demoId = new TaskId("startup-" + cmd.AppName);
         _ = Task.Run(async () =>
@@ -114,11 +134,109 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketList, Self.Value));
         }
 
+        // Server enrichment (#5): emit marketplace-list surface carrying a UiWidgetTree (list primitive).
+        // Client now renders via UiSurfaceTreeRenderer (pure neuron-driven, no client synthesis for packs).
+        var marketPacks = marketList.Props.TryGetValue("packs", out var p) ? p : null;
+        var marketTree = new UiWidgetTree(
+            "list",
+            new Dictionary<string, object?> { ["items"] = marketPacks });
+        var marketTreeSurface = new UiSurface(
+            UiSurfaceKinds.MarketplaceList,
+            new Dictionary<string, object?>
+            {
+                ["tree"] = marketTree,
+                [UiSurfaceKeys.Title] = marketList.Props.TryGetValue(UiSurfaceKeys.Title, out var t) ? t : "Marketplace",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                ["packs"] = marketPacks
+            });
+        await FireAsync(marketTreeSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketTreeSurface, Self.Value));
+        }
+
+        // Main UI is UiSurface based. Emit an app-shell surface that can drive the entire thin host chrome + nav.
+        // Neurons (and packs after embodiment) build and own this dynamically.
+        var mainShellTree = new DigitalBrain.Core.UiWidgetTree(
+            "app-shell",
+            new Dictionary<string, object?>
+            {
+                ["theme"] = "forui-neutral-dark",
+                ["title"] = "DigitalBrain",
+                ["navItems"] = new[]
+                {
+                    new Dictionary<string, object?> { ["label"] = "Marketplace", ["targetSurfaceKind"] = UiSurfaceKinds.MarketplaceList },
+                    new Dictionary<string, object?> { ["label"] = "Tasks", ["targetSurfaceKind"] = UiSurfaceKinds.TaskManager },
+                    new Dictionary<string, object?> { ["label"] = "INO Chat", ["targetSurfaceKind"] = "chat" },
+                    new Dictionary<string, object?> { ["label"] = "Timeline", ["targetSurfaceKind"] = UiSurfaceKinds.Timeline }
+                },
+                ["activeContent"] = UiSurfaceKinds.MarketplaceList
+            },
+            new List<DigitalBrain.Core.UiWidgetTree>
+            {
+                new DigitalBrain.Core.UiWidgetTree("forui:FSidebar", new Dictionary<string, object?>
+                {
+                    ["headerTitle"] = "DigitalBrain"
+                }),
+                new DigitalBrain.Core.UiWidgetTree("content-area", new Dictionary<string, object?>
+                {
+                    ["defaultView"] = UiSurfaceKinds.MarketplaceList
+                })
+            });
+
+        var appShellSurface = DigitalBrain.Core.UiSurface.ForWidgetTree(mainShellTree, title: "Main Shell", emitter: Self.Value);
+        // Also set the canonical kind so hosts can recognize it as the root chrome.
+        // (We keep the tree in Props; hosts that understand WidgetTreeKind render the full shell.)
+        await FireAsync(appShellSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(appShellSurface, Self.Value));
+        }
+
+        // Legacy shell chrome surface for incremental adoption (still useful for panels).
+        var shellSurface = new UiSurface(UiSurfaceKinds.ShellChrome, new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = "shell.primary",
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "NeuroUI Host Shell",
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["nav"] = new[]
+            {
+                new Dictionary<string, object?> { ["id"] = "market", ["label"] = "Marketplace", ["kind"] = UiSurfaceKinds.MarketplaceList },
+                new Dictionary<string, object?> { ["id"] = "tasks", ["label"] = "Tasks", ["kind"] = UiSurfaceKinds.TaskManager },
+                new Dictionary<string, object?> { ["id"] = "chat", ["label"] = "INO", ["kind"] = "chat" }
+            },
+            ["chrome"] = "forui-sidebar"
+        });
+        await FireAsync(shellSurface);
+        if (bus != null) bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(shellSurface, Self.Value));
+
         var installedStart = UiSurfaceLiveData.InstalledBundlesFromPacks(publishedForStart, Array.Empty<NeuroPack>());
         await FireAsync(installedStart);
         if (bus != null)
         {
             bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(installedStart, Self.Value));
+        }
+
+        // Seed a first-class live chart surface (uses GraphicSpec for rich interactive rendering via graphic package).
+        var demoChartData = new[]
+        {
+            new Dictionary<string, object?> { ["month"] = "Jan", ["sales"] = 42 },
+            new Dictionary<string, object?> { ["month"] = "Feb", ["sales"] = 58 },
+            new Dictionary<string, object?> { ["month"] = "Mar", ["sales"] = 31 },
+            new Dictionary<string, object?> { ["month"] = "Apr", ["sales"] = 71 },
+        };
+        var gspec = new GraphicSpec(
+            Title: "Demo Sales Trend (live chart)",
+            Data: demoChartData,
+            Variables: new Dictionary<string, object?> { ["month"] = new { type = "ordinal" }, ["sales"] = new { type = "linear" } },
+            Marks: new[] { new Dictionary<string, object?> { ["kind"] = "line", ["position"] = "month*sales" } as IReadOnlyDictionary<string, object?> },
+            Summary: "4 months. Click points or use commands to filter/transform.");
+        var chartSurface = UiSurfaceSamples.Chart("surface.chart.demo", Self.Value, gspec);
+        await FireAsync(chartSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(chartSurface, Self.Value));
         }
     }
 
@@ -279,7 +397,7 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     {
     }
 
-    public Task HandleAsync(PublishToMarketplace cmd)
+    public async Task HandleAsync(PublishToMarketplace cmd)
     {
         Logger.LogInformation("Marketplace PUBLISHED real pack {Name}@{Ver} owner={Owner} private={Private} commission={Rate:P0}",
             cmd.PackName, cmd.Version, cmd.OwnerId, cmd.IsPrivate, cmd.CommissionRate);
@@ -287,7 +405,16 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         // Update view for fast subsequent queries. The Publish synapse itself is journaled by the caller Fire.
         EnsureCache();
         _publishedCache![KeyFor(cmd.PackName, cmd.Version)] = ToNeuroPack(cmd);
-        return Task.CompletedTask;
+
+        // Emit refreshed marketplace surface so thin NeuroUI hosts (Flutter + future) see the update live from the neuron.
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        var published = _publishedCache!.Values.ToList();
+        var listSurface = UiSurfaceLiveData.MarketplaceListFromPacks(published, published);
+        await FireAsync(listSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value));
+        }
     }
 
     private static string KeyFor(string name, string version) => $"{name}@{version}";

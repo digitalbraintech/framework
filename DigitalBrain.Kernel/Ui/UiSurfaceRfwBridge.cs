@@ -39,6 +39,27 @@ public static class UiSurfaceRfwBridge
 
     public static RfwCard FromUiSurface(UiSurface surface, string emitter)
     {
+        // If the surface already carries a full RFW or widget tree definition, honor it directly.
+        if (surface.Kind == UiSurface.RfwKind || surface.Props.ContainsKey("source") || surface.Props.ContainsKey("rfwSource"))
+        {
+            var lib = ValueOrDefault(surface, "libraryName", "digitalbrain");
+            var root = ValueOrDefault(surface, "rootWidget", "root");
+            var dataJson = surface.Props.TryGetValue("dataJson", out var dj) && dj is string s ? s
+                : JsonSerializer.Serialize(surface.Props);
+            return new RfwCard(lib, root, dataJson) { CorrelationId = surface.CorrelationId ?? surface.SynapseId };
+        }
+
+        if (surface.Kind == UiSurface.WidgetTreeKind && surface.Props.TryGetValue("tree", out var treeObj))
+        {
+            // For widget trees we still use a lightweight RFW wrapper that the client knows how to expand into ForUI + sub RFW.
+            // Real power: neuron can emit ForRfw or ForWidgetTree and client renders the tree.
+            var dataJson = JsonSerializer.Serialize(new { tree = treeObj, kind = surface.Kind });
+            return new RfwCard("digitalbrain", "WidgetTreeHost", dataJson)
+            {
+                CorrelationId = surface.CorrelationId ?? surface.SynapseId
+            };
+        }
+
         var title = ValueOrDefault(surface, UiSurfaceKeys.Title, "Live embodied surface");
         var body = ValueOrDefault(surface, "body", "A typed C# pack emitted this UiSurface through the kernel.");
         var status = ValueOrDefault(surface, "status", "live");

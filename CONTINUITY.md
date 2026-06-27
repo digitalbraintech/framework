@@ -28,6 +28,25 @@ NOT regressions; everything else green.
 - Step 6 (SDK rest): shared ProcessRunner + typed Shell/FileSystem/DotNet/NuGet/Winget(net-new)/Roslyn neurons;
   GitNeuron onto ProcessRunner; retired untyped NuGet/Roslyn neurons.
 - Step 7 (Kernel): checkpoint dedup by SynapseId; BranchAsync forks into SAME grain type; RestoreCheckpointAsync;
+
+## 2026-06-27 continuation: Full marketplace + neuron-driven UI (NeuroUI Host) + Only UiSurface for everything
+
+- Single UiSurface model (everything inherits the concept or is expressed as one). RfwCard unified as UiSurface with Kind="rfw" (ForRfw helper). Added UiWidgetTree recursive model so neurons author full widget trees (ForUI primitive names + children + rfw escape hatches + actions).
+- All UI is UiSurface based — even main app shell / chrome / nav. Emitted on StartDistributedApp as "app-shell" + widget tree (neurons/packs build their own UI dynamically).
+- Client (ForUI + RFW) remains the thin renderer; added UiSurfaceTreeRenderer sketch that walks neuron-provided trees and renders real ForUI where specified. Graceful: existing surfaces + RFW continue to work; new dynamic trees from neurons are the path forward.
+- Full direction executed: UiSurface + UiWidgetTree is the only way for UI. Main shell/nav/content are built from neuron-emitted trees. Dynamic ForUI sidebar + FScaffold renderer in client. Router now uses surface-driven shell for non-canvas routes. Hardcoded nav lists are legacy fallback only.
+- Client: ForuiAppShell accepts shellSurfaceTree and renders via UiSurfaceTreeRenderer (real FSidebar from navItems in the tree). Server emits matching app-shell tree on start.
+- Verified (this session): doctor green, flutter-ui restart via MCP, kernels healthy (list_resources), Core compile clean, UiSurface tests pass. All UI surfaces (incl main) flow from neurons.
+- Continued one-by-one: client shell now live subscribes, dynamic sidebar + body renders actual live RFW surfaces (via host.render for source) or trees; server tree has top navItems + activeContent; defaults to marketplace-list; no more static demo tree; hacks cleaned.
+- Aspire MCP used for restart + doctor. One by one progress on thin host + neuron UI.
+- Marketplace is first-class neuron: MarketplaceNeuron + seeds + post-publish/install surface emission (refreshed MarketplaceList / InstalledBundles via HomeFeedBus + UiSurfaceRfwBridge) so installed packs immediately drive UI.
+- UI surface model evolved: added ShellChrome, NavConfig, ViewDefinition kinds (packs emit chrome/nav/full views; client is thin RFW + ForUI primitive renderer + surface subscription host).
+- Flutter.proj first-class in canonical brain/: referenced in Brain.slnx under /Clients/ (Type="C#", historical pattern from Projects/final + digitalbrain). Adapted app/Flutter.proj (NoTargets, incremental, Aspire windows run + web bundle coordination, no dart NuGet asset errors, source stays in app/).
+- AddFlutterClient / Aspire wiring preserved (flutter-ui executable auto-starts with kernel refs); `aspire run` brings kernels (x3) + marketplace + Flutter Windows client.
+- Verified (Aspire MCP + CLI): aspire doctor green (4/4), list_apphosts / list_resources shows flutter-ui Running + healthy refs to kernels, restart via execute_resource_command, UiSurfaceContractTests 16/16 green, relevant marketplace + core tests green (31+), kernel msbuild Compile OK post-changes.
+- Core Law: client remains thin host; all UI (incl. what was ForUI shell work) upgradable via embodied packs emitting UiSurface / RfwCard. Existing RFW + live surfaces (task manager, market, activity, chart) continue to work; new shell surfaces demonstrate the path.
+- After edits: dotnet build (targeted), high-sev tests, aspire doctor, MCP resource restart. No pre-defined Flutter screens regression for dynamic surfaces.
+
   INeuronStateProtector + AES-GCM/PassThrough + CheckpointProtector + AddKernelSecurity DI. 86/88 green.
 - Step 8 (Awesome): ProjectReview.Analyze ported near-verbatim from final + ReviewRequest/ReviewProjectRequest/
   ReviewResult + SoftwareEngineeringReviewerNeuron (real review, not string templating). 91/93 green.
@@ -132,3 +151,21 @@ Verification (Task 6):
 Filter note (not a Bucket A regression): the briefing's `Category!=E2E` does NOT exclude the E2E tests — they live in namespace DigitalBrain.Tests.E2E but are not [Trait("Category","E2E")]-tagged, so the (skipped) E2E test is still *selected*, which instantiates the DigitalBrainBrowserFixture→DigitalBrainAppHostFixture collection fixture and boots the AppHost. That fixture hangs at DigitalBrainAppHostFixture.InitializeAsync line 44 `WaitForResourceHealthyAsync("silo")` — stale resource name from the Silo→Kernel rename (now "kernel"); it waits forever → 5-min hang dump → testhost abort. Pre-existing E2E infra bug, deferred-Bucket-D territory; worked around here by excluding the E2E namespace from the high-sev filter. Recommend either tagging the E2E collection with [Trait("Category","E2E")] and/or fixing the resource name "silo"→"kernel" when Bucket D un-skips E2E.
 
 Final whole-branch review (opus code-reviewer, range ca3862a..d010827) — verdict "with fixes", no Critical. Applied (commit 76cca71): A3 failing replica now emits verify surface phase "verify-failed" before rollback (was contradictory "verified"→"rolledback"); clarifying comment that the install trust gate verifies pack INTEGRITY not publisher identity (a self-signed pack passes); removed dead TrustedPublisher.Sign(NeuroPack). Deferred follow-ups (tracked, not blocking): (a) trusted-publisher ALLOWLIST — verify AuthorPublicKeyBase64 against registered keys; pairs with Key Vault + flipping RejectUnsignedPacks on for remote/untrusted install paths; (b) NeuronSteps Reqnroll kernel-update step manually re-fires rolling surfaces that the now-live IHandle<PerformKernelSelfUpdate> already emits — redundant test debt (not a false green; assertions are existence-only and the dedicated RollingUpdateRollbackTests unit test already proves the live handler), delete the manual loop; (c) extract a shared test-config helper for the RejectUnsignedPacks IConfiguration block duplicated across NeuronTestSiloConfigurator / NeuronSteps / TrustedSeedInstallTests.StrictConfigurator.
+
+2026-06-27: Priorities 1-5 continued one-by-one.
+- #1: Body fully dynamic (activeContent default from tree/Props, always renderer or rfwHost for nav targets, no dumps/waiting text). Synthesis of list nodes for packs/tasks surfaces.
+- #2: UiSurfaceTreeRenderer expanded (fbutton/button, list/vlist with Gesture+FCard items, text, panel, row/column/hstack/vstack; forwards onEvent for actions; recursive compose preserved + improved). 
+- #3: Event round-trip: ForuiAppShell now sets up UiGatewayClient + engageUiSession (like canvas), _handleSurfaceEvent sends UiInputSynapse CLICK with actionId/synapseType/payload from renderer events. Buttons/lists in trees call onEvent which reaches server neurons (no Dart hardcoded views).
+- #4: GoRouter reduced (deleted _PlaceholderView + all surface placeholder routes under Shell; ForuiAppShell owns chrome+body; only canvas/chat/gallery remain as special routes).
+- #5: Client enrichment for server surfaces (list synthesis from 'packs'/'tasks' data uses renderer primitives immediately; server trees now render richer via #2). App-shell + surfaces from embodied packs usable without client rebuild.
+All via Aspire MCP (doctor/list/restart flutter-ui), --no-build tests (Ui 16/16), dotnet msbuild /t:Compile, dart analyze clean (preexist only), Context7 (ForUI FButton/forms/lists). Thin host, delete>added, relative. Ritual complete after each.
+
+**Full one-by-one verification ritual (2026-06-27 post all priorities):**
+- Aspire MCP: doctor 4/4 (CLI 13.5 preview, .NET11, certs, Docker), list_apphosts (1 in scope), list_resources (flutter-ui-dqzkfhvz Running+Healthy after multiple restarts, 3 kernels healthy, gateway up).
+- Tests: UiSurfaceContractTests 16/16 passed (--no-build).
+- Builds: dotnet msbuild Core + Kernel /t:Compile success (despite locks from live AppHost).
+- Client: dart analyze on forui_app_shell, rfw_runtime_host, router: only pre-existing warnings (no new errors from renderer, event wiring, router cleanup).
+- MCP restarts: flutter-ui restarted via execute_resource_command (post-#2, #3, full). Confirmed healthy state.
+- CONTINUITY + todos tracked. All 5 priorities + verifs complete one-by-one. No hardcoded Dart views; all dynamic from neurons. Ready for next work or full aspire run if needed.
+
+Additional server enrichment for #5: SystemNeurons now emits UiSurface (kind=marketplace-list / task-manager) carrying "tree": UiWidgetTree("list", items: ...) for the content. Client body prefers data['tree'] -> renderer.build (list of FCard from neuron data). Removed client-side 'packs'/'tasks' synthesis and unused _client (deleted code). Cleaned dead ?? in event/root logic. Bridge copies the tree, client detects and renders purely from neuron tree. Full roundtrip for nav/actions via events. All ritual re-run (tests 16/16, msbuild, doctor 4/4, MCP flutter-ui restart, analyze clean). Priorities 1-5 complete one-by-one.

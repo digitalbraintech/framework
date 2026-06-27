@@ -1,11 +1,67 @@
 namespace DigitalBrain.Core;
 
 /// <summary>
-/// Base for dynamic UI surfaces returned by installed INO experiences.
-/// Clients (Flutter via sdk/, future Telegram, etc.) render these instead of hard-coded UI.
+/// The single canonical dynamic UI payload. All UI (shell chrome, navigation, views, widgets, and even the main app layout)
+/// is expressed and streamed as UiSurface instances emitted by neurons (or embodied packs).
+/// Neurons build their own UI dynamically by emitting these.
+/// 
+/// The Flutter client is a thin host/renderer:
+/// - ForUI primitives for quality chrome and common widgets.
+/// - RFW for fully custom subtrees from neurons.
+/// - Composes everything from the streamed UiSurface tree(s).
+///
+/// Use Kind + Props (and the helpers below) or a UiWidgetTree for combined dynamic UI.
 /// </summary>
 [GenerateSerializer]
-public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props) : Synapse(nameof(UiSurface), DateTimeOffset.UtcNow);
+public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props) : Synapse(nameof(UiSurface), DateTimeOffset.UtcNow)
+{
+    public const string RfwKind = "rfw";
+    public const string WidgetTreeKind = "widget-tree";
+    public const string AppShellKind = "app-shell";
+    public const string ViewKind = "view";
+
+    /// Creates a UiSurface carrying an RFW definition (unifies the previous separate RfwCard concept for UI purposes).
+    public static UiSurface ForRfw(string libraryName, string rootWidget, string dataJson, string? source = null, string? emitter = null)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["libraryName"] = libraryName,
+            ["rootWidget"] = rootWidget,
+            ["dataJson"] = dataJson
+        };
+        if (source is not null) props["source"] = source;
+        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+
+        return new UiSurface(RfwKind, props);
+    }
+
+    /// Creates a surface whose primary payload is a declarative widget tree (neurons author their own UI).
+    /// The tree uses primitive names (e.g. "FSidebar", "FCard", "Panel") + children + bindings + actions.
+    public static UiSurface ForWidgetTree(UiWidgetTree tree, string? title = null, string? emitter = null)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree
+        };
+        if (title is not null) props[UiSurfaceKeys.Title] = title;
+        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+
+        return new UiSurface(WidgetTreeKind, props);
+    }
+}
+
+/// Declarative widget tree that neurons (or packs) can emit inside a UiSurface.
+/// This is how neurons "build their own UI and even dynamically".
+/// The thin host walks the tree and renders using registered primitives (ForUI + custom) or falls back to RFW.
+[GenerateSerializer]
+public record UiWidgetTree(
+    [property: Id(0)] string Type, // e.g. "FSidebar", "FCard", "VStack", "rfw", "Text", or pack-specific "MyNeuronOrb"
+    [property: Id(1)] IReadOnlyDictionary<string, object?> Props,
+    [property: Id(2)] IReadOnlyList<UiWidgetTree>? Children = null,
+    // When Type == "rfw" these carry the dynamic RFW payload
+    [property: Id(3)] string? RfwSource = null,
+    [property: Id(4)] string? RfwRoot = null
+);
 
 [GenerateSerializer]
 public record ChartSpec(
@@ -35,6 +91,30 @@ public record ChartSpec(
     };
 }
 
+// Rich grammar-of-graphics spec for first-class interactive charts (maps directly to graphic package on client).
+// Variables, marks, and selections are expressed as simple serializable structures.
+[GenerateSerializer]
+public record GraphicSpec(
+    [property: Id(0)] string Title,
+    [property: Id(1)] IReadOnlyList<IReadOnlyDictionary<string, object?>> Data,
+    [property: Id(2)] IReadOnlyDictionary<string, object?> Variables,
+    [property: Id(3)] IReadOnlyList<IReadOnlyDictionary<string, object?>> Marks,
+    [property: Id(4)] IReadOnlyDictionary<string, object?>? Selections = null,
+    [property: Id(5)] string? Summary = null,
+    [property: Id(6)] IReadOnlyDictionary<string, object?>? Annotations = null)
+{
+    public IReadOnlyDictionary<string, object?> ToProps() => new Dictionary<string, object?>
+    {
+        ["title"] = Title,
+        ["data"] = Data,
+        ["variables"] = Variables,
+        ["marks"] = Marks,
+        ["selections"] = Selections,
+        ["summary"] = Summary,
+        ["annotations"] = Annotations
+    };
+}
+
 public static class UiSurfaceKinds
 {
     public const string AuthButton = "auth-button";
@@ -48,6 +128,11 @@ public static class UiSurfaceKinds
     public const string InstalledBundles = "installed-bundles";
     public const string Timeline = "timeline";
     public const string DataChart = "data-chart";
+    // All UI is UiSurface based. These enable neurons to own chrome, nav and full main UI.
+    public const string AppShell = "app-shell";        // main root chrome + nav + layout, streamed by a neuron
+    public const string ShellChrome = "shell-chrome";
+    public const string NavConfig = "nav-config";
+    public const string ViewDefinition = "view-definition";
 }
 
 public static class UiSurfaceKeys
@@ -348,6 +433,21 @@ public static class UiSurfaceSamples
                 ["color"] = spec.Color,
                 ["tooltip"] = spec.Tooltip,
                 ["crosshair"] = spec.Crosshair,
+                ["summary"] = spec.Summary
+            }));
+
+    public static UiSurface Chart(string surfaceId, string emitter, GraphicSpec spec) => new(
+        UiSurfaceKinds.DataChart,
+        WithCommon(
+            surfaceId: surfaceId,
+            emitter: emitter,
+            title: spec.Title,
+            layout: UiSurfaceLayouts.Panel,
+            priority: 6,
+            props: new Dictionary<string, object?>
+            {
+                ["graphicSpec"] = spec.ToProps(),
+                ["data"] = spec.Data,
                 ["summary"] = spec.Summary
             }));
 
