@@ -100,6 +100,17 @@ public sealed class UiGatewayService(
                 var prompt = GetProp(props, "prompt") ?? GetProp(props, "text") ?? payloadJson;
                 await grainFactory.GetGrain<IInoNeuron>("ino-main").FireAsync(new InoRequest(prompt, GetProp(props, "sessionId")));
                 return;
+            case nameof(LoginRequest):
+                var username = GetProp(props, "username") ?? "";
+                var password = GetProp(props, "password") ?? "";
+                var loginClient = GetProp(props, "clientId") ?? "flutter";
+                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").FireAsync(new LoginRequest(username, password, loginClient));
+                return;
+            case nameof(LogoutRequest):
+                var sessionId = GetProp(props, "sessionId") ?? "";
+                var logoutClient = GetProp(props, "clientId") ?? "flutter";
+                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").FireAsync(new LogoutRequest(sessionId, logoutClient));
+                return;
             case nameof(InstallFromMarketplace):
                 var pack = GetProp(props, "packName") ?? GetProp(props, "name") ?? "";
                 var ver = GetProp(props, "version") ?? "0.1.0";

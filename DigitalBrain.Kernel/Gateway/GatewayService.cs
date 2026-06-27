@@ -47,6 +47,29 @@ public sealed class GatewayService(
                 return request;
             }
 
+            if (request.TypeName == nameof(LoginRequest) || request.TypeName.Contains("LoginRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                var session = grains.GetGrain<IUserSessionNeuron>("session-main");
+                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
+                var username = p.TryGetValue("username", out var u) ? u?.ToString() ?? "" : "";
+                var password = p.TryGetValue("password", out var pw) ? pw?.ToString() ?? "" : "";
+                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
+                await session.FireAsync(new LoginRequest(username, password, clientId));
+                return request;
+            }
+
+            if (request.TypeName == nameof(LogoutRequest) || request.TypeName.Contains("LogoutRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                var session = grains.GetGrain<IUserSessionNeuron>("session-main");
+                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
+                var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() ?? "" : "";
+                var clientId = p.TryGetValue("clientId", out var cid) ? cid?.ToString() ?? "grpc" : "grpc";
+                await session.FireAsync(new LogoutRequest(sessionId, clientId));
+                return request;
+            }
+
             // Fallback to resolver for other surface actions (experience run etc.)
             try
             {
@@ -72,20 +95,28 @@ public sealed class GatewayService(
     // Server-driven UI: stream RfwCards to the client as neurons broadcast them, until the client disconnects.
     public override async Task WatchHomeFeed(WatchHomeFeedRequest request, IServerStreamWriter<RfwCardEnvelope> responseStream, ServerCallContext context)
     {
+        var loginSurface = await grains.GetGrain<IUserSessionNeuron>("session-main").BuildLoginSurfaceAsync("flutter");
+        await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(loginSurface, "session-main"));
+
         using var subscription = homeFeedBus.Subscribe();
         await foreach (var card in subscription.Reader.ReadAllAsync(context.CancellationToken))
         {
-            await responseStream.WriteAsync(new RfwCardEnvelope
-            {
-                LibraryName = card.LibraryName,
-                RootWidget = card.RootWidget,
-                DataJson = card.DataJson,
-                CorrelationId = card.CorrelationId ?? string.Empty,
-                Timestamp = card.Timestamp.ToString("O"),
-                CallerNeuronType = card.Sender?.Value ?? string.Empty
-            });
+            await WriteCardAsync(responseStream, card);
         }
     }
+
+    private static Task WriteCardAsync(
+        IServerStreamWriter<RfwCardEnvelope> responseStream,
+        RfwCard card) =>
+        responseStream.WriteAsync(new RfwCardEnvelope
+        {
+            LibraryName = card.LibraryName,
+            RootWidget = card.RootWidget,
+            DataJson = card.DataJson,
+            CorrelationId = card.CorrelationId ?? string.Empty,
+            Timestamp = card.Timestamp.ToString("O"),
+            CallerNeuronType = card.Sender?.Value ?? string.Empty
+        });
 
     public override Task<HealthReply> Health(HealthRequest request, ServerCallContext context) =>
         Task.FromResult(new HealthReply

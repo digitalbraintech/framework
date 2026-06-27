@@ -73,6 +73,7 @@ public static class NeuronUiKit
     public const string NeuronButton = "neuron:NeuronButton";
     public const string NeuronList = "neuron:NeuronList";
     public const string NeuronListItem = "neuron:NeuronListItem";
+    public const string Form = "neuron:Form";
     public const string Header = "neuron:Header";
     public const string Panel = "neuron:Panel";
     public const string Divider = "neuron:Divider";
@@ -139,6 +140,7 @@ public record GraphicSpec(
 public static class UiSurfaceKinds
 {
     public const string AuthButton = "auth-button";
+    public const string Login = "login";
     public const string List = "list";
     public const string Ide = "ide";
     public const string ActivityGraph = "activity-graph";
@@ -281,6 +283,74 @@ public static class UiSurfaceSamples
                 {
                     ["taskId"] = "task-demo-1"
                 })
+            }));
+
+    public static UiSurface Login(string? error = null, string clientId = "flutter") => new(
+        UiSurfaceKinds.Login,
+        WithCommon(
+            surfaceId: "surface.login.local",
+            emitter: "session-main",
+            title: "Sign In",
+            layout: UiSurfaceLayouts.Panel,
+            requiresInput: true,
+            priority: 100,
+            props: new Dictionary<string, object?>
+            {
+                ["clientId"] = clientId,
+                ["mode"] = "local",
+                ["error"] = error,
+                ["fields"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = "username",
+                        ["label"] = "Username",
+                        ["kind"] = "text",
+                        ["required"] = true
+                    },
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = "password",
+                        ["label"] = "Password",
+                        ["kind"] = "password",
+                        ["required"] = true
+                    }
+                },
+                ["submitAction"] = SynapseAction(
+                    "local-login",
+                    "Sign in",
+                    nameof(LoginRequest),
+                    new Dictionary<string, object?>
+                    {
+                        ["clientId"] = clientId
+                    }),
+                ["tree"] = new UiWidgetTree(
+                    NeuronUiKit.Form,
+                    new Dictionary<string, object?>
+                    {
+                        ["title"] = "Sign In",
+                        ["submitLabel"] = "Sign in",
+                        ["error"] = error,
+                        [UiSurfaceKeys.SynapseType] = nameof(LoginRequest),
+                        ["clientId"] = clientId,
+                        ["fields"] = new[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["name"] = "username",
+                                ["label"] = "Username",
+                                ["kind"] = "text",
+                                ["required"] = true
+                            },
+                            new Dictionary<string, object?>
+                            {
+                                ["name"] = "password",
+                                ["label"] = "Password",
+                                ["kind"] = "password",
+                                ["required"] = true
+                            }
+                        }
+                    })
             }));
 
     public static UiSurface MarketplaceList() => new(

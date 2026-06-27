@@ -5,13 +5,20 @@ namespace DigitalBrain.Tests.TestSupport;
 // Minimal ServerCallContext for unit-testing gRPC service methods directly (no transport).
 public sealed class TestServerCallContext : ServerCallContext
 {
-    public static TestServerCallContext Create() => new();
+    private readonly CancellationToken _cancellationToken;
+
+    private TestServerCallContext(CancellationToken cancellationToken = default)
+    {
+        _cancellationToken = cancellationToken;
+    }
+
+    public static TestServerCallContext Create(CancellationToken cancellationToken = default) => new(cancellationToken);
     protected override string MethodCore => "test";
     protected override string HostCore => "test";
     protected override string PeerCore => "test";
     protected override DateTime DeadlineCore => DateTime.MaxValue;
     protected override Metadata RequestHeadersCore => new();
-    protected override CancellationToken CancellationTokenCore => CancellationToken.None;
+    protected override CancellationToken CancellationTokenCore => _cancellationToken;
     protected override Metadata ResponseTrailersCore { get; } = new();
     protected override Status StatusCore { get; set; }
     protected override WriteOptions? WriteOptionsCore { get; set; }

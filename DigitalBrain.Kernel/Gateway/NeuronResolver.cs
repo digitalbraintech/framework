@@ -26,6 +26,7 @@ public static class NeuronResolver
             "ino-main" => grains.GetGrain<IInoNeuron>(neuronId),
             "llm-main" => grains.GetGrain<ILlmNeuron>(neuronId),
             "market-main" => grains.GetGrain<IMarketplaceNeuron>(neuronId),
+            "session-main" => grains.GetGrain<IUserSessionNeuron>(neuronId),
             "status-main" => grains.GetGrain<ISystemStatus>(neuronId),
             _ => grains.GetGrain<IDemoNeuron>(neuronId)
         };

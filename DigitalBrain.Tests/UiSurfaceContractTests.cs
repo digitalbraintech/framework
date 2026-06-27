@@ -11,6 +11,7 @@ public class UiSurfaceContractTests
         { UiSurfaceSamples.TaskWindow(), new[] { "taskId", "state", "body", UiSurfaceKeys.Actions } },
         { UiSurfaceSamples.TaskManager(), new[] { "totals", "tasks" } },
         { UiSurfaceSamples.UserInput(), new[] { "prompt", "schema", "submitAction", "cancelAction" } },
+        { UiSurfaceSamples.Login(), new[] { "clientId", "fields", "submitAction", "tree" } },
         { UiSurfaceSamples.MarketplaceList(), new[] { "packs", "installAction", "updateAction" } },
         { UiSurfaceSamples.InstalledBundles(), new[] { "bundles", "experiences" } },
         { UiSurfaceSamples.Timeline(), new[] { "events", "filters" } },
@@ -42,6 +43,7 @@ public class UiSurfaceContractTests
         Assert.Equal("task-window", UiSurfaceKinds.TaskWindow);
         Assert.Equal("task-manager", UiSurfaceKinds.TaskManager);
         Assert.Equal("user-input", UiSurfaceKinds.UserInput);
+        Assert.Equal("login", UiSurfaceKinds.Login);
         Assert.Equal("marketplace-list", UiSurfaceKinds.MarketplaceList);
         Assert.Equal("installed-bundles", UiSurfaceKinds.InstalledBundles);
         Assert.Equal("timeline", UiSurfaceKinds.Timeline);
@@ -54,6 +56,9 @@ public class UiSurfaceContractTests
         var userInput = UiSurfaceSamples.UserInput();
         AssertSynapseAction(userInput.Props["submitAction"], nameof(InoRequest));
         AssertSynapseAction(userInput.Props["cancelAction"], nameof(DemoMessageSynapse));
+
+        var login = UiSurfaceSamples.Login();
+        AssertSynapseAction(login.Props["submitAction"], nameof(LoginRequest));
 
         var marketplace = UiSurfaceSamples.MarketplaceList();
         AssertSynapseAction(marketplace.Props["installAction"], nameof(InstallFromMarketplace));
@@ -201,6 +206,7 @@ public class UiSurfaceContractTests
         Assert.Equal("neuron:MenuItem", DigitalBrain.Core.NeuronUiKit.MenuItem);
         Assert.Equal("neuron:ActionButton", DigitalBrain.Core.NeuronUiKit.ActionButton);
         Assert.Equal("neuron:NeuronButton", DigitalBrain.Core.NeuronUiKit.NeuronButton);
+        Assert.Equal("neuron:Form", DigitalBrain.Core.NeuronUiKit.Form);
         Assert.Equal("neuron:Header", DigitalBrain.Core.NeuronUiKit.Header);
         Assert.Equal("neuron:Divider", DigitalBrain.Core.NeuronUiKit.Divider);
     }

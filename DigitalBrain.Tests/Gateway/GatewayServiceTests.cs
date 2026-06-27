@@ -61,6 +61,21 @@ public class GatewayServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task WatchHomeFeed_Writes_Login_Surface_To_New_Client()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var writer = new CapturingServerStreamWriter<RfwCardEnvelope>(() => cts.Cancel());
+        var svc = NewService();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            svc.WatchHomeFeed(new WatchHomeFeedRequest(), writer, TestContext(cts.Token)));
+
+        var card = Assert.Single(writer.Messages);
+        Assert.Contains("\"kind\":\"login\"", card.DataJson);
+        Assert.Contains("\"synapseType\":\"LoginRequest\"", card.DataJson);
+    }
+
+    [Fact]
     public async Task Send_SurfaceDemoRequested_InstallsPack_And_BroadcastsRenderableSurface()
     {
         using var subscription = _homeFeedBus.Subscribe();
@@ -110,7 +125,25 @@ public class GatewayServiceTests : IAsyncLifetime
             surface.CorrelationId == "ui-demo-test");
     }
 
-    private static ServerCallContext TestContext() => TestServerCallContext.Create();
+    private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>
+        TestServerCallContext.Create(cancellationToken);
+
+    private sealed class CapturingServerStreamWriter<T>(Action? afterFirstWrite = null) : IServerStreamWriter<T>
+    {
+        public List<T> Messages { get; } = new();
+        public WriteOptions? WriteOptions { get; set; }
+
+        public Task WriteAsync(T message)
+        {
+            Messages.Add(message);
+            if (Messages.Count == 1)
+            {
+                afterFirstWrite?.Invoke();
+            }
+
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class GatewaySiloConfig : ISiloConfigurator
     {
