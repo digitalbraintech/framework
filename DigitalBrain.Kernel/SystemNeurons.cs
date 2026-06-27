@@ -137,9 +137,17 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         // Server enrichment (#5): emit marketplace-list surface carrying a UiWidgetTree (list primitive).
         // Client now renders via UiSurfaceTreeRenderer (pure neuron-driven, no client synthesis for packs).
         var marketPacks = marketList.Props.TryGetValue("packs", out var p) ? p : null;
+        // Buddy search via forui:FAutocomplete (Neuron UI Kit). Static names for demo; select/query fires UiInputSynapse.
+        var acItems = new[] { "DigitalBrain.UIKit.ForUI", "kernel", "INO", "Marketplace", "Tasks" };
+        var acProps = new Dictionary<string, object?> { ["hint"] = "Search buddies / packs", ["items"] = acItems };
         var marketTree = new UiWidgetTree(
-            "list",
-            new Dictionary<string, object?> { ["items"] = marketPacks });
+            "column",
+            new Dictionary<string, object?>(),
+            new List<UiWidgetTree>
+            {
+                new UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Autocomplete, acProps),
+                new UiWidgetTree("list", new Dictionary<string, object?> { ["items"] = marketPacks })
+            });
         var marketTreeSurface = new UiSurface(
             UiSurfaceKinds.MarketplaceList,
             new Dictionary<string, object?>
@@ -183,10 +191,9 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         }
 
         var mainShellTree = new DigitalBrain.Core.UiWidgetTree(
-            "app-shell",
+            DigitalBrain.Core.NeuronUiKit.Scaffold,
             new Dictionary<string, object?>
             {
-                ["theme"] = "forui-neutral-dark",
                 ["title"] = "DigitalBrain",
                 ["activeContent"] = UiSurfaceKinds.MarketplaceList
             },
@@ -196,16 +203,15 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
                 {
                     ["title"] = "DigitalBrain"
                 }),
-                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Menu, new Dictionary<string, object?>(),
-                    // Menu built from data (prepared for dynamic emission from a neuron listing installed/interesting experiences)
+                new DigitalBrain.Core.UiWidgetTree("forui:sidebar", new Dictionary<string, object?> { ["title"] = "DigitalBrain" },
                     new List<DigitalBrain.Core.UiWidgetTree>(BuildShellMenuItems())),
-                new DigitalBrain.Core.UiWidgetTree("content-area", new Dictionary<string, object?>
+                new DigitalBrain.Core.UiWidgetTree("content", new Dictionary<string, object?>
                 {
                     ["defaultView"] = UiSurfaceKinds.MarketplaceList
                 })
             });
 
-        var appShellSurface = DigitalBrain.Core.UiSurface.ForWidgetTree(mainShellTree, title: "Main Shell", emitter: Self.Value);
+        var appShellSurface = DigitalBrain.Core.UiSurface.ForWidgetTree(mainShellTree, title: "Main Shell", emitter: "shell-main");
         // Also set the canonical kind so hosts can recognize it as the root chrome.
         // (We keep the tree in Props; hosts that understand WidgetTreeKind render the full shell.)
         await FireAsync(appShellSurface);

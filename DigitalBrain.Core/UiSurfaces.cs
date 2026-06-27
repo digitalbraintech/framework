@@ -50,12 +50,12 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
     }
 }
 
-/// Declarative widget tree that neurons (or packs) can emit inside a UiSurface.
-/// Neurons author full chrome, menus, navigation and content using the Neuron UI Kit + forui:* + rfw escapes.
-/// Client (renderer) is dumb: only maps types to widgets and forwards events as synapses.
+/// Declarative widget tree emitted by neurons inside UiSurface (WidgetTreeKind).
+/// Uses NeuronUiKit (neuron:*) and forui:* names (forui:FScaffold, forui:FAutocomplete, forui:FSidebar etc) + rfw escapes.
+/// Renderer maps to ForUI widgets and sends events back as synapses. Client is thin host.
 [GenerateSerializer]
 public record UiWidgetTree(
-    [property: Id(0)] string Type, // "app-shell", "neuron:Menu", "neuron:MenuItem", "neuron:ActionButton", "neuron:NeuronButton", "forui:FSidebar", "forui:FButton", "list", "rfw", ...
+    [property: Id(0)] string Type, // "app-shell", NeuronUiKit.Menu, "forui:FScaffold", "forui:FAutocomplete", "list", "rfw", ...
     [property: Id(1)] IReadOnlyDictionary<string, object?> Props,
     [property: Id(2)] IReadOnlyList<UiWidgetTree>? Children = null,
     [property: Id(3)] string? RfwSource = null,
@@ -76,6 +76,8 @@ public static class NeuronUiKit
     public const string Header = "neuron:Header";
     public const string Panel = "neuron:Panel";
     public const string Divider = "neuron:Divider";
+    public const string Scaffold = "forui:FScaffold";
+    public const string Autocomplete = "forui:FAutocomplete";
 }
 
 [GenerateSerializer]

@@ -26,14 +26,55 @@ var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient)
     .WithExplicitStart();
 
-// Flutter as marketplace pack (DigitalBrain.UI.AspireFlutter).
-// The pack provides the Aspire integration. Use the extension from the pack's SDK.
-// brain.cs is thin; the pack adds the resource when installed.
-var flutterUiPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "app"));
-if (Directory.Exists(flutterUiPath))
+// Flutter Windows client — automatically started by `aspire run`.
+// The client receives kernel endpoint via Aspire service discovery (services__kernel__http__0 etc.)
+// which resolveKernelEndpoint() in the Flutter app already understands.
+var flutterUiPath = ResolveFlutterAppPath(builder);
+if (!string.IsNullOrEmpty(flutterUiPath))
 {
     ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")
         .WithReference(kernel);
+}
+else
+{
+    Console.WriteLine("[Aspire] WARNING: Could not locate Flutter app directory (app/). Set DIGITALBRAIN_FLUTTER_APP_PATH env var or place the 'app' folder as a sibling of 'brain'. Flutter Windows client will not auto-start.");
+}
+
+static string? ResolveFlutterAppPath(IDistributedApplicationBuilder b)
+{
+    // 1. Explicit override (highest priority)
+    var flutterPathEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_FLUTTER_APP_PATH");
+    if (!string.IsNullOrWhiteSpace(flutterPathEnv) && System.IO.Directory.Exists(flutterPathEnv))
+        return System.IO.Path.GetFullPath(flutterPathEnv);
+
+    // 2. Common relative locations from AppHost
+    var appHostDir = b.AppHostDirectory;
+    var candidates = new[]
+    {
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "..", "app")),   // typical: brain/Neuro... -> root/app
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "app")),
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "app")),
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "..", "app")),
+    };
+
+    foreach (var c in candidates)
+    {
+        if (System.IO.Directory.Exists(c) && System.IO.File.Exists(System.IO.Path.Combine(c, "pubspec.yaml")))
+            return c;
+    }
+
+    // 3. Walk up from AppHostDirectory looking for an "app" folder with Flutter marker
+    var dir = new System.IO.DirectoryInfo(appHostDir);
+    for (int i = 0; i < 6 && dir != null; i++)
+    {
+        var candidate = System.IO.Path.Combine(dir.FullName, "app");
+        if (System.IO.Directory.Exists(candidate) && System.IO.File.Exists(System.IO.Path.Combine(candidate, "pubspec.yaml")))
+            return System.IO.Path.GetFullPath(candidate);
+
+        dir = dir.Parent;
+    }
+
+    return null;
 }
 
 if (ctx.EnableMcp)

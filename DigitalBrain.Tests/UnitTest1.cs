@@ -298,6 +298,15 @@ public class NeuronTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ChartNeuron_Handles_Visualize_With_GraphicSpec()
+    {
+        var chart = _cluster!.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-cmd-test");
+        // Verify the new graphic path doesn't break firing
+        await chart.FireAsync(new VisualizeDataRequest("demo sales csv", "[{\"m\":\"Jan\",\"s\":10},{\"m\":\"Feb\",\"s\":20}]", null, "cmd-1"));
+        // Command path exercised in integration; here just ensure no explosion on visualize for new spec
+    }
+
+    [Fact]
     public async Task Marketplace_Rejects_Invalid_Signature_And_Accepts_Valid()
     {
         var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();

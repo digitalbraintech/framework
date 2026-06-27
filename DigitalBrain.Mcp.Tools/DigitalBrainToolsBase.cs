@@ -75,6 +75,7 @@ public abstract class DigitalBrainToolsBase(IGrainFactory grains)
             "company-main" => Grains.GetGrain<ICompanyKnowledgeNeuron>(neuronId),
             "company-skill-main" => Grains.GetGrain<ICompanySkillOrchestratorNeuron>(neuronId),
             "chart-main" => Grains.GetGrain<IDataVisualizationNeuron>(neuronId),
+            _ when neuronId.StartsWith("chart-", StringComparison.OrdinalIgnoreCase) => Grains.GetGrain<IChartNeuron>(neuronId),
             "db-main" => Grains.GetGrain<IDbSupportNeuron>(neuronId),
             "foundry-main" => Grains.GetGrain<ICodeFoundryLoopNeuron>(neuronId),
             "ino-editor-main" => Grains.GetGrain<IInoCodeEditor>(neuronId),

@@ -1,4 +1,6 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.AI;
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text.Json;
 
@@ -7,298 +9,244 @@ using System.Text.Json;
 namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.data-visualization.v1")]
-public class DataVisualizationNeuron : Neuron, IDataVisualizationNeuron
+public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
 {
-    public DataVisualizationNeuron(ILogger<DataVisualizationNeuron> logger, NeuronJournals journals)
+    private readonly ConcurrentDictionary<string, ChartSession> _sessions = new(StringComparer.Ordinal);
+
+    public ChartNeuron(ILogger<ChartNeuron> logger, NeuronJournals journals)
         : base(logger, journals)
     {
     }
 
+    public static string AgentDisplayName => "Chart";
+    public static string AgentDescription => "First-class interactive grammar-of-graphics charts with analysis and conversational modification.";
+    public static string[] AgentCapabilities => new[] { "chart", "visualize", "analyze", "filter", "transform", "highlight" };
+    public static string AgentInstructions => "You are Chart. Visualize data and modify live views on natural language instructions. Maintain per-surface context and emit updated surfaces using the same surfaceId for live panel identity.";
+    public static string[] AgentRoutingExamples => new[] { "show sales trend", "filter last 7 days", "switch to area chart and highlight outliers" };
+
     public async Task HandleAsync(VisualizeDataRequest request)
     {
-        var requestId = !string.IsNullOrWhiteSpace(request.RequestId)
-            ? request.RequestId!
-            : request.CorrelationId ?? "chart-" + Guid.NewGuid().ToString("N")[..10];
+        var surfaceId = !string.IsNullOrWhiteSpace(request.RequestId) ? request.RequestId! : request.CorrelationId ?? "chart-" + Guid.NewGuid().ToString("N")[..8];
+        var rows = DataChartBuilder.ParseRows(request.DataJson).Select(r => (IReadOnlyDictionary<string, object?>)r).ToArray();
 
-        try
-        {
-            var surface = DataChartBuilder.BuildSurface(
-                requestId,
-                Self.Value,
-                request.Prompt,
-                request.DataJson,
-                request.ChartHint);
+        var session = _sessions.GetOrAdd(surfaceId, _ => new ChartSession { SurfaceId = surfaceId });
+        session.Rows = rows;
+        session.OriginalRows = rows;
 
-            await FireAsync(new DataChartGenerated(requestId, surface));
-        }
-        catch (Exception ex)
+        var spec = BuildGraphicSpec(session, request.Prompt, request.ChartHint);
+        var surface = UiSurfaceSamples.Chart(surfaceId, Self.Value, spec);
+
+        await FireAsync(new DataChartGenerated(surfaceId, surface));
+        await BroadcastRfwCard(surface);
+    }
+
+    public async Task HandleAsync(ChartCommand command)
+    {
+        if (!_sessions.TryGetValue(command.SurfaceId, out var session))
         {
-            await FireAsync(new DataChartFailed(requestId, ex.Message));
+            await FireAsync(new DataChartFailed(command.SurfaceId, "no session"));
+            return;
         }
+
+        var chat = ServiceProvider.GetService<IChatClient>();
+        var instruction = command.Instruction.ToLowerInvariant();
+
+        // LLM assisted action inference (fall back to string match)
+        var action = "passthrough";
+        string? arg = null;
+        if (chat != null)
+        {
+            var summary = $"{session.Rows.Count} rows";
+            try
+            {
+                var resp = await chat.GetResponseAsync($"Data: {summary}. Instruction: {command.Instruction}. Reply with short action like: filter:7, area, outliers, group, remove-below:10");
+                var t = (resp.Text ?? "").ToLowerInvariant();
+                if (t.Contains("filter") || instruction.Contains("last") || instruction.Contains("7 day")) { action = "filter"; arg = "7"; }
+                else if (t.Contains("area")) action = "area";
+                else if (t.Contains("outlier")) action = "outliers";
+                else if (t.Contains("group")) action = "group";
+                else if (t.Contains("remove") || t.Contains("below")) { action = "remove-below"; arg = "0"; }
+            }
+            catch { }
+        }
+
+        if (instruction.Contains("7") || instruction.Contains("last")) { action = "filter"; arg = "7"; }
+        if (instruction.Contains("area")) action = "area";
+        if (instruction.Contains("outlier")) action = "outliers";
+
+        session.Rows = Apply(session, action, arg);
+
+        var newSpec = BuildGraphicSpec(session, instruction, null);
+        session.Current = newSpec;
+
+        var s = UiSurfaceSamples.Chart(command.SurfaceId, Self.Value, newSpec);
+        await FireAsync(new DataChartGenerated(command.SurfaceId, s));
+        await BroadcastRfwCard(s);
+    }
+
+    public async Task HandleAsync(ChartInteraction inter)
+    {
+        if (!_sessions.TryGetValue(inter.SurfaceId, out var session) || session.Current == null) return;
+        var s = UiSurfaceSamples.Chart(inter.SurfaceId, Self.Value, session.Current);
+        await FireAsync(new DataChartGenerated(inter.SurfaceId, s));
+        await BroadcastRfwCard(s);
+    }
+
+    private IReadOnlyList<IReadOnlyDictionary<string, object?>> Apply(ChartSession ses, string action, string? arg)
+    {
+        var rows = ses.Rows;
+        if (action == "filter")
+        {
+            int n = 7;
+            if (int.TryParse(arg, out var v)) n = v;
+            return rows.TakeLast(Math.Max(1, Math.Min(n, rows.Count))).ToList();
+        }
+        if (action == "remove-below")
+        {
+            double th = 0;
+            double.TryParse(arg, out th);
+            return rows.Where(r => GetFirstNumber(r) >= th).ToList();
+        }
+        return rows;
+    }
+
+    private static double GetFirstNumber(IReadOnlyDictionary<string, object?> r)
+    {
+        foreach (var v in r.Values)
+        {
+            if (v is double d) return d;
+            if (v is int i) return i;
+            if (v is long l) return l;
+            if (v is string s && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var d2)) return d2;
+        }
+        return 0;
+    }
+
+    private GraphicSpec BuildGraphicSpec(ChartSession ses, string prompt, string? hint)
+    {
+        var rows = ses.Rows;
+        var type = DataChartBuilder.ChooseChartType(prompt, hint);
+        var (x, y, ser) = DataChartBuilder.InferEncoding(rows, type);
+
+        var vars = new Dictionary<string, object?> { [x] = new { type = "ordinal" }, [y] = new { type = "linear" } };
+        if (ser != null) vars[ser] = new { type = "nominal" };
+
+        var marks = new List<IReadOnlyDictionary<string, object?>>
+        {
+            new Dictionary<string, object?> { ["kind"] = type == "area" ? "area" : type == "line" ? "line" : "interval", ["position"] = x + "*" + y }
+        };
+
+        var title = string.IsNullOrWhiteSpace(prompt) ? type + " chart" : (prompt.Length > 55 ? prompt[..55] + "..." : prompt);
+        var sum = $"{rows.Count} rows. {type} view.";
+
+        var g = new GraphicSpec(title, rows, vars, marks, null, sum);
+        ses.Current = g;
+        return g;
+    }
+
+    private async Task BroadcastRfwCard(UiSurface surface)
+    {
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus == null) return;
+        var card = UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value);
+        if (surface.Props.TryGetValue("graphicSpec", out var g))
+        {
+            var data = JsonSerializer.Serialize(new { title = surface.Props.GetValueOrDefault(UiSurfaceKeys.Title), graphicSpec = g, summary = surface.Props.GetValueOrDefault("summary") });
+            card = new RfwCard("digitalbrain", "ChartCard", data) { CorrelationId = surface.CorrelationId ?? surface.SynapseId };
+        }
+        bus.Broadcast(card);
+    }
+
+    public new Task<IReadOnlyList<Synapse>> GetTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
+
+    private sealed class ChartSession
+    {
+        public string SurfaceId = "";
+        public IReadOnlyList<IReadOnlyDictionary<string, object?>> Rows = Array.Empty<IReadOnlyDictionary<string, object?>>();
+        public IReadOnlyList<IReadOnlyDictionary<string, object?>> OriginalRows = Array.Empty<IReadOnlyDictionary<string, object?>>();
+        public GraphicSpec? Current;
     }
 }
 
+// Backward compat alias for old code / tests / MCP
+public class DataVisualizationNeuron : ChartNeuron
+{
+    public DataVisualizationNeuron(ILogger<DataVisualizationNeuron> logger, NeuronJournals journals) : base(logger, journals) { }
+}
+
+// Minimal static helpers for reuse (no full original duplication)
 public static class DataChartBuilder
 {
-    private static readonly string[] RowArrayNames = ["rows", "data", "items", "values", "records"];
-    private static readonly string[] ValidChartTypes = ["bar", "line", "area", "scatter", "pie"];
+    public static string ChooseChartType(string prompt, string? chartHint) => ChartNeuronDataChartBuilderShim.Choose(prompt, chartHint);
+    public static (string X, string Y, string? Series) InferEncoding(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, string chartType) => ChartNeuronDataChartBuilderShim.Infer(rows, chartType);
+    public static IReadOnlyList<Dictionary<string, object?>> ParseRows(string dataJson) => ChartNeuronDataChartBuilderShim.Parse(dataJson);
 
-    public static UiSurface BuildSurface(
-        string requestId,
-        string emitter,
-        string prompt,
-        string dataJson,
-        string? chartHint = null)
+    public static UiSurface BuildSurface(string requestId, string emitter, string prompt, string dataJson, string? chartHint = null)
     {
-        var rows = ParseRows(dataJson)
-            .Select(row => (IReadOnlyDictionary<string, object?>)row)
-            .ToArray();
-        var chartType = ChooseChartType(prompt, chartHint);
-        var (x, y, series) = InferEncoding(rows, chartType);
-        var title = BuildTitle(prompt, chartType, x, y);
-        var summary = $"{rows.Length} rows. {chartType} chart of {y} by {x}.";
-        var color = series;
-
-        var spec = new ChartSpec(
-            Title: title,
-            ChartType: chartType,
-            Data: rows,
-            X: x,
-            Y: y,
-            Series: series,
-            Color: color,
-            Tooltip: true,
-            Crosshair: chartType != "pie",
-            Summary: summary);
-
-        return UiSurfaceSamples.DataChart(
-            surfaceId: "surface.data-chart." + SanitizeId(requestId),
-            emitter: emitter,
-            spec: spec);
+        var rows = ParseRows(dataJson).Select(r => (IReadOnlyDictionary<string, object?>)r).ToArray();
+        var ct = ChooseChartType(prompt, chartHint);
+        var (x, y, ser) = InferEncoding(rows, ct);
+        var title = string.IsNullOrWhiteSpace(prompt) ? ct + " chart" : prompt;
+        var spec = new ChartSpec(title, ct, rows, x, y, ser, null, true, ct != "pie", $"{rows.Length} rows.");
+        return UiSurfaceSamples.DataChart("surface.data-chart." + requestId, emitter, spec);
     }
 
-    public static IReadOnlyList<Dictionary<string, object?>> ParseRows(string dataJson)
+    // Shim to avoid name conflict during edits
+    internal static class ChartNeuronDataChartBuilderShim
     {
-        if (string.IsNullOrWhiteSpace(dataJson))
+        private static readonly string[] RowArrayNames = ["rows", "data", "items", "values", "records"];
+        private static readonly string[] Valid = ["bar", "line", "area", "scatter", "pie"];
+
+        public static string Choose(string p, string? h)
         {
-            return Array.Empty<Dictionary<string, object?>>();
+            var hh = (h ?? "").Trim().ToLowerInvariant();
+            var direct = Valid.FirstOrDefault(t => hh == t || hh.Contains(t));
+            if (direct != null) return direct;
+            var txt = (hh + " " + (p ?? "")).ToLowerInvariant();
+            if (txt.Contains("pie") || txt.Contains("share") || txt.Contains("percent")) return "pie";
+            if (txt.Contains("scatter")) return "scatter";
+            if (txt.Contains("area")) return "area";
+            if (txt.Contains("trend") || txt.Contains("time")) return "line";
+            return "bar";
         }
 
-        using var document = JsonDocument.Parse(dataJson);
-        return ParseRows(document.RootElement);
-    }
-
-    private static IReadOnlyList<Dictionary<string, object?>> ParseRows(JsonElement element)
-    {
-        if (element.ValueKind == JsonValueKind.Array)
+        public static (string X, string Y, string? Series) Infer(IReadOnlyList<IReadOnlyDictionary<string, object?>> rows, string t)
         {
-            return element
-                .EnumerateArray()
-                .Where(item => item.ValueKind == JsonValueKind.Object)
-                .Select(ToRow)
-                .ToArray();
+            var f = rows.SelectMany(r => r.Keys).Distinct(StringComparer.Ordinal).ToArray();
+            if (f.Length == 0) return ("category", "value", null);
+            var x = f.FirstOrDefault(k => rows.Any(r => IsCat(r[k]))) ?? f[0];
+            var y = f.FirstOrDefault(k => rows.Any(r => IsNum(r[k]))) ?? f[0];
+            var s = f.FirstOrDefault(k => k != x && k != y && rows.Any(r => IsCat(r[k])));
+            return (x, y, s);
         }
 
-        if (element.ValueKind != JsonValueKind.Object)
+        public static IReadOnlyList<Dictionary<string, object?>> Parse(string j)
         {
-            return Array.Empty<Dictionary<string, object?>>();
+            if (string.IsNullOrWhiteSpace(j)) return Array.Empty<Dictionary<string, object?>>();
+            using var d = JsonDocument.Parse(j);
+            var e = d.RootElement;
+            if (e.ValueKind == JsonValueKind.Array) return e.EnumerateArray().Where(i => i.ValueKind == JsonValueKind.Object).Select(ToR).ToArray();
+            return new[] { ToR(e) };
         }
 
-        foreach (var name in RowArrayNames)
+        private static Dictionary<string, object?> ToR(JsonElement e)
         {
-            if (TryGetProperty(element, name, out var rows) && rows.ValueKind == JsonValueKind.Array)
-            {
-                return ParseRows(rows);
-            }
+            var r = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var p in e.EnumerateObject()) r[p.Name] = ToV(p.Value);
+            return r;
         }
 
-        return new[] { ToRow(element) };
-    }
-
-    private static Dictionary<string, object?> ToRow(JsonElement element)
-    {
-        var row = new Dictionary<string, object?>(StringComparer.Ordinal);
-        foreach (var property in element.EnumerateObject())
+        private static object? ToV(JsonElement e) => e.ValueKind switch
         {
-            row[property.Name] = ToJsonFriendlyValue(property.Value);
-        }
-
-        return row;
-    }
-
-    private static object? ToJsonFriendlyValue(JsonElement element) =>
-        element.ValueKind switch
-        {
-            JsonValueKind.Number when element.TryGetInt64(out var integer) => integer,
-            JsonValueKind.Number when element.TryGetDouble(out var number) => number,
-            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when e.TryGetInt64(out var i) => i,
+            JsonValueKind.Number when e.TryGetDouble(out var d) => d,
+            JsonValueKind.String => e.GetString(),
             JsonValueKind.True => true,
             JsonValueKind.False => false,
-            JsonValueKind.Null => null,
-            JsonValueKind.Undefined => null,
-            _ => element.GetRawText()
+            _ => null
         };
 
-    private static string ChooseChartType(string prompt, string? chartHint)
-    {
-        var hint = chartHint?.Trim().ToLowerInvariant();
-        if (!string.IsNullOrWhiteSpace(hint))
-        {
-            var direct = ValidChartTypes.FirstOrDefault(type => hint == type || hint.Contains(type, StringComparison.Ordinal));
-            if (direct is not null)
-            {
-                return direct;
-            }
-        }
-
-        var text = (chartHint + " " + prompt).ToLowerInvariant();
-        if (text.Contains("pie", StringComparison.Ordinal) ||
-            text.Contains("share", StringComparison.Ordinal) ||
-            text.Contains("percent", StringComparison.Ordinal) ||
-            text.Contains("percentage", StringComparison.Ordinal))
-        {
-            return "pie";
-        }
-
-        if (text.Contains("scatter", StringComparison.Ordinal) ||
-            text.Contains("correlation", StringComparison.Ordinal))
-        {
-            return "scatter";
-        }
-
-        if (text.Contains("area", StringComparison.Ordinal))
-        {
-            return "area";
-        }
-
-        if (text.Contains("trend", StringComparison.Ordinal) ||
-            text.Contains("over time", StringComparison.Ordinal) ||
-            text.Contains("time series", StringComparison.Ordinal) ||
-            text.Contains("timeseries", StringComparison.Ordinal))
-        {
-            return "line";
-        }
-
-        return "bar";
-    }
-
-    private static (string X, string Y, string? Series) InferEncoding(
-        IReadOnlyList<IReadOnlyDictionary<string, object?>> rows,
-        string chartType)
-    {
-        var fields = rows
-            .SelectMany(row => row.Keys)
-            .Distinct(StringComparer.Ordinal)
-            .ToArray();
-
-        if (fields.Length == 0)
-        {
-            return ("category", "value", null);
-        }
-
-        if (chartType == "scatter")
-        {
-            var numericFields = fields
-                .Where(field => rows.Any(row => TryGet(row, field, out var value) && IsNumeric(value)))
-                .ToArray();
-
-            if (numericFields.Length >= 2)
-            {
-                var scatterSeries = fields.FirstOrDefault(field =>
-                    field != numericFields[0] &&
-                    field != numericFields[1] &&
-                    rows.Any(row => TryGet(row, field, out var value) && IsCategorical(value)));
-
-                return (numericFields[0], numericFields[1], scatterSeries);
-            }
-        }
-
-        var x = fields.FirstOrDefault(field =>
-            rows.Any(row => TryGet(row, field, out var value) && IsCategorical(value)));
-        var y = fields.FirstOrDefault(field =>
-            rows.Any(row => TryGet(row, field, out var value) && IsNumeric(value)));
-
-        x ??= fields.FirstOrDefault(field => field != y) ?? fields[0];
-        y ??= fields.FirstOrDefault(field => field != x) ?? fields[0];
-
-        var series = fields.FirstOrDefault(field =>
-            field != x &&
-            field != y &&
-            rows.Any(row => TryGet(row, field, out var value) && IsCategorical(value)));
-
-        return (x, y, series);
-    }
-
-    private static bool TryGet(IReadOnlyDictionary<string, object?> row, string field, out object? value)
-    {
-        if (row.TryGetValue(field, out value))
-        {
-            return true;
-        }
-
-        foreach (var entry in row)
-        {
-            if (entry.Key.Equals(field, StringComparison.OrdinalIgnoreCase))
-            {
-                value = entry.Value;
-                return true;
-            }
-        }
-
-        value = null;
-        return false;
-    }
-
-    private static bool TryGetProperty(JsonElement element, string name, out JsonElement value)
-    {
-        foreach (var property in element.EnumerateObject())
-        {
-            if (property.NameEquals(name) || property.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
-            {
-                value = property.Value;
-                return true;
-            }
-        }
-
-        value = default;
-        return false;
-    }
-
-    private static bool IsCategorical(object? value) =>
-        value is string text && !IsNumeric(text);
-
-    private static bool IsNumeric(object? value) =>
-        value switch
-        {
-            byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal => true,
-            string text => double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out _),
-            _ => false
-        };
-
-    private static string BuildTitle(string prompt, string chartType, string x, string y)
-    {
-        var title = prompt.Trim();
-        if (title.Length > 72)
-        {
-            title = title[..72].TrimEnd() + "...";
-        }
-
-        return string.IsNullOrWhiteSpace(title)
-            ? $"{ToTitleCase(chartType)} chart of {y} by {x}"
-            : title;
-    }
-
-    private static string ToTitleCase(string value) =>
-        value.Length == 0 ? value : char.ToUpperInvariant(value[0]) + value[1..];
-
-    private static string SanitizeId(string requestId)
-    {
-        var chars = requestId
-            .Where(ch => char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.')
-            .Take(64)
-            .ToArray();
-
-        return chars.Length == 0 ? "chart" : new string(chars);
+        private static bool IsCat(object? v) => v is string s && !IsNum(s);
+        private static bool IsNum(object? v) => v is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal || (v is string s && double.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out _));
     }
 }
-

@@ -340,7 +340,17 @@ public record DataChartGenerated(string RequestId, UiSurface Surface) : Synapse(
 [GenerateSerializer]
 public record DataChartFailed(string RequestId, string Reason) : Synapse(nameof(DataChartFailed), DateTimeOffset.UtcNow);
 
+// First-class chart interaction and modification (conversational + selection driven)
+[GenerateSerializer]
+public record ChartCommand(string SurfaceId, string Instruction, string? Context = null) : Synapse(nameof(ChartCommand), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ChartInteraction(string SurfaceId, string Kind, IReadOnlyDictionary<string, object?> Payload) : Synapse(nameof(ChartInteraction), DateTimeOffset.UtcNow);
+
 public interface IDataVisualizationNeuron : INeuron, IHandle<VisualizeDataRequest> { }
+
+// Chart neuron supports agent metadata for routing + full conversational + selection driven updates.
+public interface IChartNeuron : INeuronAgent, IHandle<VisualizeDataRequest>, IHandle<ChartCommand>, IHandle<ChartInteraction> { }
 
 // Closed loops for marketplace (UI authoring via Dart MCP + widget tree; SoftwareEngineering runtime mod via Aspire MCP + LLM)
 
