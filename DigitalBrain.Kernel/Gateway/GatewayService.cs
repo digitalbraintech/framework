@@ -98,8 +98,9 @@ public sealed class GatewayService(
     // Server-driven UI: stream RfwCards to the client as neurons broadcast them, until the client disconnects.
     public override async Task WatchHomeFeed(WatchHomeFeedRequest request, IServerStreamWriter<RfwCardEnvelope> responseStream, ServerCallContext context)
     {
-        var loginSurface = await grains.GetGrain<IUserSessionNeuron>("session-main").BuildLoginSurfaceAsync("flutter");
-        await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(loginSurface, "session-main"));
+        logger.LogInformation("WatchHomeFeed opened for {Peer}", context.Peer);
+        await WriteCardAsync(responseStream, UiSurfaceRfwBridge.FromUiSurface(UiSurfaceSamples.Login(clientId: "flutter"), "session-main"));
+        logger.LogInformation("WatchHomeFeed sent initial login surface to {Peer}", context.Peer);
 
         using var subscription = homeFeedBus.Subscribe();
         await foreach (var card in subscription.Reader.ReadAllAsync(context.CancellationToken))

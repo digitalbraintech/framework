@@ -28,11 +28,20 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     if (isAspireHosted)
     {
-        options.ConfigureEndpointDefaults(listen => listen.Protocols = HttpProtocols.Http2);
-        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
-        if (int.TryParse(webPort, out var port))
+        var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var grpcPort in grpcPorts)
         {
-            options.ListenAnyIP(port, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
+            if (int.TryParse(grpcPort, out var grpcEndpointPort))
+            {
+                options.ListenAnyIP(grpcEndpointPort, listen => listen.Protocols = HttpProtocols.Http2);
+            }
+        }
+
+        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
+        if (int.TryParse(webPort, out var webEndpointPort))
+        {
+            options.ListenAnyIP(webEndpointPort, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
         }
         return;
     }
@@ -165,13 +174,26 @@ if (serveWebBundle)
 var grainFactory = app.Services.GetService<IGrainFactory>();
 if (grainFactory != null)
 {
-    var status = grainFactory.GetGrain<ISystemStatus>("status-main");
-    _ = status.GetTimelineAsync();
-    _ = grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync();
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var status = grainFactory.GetGrain<ISystemStatus>("status-main");
+                await status.GetTimelineAsync();
+                await grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync();
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogWarning(ex, "Kernel startup neuron warmup failed.");
+            }
+        });
+    });
 }
 
 app.Run();
