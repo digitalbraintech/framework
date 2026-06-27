@@ -103,6 +103,23 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             }
             catch { /* best effort seed */ }
         });
+
+        // Emit live marketplace surfaces on start (UI kit driven: lists with install/run actions as synapses).
+        // Uses seeds for immediate visibility; refreshed post-install in MarketplaceNeuron.
+        var publishedForStart = MarketplaceSeeds.LocalUiPacks;
+        var marketList = UiSurfaceLiveData.MarketplaceListFromPacks(publishedForStart, Array.Empty<NeuroPack>());
+        await FireAsync(marketList);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketList, Self.Value));
+        }
+
+        var installedStart = UiSurfaceLiveData.InstalledBundlesFromPacks(publishedForStart, Array.Empty<NeuroPack>());
+        await FireAsync(installedStart);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(installedStart, Self.Value));
+        }
     }
 
     public async Task HandleAsync(RestartResource cmd)
@@ -355,6 +372,18 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         // Deliver the full pack (with Code) so the host neuron can compile + embody it; then trigger a use.
         await generated.DeliverAsync(new NeuroPackInstalled(pack));
         await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated"));
+
+        // Refresh installed bundles surface (and marketplace list) so UI sees update live via kit.
+        // (Real query uses journals/cache; seeds + this pack for immediate.)
+        var pub = new List<NeuroPack> { pack };
+        var inst = new List<NeuroPack> { pack };
+        var refInst = UiSurfaceLiveData.InstalledBundlesFromPacks(pub, inst);
+        await FireAsync(refInst);
+        var bus2 = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus2 != null)
+        {
+            bus2.Broadcast(UiSurfaceRfwBridge.FromUiSurface(refInst, Self.Value));
+        }
 
         Logger.LogInformation("Marketplace INSTALL {Key} by {Buyer}. Commission {Rate:P0} taken for seller {Seller}.",
             cmd.PackName + "@" + cmd.Version, cmd.BuyerId, pack.CommissionRate, pack.OwnerId);

@@ -23,6 +23,39 @@ public sealed class GatewayService(
                 return request;
             }
 
+            // Generic surface action dispatch (from UI kit RFW events / descriptors).
+            // Supports install from MarketplaceList + run experiences from InstalledBundles via neurons/synapses.
+            if (request.TypeName == nameof(InstallFromMarketplace) || request.TypeName.Contains("InstallFromMarketplace", StringComparison.OrdinalIgnoreCase))
+            {
+                var market = grains.GetGrain<IMarketplaceNeuron>("market-main");
+                // payload json carries props (packName/version/buyerId from surface action)
+                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+                var p = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr) ?? new();
+                var packName = p.TryGetValue("packName", out var pn) ? pn?.ToString() ?? p.GetValueOrDefault("name")?.ToString() ?? "" : "";
+                var ver = p.TryGetValue("version", out var v) ? v?.ToString() ?? "" : "";
+                var buyer = p.TryGetValue("buyerId", out var b) ? b?.ToString() ?? "current-user" : "current-user";
+                if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
+                await market.FireAsync(new InstallFromMarketplace(packName, ver, buyer));
+                return request;
+            }
+
+            if (request.TypeName == nameof(InoRequest) || request.TypeName.Contains("InoRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                var ino = grains.GetGrain<IInoNeuron>("ino-main");
+                // minimal: treat as demo for now or parse prompt; real would use props
+                await ino.FireAsync(new DemoMessageSynapse("UI action: " + request.TypeName));
+                return request;
+            }
+
+            // Fallback to resolver for other surface actions (experience run etc.)
+            try
+            {
+                var neuron = NeuronResolver.Resolve(grains, request.TypeName.Contains("market", StringComparison.OrdinalIgnoreCase) ? "market-main" : "ino-main");
+                await neuron.FireAsync(new DemoMessageSynapse("surface-action:" + request.TypeName));
+                return request;
+            }
+            catch { }
+
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Unsupported synapse envelope type: " + request.TypeName));
         }
         catch (RpcException)
