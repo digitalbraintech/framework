@@ -206,5 +206,7 @@ Neurons (System, UI kit pack, embodied packs) are the authors of the shell. Clie
 - Verification: builds, tests 16/16, doctor 4/4, analyze clean, flutter-ui MCP restart.
 - Continued one-by-one: Refactored menu construction to BuildShellMenuItems() local to prepare for dynamic from neuron (no more inline new[] for items).
 - Verification: msbuild CoreCompile, Ui tests 16/16 --no-build, doctor 4/4.
-- Next: actually drive the list from live data like seeds or installed packs for "dynamic menu of available/interesting neurons". Commit + ritual.
-- All changes committed one-by-one as requested.
+- Continued: Made the menu data-driven (array of (label, target) + yield) so it can be populated from real data (seeds, installed packs, etc.) without changing structure. Divider example kept.
+- Verification: msbuild, Ui tests 16/16 --no-build, aspire doctor 4/4 (MCP).
+- Next one-by-one: populate the data array dynamically from MarketplaceSeeds.LocalUiPacks or similar live list (as neuron:MenuItem or NeuronButton). Then commit.
+- All one by one + ritual + commits.

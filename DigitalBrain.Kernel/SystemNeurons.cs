@@ -157,30 +157,27 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
 
         // Main UI is UiSurface based. Emit an app-shell surface that can drive the entire thin host chrome + nav.
         // Neurons (and packs after embodiment) build and own this dynamically.
-        static IEnumerable<DigitalBrain.Core.UiWidgetTree> BuildShellMenuItems() =>
-        [
-            new(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
+        // Dynamic menu data (in real flow a neuron/pack would emit the list of interesting/ installed experiences)
+        static IEnumerable<DigitalBrain.Core.UiWidgetTree> BuildShellMenuItems()
+        {
+            var items = new[]
             {
-                ["label"] = "Marketplace",
-                ["targetSurfaceKind"] = UiSurfaceKinds.MarketplaceList
-            }),
-            new(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>()),
-            new(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
+                ("Marketplace", UiSurfaceKinds.MarketplaceList),
+                ("Tasks", UiSurfaceKinds.TaskManager),
+                ("INO Chat", "chat"),
+                ("Timeline", UiSurfaceKinds.Timeline)
+            };
+            foreach (var (label, target) in items)
             {
-                ["label"] = "Tasks",
-                ["targetSurfaceKind"] = UiSurfaceKinds.TaskManager
-            }),
-            new(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
-            {
-                ["label"] = "INO Chat",
-                ["targetSurfaceKind"] = "chat"
-            }),
-            new(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
-            {
-                ["label"] = "Timeline",
-                ["targetSurfaceKind"] = UiSurfaceKinds.Timeline
-            })
-        ];
+                yield return new(DigitalBrain.Core.NeuronUiKit.MenuItem, new Dictionary<string, object?>
+                {
+                    ["label"] = label,
+                    ["targetSurfaceKind"] = target
+                });
+            }
+            // Example divider from kit (separators can be emitted too)
+            yield return new(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>());
+        }
 
         var mainShellTree = new DigitalBrain.Core.UiWidgetTree(
             "app-shell",
