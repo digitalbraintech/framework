@@ -74,7 +74,6 @@ internal static class TravelCards
         b.Append("widget root = VStack(gap: 12.0, children: [\n");
         b.Append("  Panel(radius: 20.0, padding: 18.0, child: VStack(gap: 6.0, cross: \"start\", children: [\n");
         b.Append("    SectionLabel(text: \"WEATHER\"),\n");
-        b.Append($"    Text(text: \"{w.Destination}\", variant: \"subtitle\"),\n");
         b.Append("    Text(text: data.weather.headline, variant: \"heading\"),\n");
         b.Append("  ])),\n");
         b.Append("  ...for f in data.flights:\n");

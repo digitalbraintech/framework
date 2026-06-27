@@ -24,6 +24,8 @@ public class TravelPackTests
         return doc.RootElement.GetProperty("source").GetString()!;
     }
 
+    static string DataJson(UiSurface s) => (string)s.Props["dataJson"]!;
+
     [Fact]
     public void Start_emits_intro_surface_with_weather_and_flights()
     {
@@ -34,7 +36,7 @@ public class TravelPackTests
         Assert.Equal("travel-intro", SurfaceId(surface));
         var src = Source(surface);
         Assert.Contains("WEATHER", src);
-        Assert.Contains("Bali", src);
+        Assert.Contains("Bali", DataJson(surface));
         Assert.Contains("ExperienceStep", src);      // flight Select button wires a step
         Assert.Contains("flight.selected", src);
     }
