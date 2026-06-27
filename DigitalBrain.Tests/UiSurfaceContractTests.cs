@@ -9,6 +9,7 @@ public class UiSurfaceContractTests
     {
         { UiSurfaceSamples.ActivityGraph(), new[] { "nodes", "edges", "events" } },
         { UiSurfaceSamples.TaskWindow(), new[] { "taskId", "state", "body", UiSurfaceKeys.Actions } },
+        { UiSurfaceSamples.TaskManager(), new[] { "totals", "tasks" } },
         { UiSurfaceSamples.UserInput(), new[] { "prompt", "schema", "submitAction", "cancelAction" } },
         { UiSurfaceSamples.MarketplaceList(), new[] { "packs", "installAction", "updateAction" } },
         { UiSurfaceSamples.InstalledBundles(), new[] { "bundles", "experiences" } },
@@ -39,6 +40,7 @@ public class UiSurfaceContractTests
     {
         Assert.Equal("activity-graph", UiSurfaceKinds.ActivityGraph);
         Assert.Equal("task-window", UiSurfaceKinds.TaskWindow);
+        Assert.Equal("task-manager", UiSurfaceKinds.TaskManager);
         Assert.Equal("user-input", UiSurfaceKinds.UserInput);
         Assert.Equal("marketplace-list", UiSurfaceKinds.MarketplaceList);
         Assert.Equal("installed-bundles", UiSurfaceKinds.InstalledBundles);

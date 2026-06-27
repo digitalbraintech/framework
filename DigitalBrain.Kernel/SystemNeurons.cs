@@ -71,6 +71,38 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             ["workbenchPanels"] = new[] { "tasks", "graph", "market", "chat", "timeline" }
         };
         await FireAsync(new UiSurface(KernelUiSurfaceKinds.Dashboard, dashboardProps));
+
+        // Emit task manager surface (via kit) so user sees productive task view immediately on start.
+        var recentEvents = OutgoingJournal.Concat(IncomingJournal).ToList();
+        var taskSurface = UiSurfaceLiveData.TaskManagerFromTasks(recentEvents);
+        await FireAsync(taskSurface);
+
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var card = UiSurfaceRfwBridge.FromUiSurface(taskSurface, Self.Value);
+            bus.Broadcast(card);
+
+            // Direct card using prepared client template root (matches kTaskManagerCardSource shape).
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = taskSurface.Props.GetValueOrDefault("totals"),
+                tasks = taskSurface.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
+
+        // Seed a visible startup task so the manager shows real work item right away.
+        var demoId = new TaskId("startup-" + cmd.AppName);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var kt = GrainFactory.GetGrain<IKernelTask>(demoId);
+                await kt.FireAsync(new RunTask(demoId, "Explore the live Task Manager (UI kit on startup)"));
+            }
+            catch { /* best effort seed */ }
+        });
     }
 
     public async Task HandleAsync(RestartResource cmd)
@@ -1162,11 +1194,42 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         }
         await FireAsync(new TaskProgress(cmd.TaskId, "finalizing"));
         await FireAsync(new TaskCompleted(cmd.TaskId, result));
+
+        // Refresh task manager card on feed so UI sees live state (UI kit driven).
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent);
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = tm.Props.GetValueOrDefault("totals"),
+                tasks = tm.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
     }
 
     public async Task HandleAsync(CancelTask cmd)
     {
         await FireAsync(new TaskCancelled(cmd.TaskId));
+
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent);
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = tm.Props.GetValueOrDefault("totals"),
+                tasks = tm.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
     }
 
     public Task<TaskInfo> GetInfoAsync()

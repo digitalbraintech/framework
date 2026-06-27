@@ -32,7 +32,8 @@ var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
 var flutterUiPath = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, "..", "..", "app"));
 if (Directory.Exists(flutterUiPath))
 {
-    ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows");
+    ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")
+        .WithReference(kernel);
 }
 
 if (ctx.EnableMcp)

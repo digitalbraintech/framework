@@ -42,6 +42,7 @@ public static class UiSurfaceKinds
     public const string Ide = "ide";
     public const string ActivityGraph = "activity-graph";
     public const string TaskWindow = "task-window";
+    public const string TaskManager = "task-manager";
     public const string UserInput = "user-input";
     public const string MarketplaceList = "marketplace-list";
     public const string InstalledBundles = "installed-bundles";
@@ -302,6 +303,32 @@ public static class UiSurfaceSamples
             Y: "sales",
             Summary: "2 rows. Bar chart of sales by month."));
 
+    public static UiSurface TaskManager() => new(
+        UiSurfaceKinds.TaskManager,
+        WithCommon(
+            surfaceId: "surface.task-manager.demo",
+            emitter: "kernel",
+            title: "Task Manager",
+            layout: UiSurfaceLayouts.Panel,
+            priority: 20,
+            props: new Dictionary<string, object?>
+            {
+                ["totals"] = new Dictionary<string, object?> { ["active"] = 1, ["completed"] = 2, ["failed"] = 0 },
+                ["tasks"] = new[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["correlationId"] = "t1",
+                        ["shortHash"] = "abc123",
+                        ["originNeuron"] = "demo",
+                        ["originIcon"] = "task",
+                        ["ageMs"] = 1234,
+                        ["edgeCount"] = 3,
+                        ["status"] = "running"
+                    }
+                }
+            }));
+
     public static UiSurface DataChart(string surfaceId, string emitter, ChartSpec spec) => new(
         UiSurfaceKinds.DataChart,
         WithCommon(
@@ -377,7 +404,8 @@ public static class UiSurfaceLiveData
         {
             InstalledBundlesFromPacks(publishedPacks, installedPacks),
             ActivityGraphFromTimeline(graphTimeline, maxEvents),
-            MarketplaceListFromPacks(publishedPacks, installedPacks)
+            MarketplaceListFromPacks(publishedPacks, installedPacks),
+            TaskManagerFromTasks(taskTimelines.SelectMany(t => t.Timeline).ToList(), maxEvents)
         };
 
         surfaces.AddRange(ChartSurfacesFromTimeline(chartTimeline ?? timelineEvents, maxEvents));
@@ -570,6 +598,56 @@ public static class UiSurfaceLiveData
             .Concat(direct)
             .TakeLast(maxEvents)
             .ToArray();
+    }
+
+    public static UiSurface TaskManagerFromTasks(IReadOnlyList<Synapse> taskEvents, int maxEvents = 10)
+    {
+        var created = taskEvents.OfType<TaskCreated>().ToList();
+        var progresses = taskEvents.OfType<TaskProgress>().ToList();
+        var completed = taskEvents.OfType<TaskCompleted>().ToList();
+        var cancelled = taskEvents.OfType<TaskCancelled>().ToList();
+
+        int activeCount = Math.Max(0, created.Count - completed.Count - cancelled.Count);
+
+        var taskRows = created.TakeLast(maxEvents).Select(c =>
+        {
+            var latest = progresses.LastOrDefault(p => p.TaskId == c.TaskId);
+            string status = completed.Any(x => x.TaskId == c.TaskId) ? "completed"
+                : cancelled.Any(x => x.TaskId == c.TaskId) ? "cancelled"
+                : latest != null ? "running:" + latest.Detail : "created";
+
+            return new Dictionary<string, object?>
+            {
+                ["correlationId"] = c.SynapseId,
+                ["shortHash"] = c.TaskId.Value.Length > 8 ? c.TaskId.Value[..8] : c.TaskId.Value,
+                ["originNeuron"] = c.Sender?.Value ?? "kernel",
+                ["originIcon"] = "task",
+                ["ageMs"] = (int)(DateTimeOffset.UtcNow - c.Timestamp).TotalMilliseconds,
+                ["edgeCount"] = 1,
+                ["status"] = status
+            };
+        }).ToArray();
+
+        var totals = new Dictionary<string, object?>
+        {
+            ["active"] = activeCount,
+            ["completed"] = completed.Count,
+            ["failed"] = 0
+        };
+
+        return new UiSurface(
+            UiSurfaceKinds.TaskManager,
+            WithCommon(
+                surfaceId: "surface.task-manager.live",
+                emitter: "kernel.task",
+                title: "Task Manager",
+                layout: UiSurfaceLayouts.Panel,
+                priority: 20,
+                props: new Dictionary<string, object?>
+                {
+                    ["totals"] = totals,
+                    ["tasks"] = taskRows
+                }));
     }
 
     private static Dictionary<string, object?> BundleRow(NeuroPack pack)
