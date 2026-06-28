@@ -86,4 +86,17 @@ public class TravelPackTests
         var activities = OnlySurface(pack.Handle(Step("events.skipped")));
         Assert.Equal("travel-activities", SurfaceId(activities));
     }
+
+    [Fact]
+    public void Each_hop_carries_active_experience_marker()
+    {
+        var pack = new TravelPackBehavior();
+        var intro = OnlySurface(pack.Handle(Step("start", ("prompt", "plan a trip to Bali next month"))));
+        Assert.Contains("\"activeExperience\":\"travel/plan-trip\"", DataJson(intro));
+        Assert.Contains("\"surfaceId\":\"travel-intro\"", DataJson(intro));
+
+        var hotels = OnlySurface(pack.Handle(Step("flight.selected", ("flightId", "FL-001"))));
+        Assert.Contains("\"activeExperience\":\"travel/plan-trip\"", DataJson(hotels));
+        Assert.Contains("\"surfaceId\":\"travel-hotels\"", DataJson(hotels));
+    }
 }

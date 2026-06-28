@@ -169,19 +169,16 @@ internal static class TravelCards
         return Surface("travel-summary", data);
     }
 
-    public static UiSurface Surface(string surfaceId, object data)
-    {
-        var props = new Dictionary<string, object?>
-        {
-            ["libraryName"] = "digitalbrain",
-            ["rootWidget"] = "root",
-            ["dataJson"] = JsonSerializer.Serialize(data, Json),
-            [UiSurfaceKeys.SurfaceId] = surfaceId,
-            [UiSurfaceKeys.Emitter] = "travel",
-            [UiSurfaceKeys.Title] = "Plan a trip",
-        };
-        return new UiSurface(UiSurface.RfwKind, props);
-    }
+    public static UiSurface Surface(string surfaceId, object data) =>
+        UiSurface.ForExperienceHop(
+            pack: "travel",
+            experienceId: "plan-trip",
+            surfaceId: surfaceId,
+            libraryName: "digitalbrain",
+            rootWidget: "root",
+            dataJson: JsonSerializer.Serialize(data, Json),
+            title: "Plan a trip",
+            emitter: "travel");
 }
 
 public sealed class TravelPackBehavior : IPackBehavior
