@@ -1,5 +1,7 @@
 namespace DigitalBrain.Core;
 
+using System.Text.Json.Nodes;
+
 /// <summary>
 /// The single canonical dynamic UI payload. All UI (shell chrome, navigation, views, widgets, and even the main app layout)
 /// is expressed and streamed as UiSurface instances emitted by neurons (or embodied packs).
@@ -30,6 +32,40 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
             ["dataJson"] = dataJson
         };
         if (source is not null) props["source"] = source;
+        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+
+        return new UiSurface(RfwKind, props);
+    }
+
+    /// Creates an RFW hop surface tagged so an experience host can recognize it and pick the
+    /// active hop. The marker is merged INTO dataJson (the RFW bridge forwards Props["dataJson"]
+    /// verbatim, so a top-level prop alone would never reach the Flutter client).
+    public static UiSurface ForExperienceHop(
+        string pack,
+        string experienceId,
+        string surfaceId,
+        string libraryName,
+        string rootWidget,
+        string dataJson,
+        string? title = null,
+        string? emitter = null)
+    {
+        var experienceRef = $"{pack}/{experienceId}";
+        var payload = JsonNode.Parse(dataJson) as JsonObject ?? new JsonObject();
+        payload["activeExperience"] = experienceRef;
+        payload["experienceId"] = experienceId;
+        payload["surfaceId"] = surfaceId;
+
+        var props = new Dictionary<string, object?>
+        {
+            ["libraryName"] = libraryName,
+            ["rootWidget"] = rootWidget,
+            ["dataJson"] = payload.ToJsonString(),
+            ["activeExperience"] = experienceRef,
+            ["experienceId"] = experienceId,
+            [UiSurfaceKeys.SurfaceId] = surfaceId,
+        };
+        if (title is not null) props[UiSurfaceKeys.Title] = title;
         if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
 
         return new UiSurface(RfwKind, props);
