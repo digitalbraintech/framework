@@ -260,3 +260,41 @@ both green; non-E2E suite 163 pass / 0 fail; aspire doctor 4/4.
   do) — a real UX gap for experiences; the gateway publish path is now reachable but has no auth (RejectUnsigned
   still gates install); consider an empty-pack/embodiment-failed guard so a failed publish/install surfaces an
   error instead of a silent render timeout.
+
+## 2026-06-28 — Experiences get a first-class full-screen home (branch experiences-shell-host off master e2db26a)
+Closed the UX gap from Task D: an Experience is a guided multi-hop journey but had no full-screen rendering —
+live pack surfaces only appeared as cascading floating panels on the canvas. Now an Experience renders as a
+coherent full-screen journey that advances hop-in-place on a dedicated route. Subagent-driven (9 tasks, TDD,
+per-task spec+quality review + final opus whole-branch review both repos = Ready to merge, 0 Critical/Important).
+Spec+plan under docs/superpowers/{specs,plans}/2026-06-28-experiences-shell-host*.
+- **The marker trap (key insight).** A hop is tagged with `activeExperience` = "<pack>/<experienceId>". It MUST
+  be merged INTO the wire `dataJson`, not just a top-level prop: `UiSurfaceRfwBridge.FromUiSurface` forwards
+  `props["dataJson"]` verbatim for RFW surfaces, so a top-level prop never reaches Flutter's `_decode`. New Core
+  helper `UiSurface.ForExperienceHop(pack, experienceId, surfaceId, lib, root, dataJson, title?, emitter?)` does
+  the JsonNode merge in Core (pack stays Core+BCL). `CorrelationId == surfaceId` (bridge already prefers
+  props[surfaceId]). `TravelPack` emits its 5 hops through it; `ExperienceHopBridgeTests` pins the round-trip.
+- **Dedicated experience-host route (app, separate repo, branch experiences-shell-host off prod/sp1-remote-endpoint).**
+  New `/#/experience` + `/#/experience/:pack/:experienceId` → `ExperienceHostScreen`: subscribes to WatchHomeFeed,
+  keeps the LATEST envelope whose decoded data has a matching `activeExperience`, renders only it full-screen,
+  replacing the prior hop in place. Chrome-free + a minimal back affordance. The inline-RFW render path was
+  EXTRACTED from `ForuiAppShell._renderEnvelope` into shared `lib/rfw_host/inline_rfw_surface.dart`
+  (`buildInlineRfwSurface`) — shell delegates to it behavior-identically (still passes no semanticsId); the host
+  passes `semanticsId == correlationId == surfaceId` (the E2E linchpin: `flt-semantics-identifier`). Shell + canvas
+  untouched → merged canvas E2E does not regress.
+- **ExperienceFlowDriver (E2E ergonomics).** `DigitalBrain.Tests/E2E/ExperienceFlowDriver.cs` generalizes
+  publish/self-sign/install → OpenAsync (nav to the experience route + wait-for-WatchHomeFeed, subscribe-before-emit)
+  → TriggerExperienceAsync/TapAsync → AssertHopRendersAsync (waits on flt-semantics-identifier, count==1, per-hop
+  screenshot to AppContext.BaseDirectory/e2e-screenshots; on failure dumps browser console/page-errors/DOM and
+  rethrows). Fixture gained headed/headless (`DIGITALBRAIN_E2E_HEADED`/`_HEADLESS`) + `_SLOWMO` toggles (default
+  preserved: local headed, CI headless). Dart-MCP widget-tree/runtime-error inspection is documented as a SEPARATE
+  manual recipe (debug `flutter run` has a DTD; the release Playwright bundle does not). `TravelPlanTripRendersE2ETests`
+  rewritten onto the driver (~10 lines), now targeting the experience route (not /#/canvas). Authoring a new
+  experience E2E is now ~10 lines.
+- **Verification:** brain build clean; fast suite 167 pass / 1 skip / 0 fail (baseline 163 + 4 new: ForExperienceHop ×2,
+  travel marker ×1, bridge ×1); app `flutter analyze` clean (76 pre-existing) + `flutter test` 11/11; aspire doctor 4/4;
+  the rewritten browser E2E PASSED 1/1 on the experience route (all 5 hops full-screen). Both repos final-reviewed
+  Ready to merge.
+- **Deferred follow-ups:** shell "Plan a trip" entry button (route reached by deep-link this phase); card-tap →
+  ExperienceStep gateway mapping (host `_onSurfaceEvent` is a no-op; E2E drives hops natively); per-user (not
+  per-install) flow state; NeuroPack→Domain rename; cross-origin E2E; unit test for the ForExperienceHop
+  empty/malformed-dataJson guard branch.
