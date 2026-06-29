@@ -1177,6 +1177,28 @@ public static class UiSurfaceLiveData
                 userId,
                 sessionId);
         }
+        else if (pack.Name.Equals("hello-world", StringComparison.OrdinalIgnoreCase))
+        {
+            yield return ExperienceRow(
+                pack,
+                "open",
+                "Open",
+                "experience",
+                "Enter your name and get a greeting.",
+                UiSurfaceSamples.SynapseAction(
+                    "open-hello-world",
+                    "Open",
+                    nameof(ExperienceUsed),
+                    new Dictionary<string, object?>
+                    {
+                        ["packName"] = pack.Name,
+                        ["action"] = "open",
+                        // The launcher button forwards props["targetSurfaceKind"] to onNavSelected → shell _goTo → context.go.
+                        ["targetSurfaceKind"] = "/experience/hello-world/hello-world"
+                    }),
+                userId,
+                sessionId);
+        }
         else if (pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase) || pack.Name.Contains("DevPack", StringComparison.OrdinalIgnoreCase))
         {
             yield return ExperienceRow(
@@ -1344,6 +1366,7 @@ public static class UiSurfaceLiveData
     private static bool IsPreinstalledLocalPack(NeuroPack pack) =>
         pack.Name.StartsWith("DigitalBrain.UI", StringComparison.Ordinal) ||
         pack.Name.StartsWith("DigitalBrain.Experience", StringComparison.Ordinal) ||
+        pack.Name.Equals("hello-world", StringComparison.OrdinalIgnoreCase) ||
         pack.Name.Contains("Dummy", StringComparison.OrdinalIgnoreCase);
 
     private static IReadOnlyDictionary<string, object?> WithCommon(

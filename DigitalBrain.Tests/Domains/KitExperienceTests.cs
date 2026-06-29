@@ -80,4 +80,19 @@ public class KitExperienceTests
         Assert.True(pack.CanHandle(Step("start")));
         Assert.Contains(pack.GetManifest().HandledSynapseTypes, t => t.Value == nameof(ExperienceStep));
     }
+
+    [Fact]
+    public void HelloWorld_pack_source_is_present_and_explicit_usings()
+    {
+        var code = DigitalBrain.Tests.E2E.Packs.HelloWorldPackSource.Code;
+        Assert.Contains("using DigitalBrain.Core;", code);
+        Assert.Contains(": KitExperience", code);
+        Assert.DoesNotContain("/* TODO", code);
+    }
+
+    [Fact]
+    public void Seeds_include_hello_world_pack()
+    {
+        Assert.Contains(MarketplaceSeeds.LocalUiPacks, p => p.Name == "hello-world");
+    }
 }

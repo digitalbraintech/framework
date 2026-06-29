@@ -68,6 +68,30 @@ public static class MarketplaceSeeds
             "Packed Telegram bot integration. No core logic; install via marketplace, configure token, wires via synapses or gRPC. Reusable across brains.",
             "Installable Telegram bot experience. Aspire-executable or process pack for distribution and reuse."),
 
+        new NeuroPack(
+            "hello-world",
+            "1.0.0",
+            "digitalbraintech",
+            false,
+            0.0,
+            """
+using System.Collections.Generic;
+using DigitalBrain.Core;
+
+public sealed class HelloWorldExperience : KitExperience
+{
+    protected override UiExperience Define() => Experience("hello-world", "Hello World")
+        .Hop("ask", s => s
+            .Text("What's your name?")
+            .TextField("name", "Your name")
+            .Button("Greet", "greeting"))
+        .Hop("greeting", s => s
+            .Panel(p => p.Text(state =>
+                $"Hello {(state.TryGetValue(\"name\", out var n) && n.Length > 0 ? n : \"World\")}!")));
+}
+""",
+            "Hello World — the smallest ui: kit app: enter your name, press Greet, see a greeting."),
+
         // Dummy for dev testing of full typed-C# behavior pack flow (packaging + publish + share + install + embody).
         new NeuroPack(
             "Dummy.BehaviorPack",
