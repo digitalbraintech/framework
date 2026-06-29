@@ -27,9 +27,9 @@ public sealed class UiExperience
 public sealed class UiHop
 {
     public string Id { get; }
-    internal List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = new();
+    public List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = new();
 
-    internal UiHop(string id) => Id = id;
+    public UiHop(string id) => Id = id;
 
     public UiHop Text(string text)
     {
@@ -63,6 +63,27 @@ public sealed class UiHop
         body(inner);
         Factories.Add(state => new UiWidgetTree(Ui.Panel, new Dictionary<string, object?>(),
             inner.Factories.Select(factory => factory(state)).ToList()));
+        return this;
+    }
+
+    public UiHop Checkbox(string name, string label)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Checkbox,
+            new Dictionary<string, object?> { ["name"] = name, ["label"] = label }));
+        return this;
+    }
+
+    public UiHop Switch(string name, string label)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Switch,
+            new Dictionary<string, object?> { ["name"] = name, ["label"] = label }));
+        return this;
+    }
+
+    public UiHop TextArea(string name, string placeholder = "")
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.TextArea,
+            new Dictionary<string, object?> { ["name"] = name, ["placeholder"] = placeholder }));
         return this;
     }
 }

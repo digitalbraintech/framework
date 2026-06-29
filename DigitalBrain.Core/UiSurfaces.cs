@@ -151,6 +151,9 @@ public static class Ui
     public const string TextField = "ui:TextField";
     public const string Button = "ui:Button";
     public const string Panel = "ui:Panel";
+    public const string Checkbox = "ui:Checkbox";
+    public const string Switch = "ui:Switch";
+    public const string TextArea = "ui:TextArea";
 }
 
 [GenerateSerializer]

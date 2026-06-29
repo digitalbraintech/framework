@@ -95,4 +95,20 @@ public class KitExperienceTests
     {
         Assert.Contains(MarketplaceSeeds.LocalUiPacks, p => p.Name == "hello-world");
     }
+
+    [Fact]
+    public void Checkbox_switch_textarea_emit_named_input_nodes()
+    {
+        var hop = new UiHop("h");
+        hop.Checkbox("agree", "I agree").Switch("notify", "Notify me").TextArea("bio", "About you");
+        var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
+
+        Assert.Equal(DigitalBrain.Core.Ui.Checkbox, nodes[0].Type);
+        Assert.Equal("agree", nodes[0].Props["name"]);
+        Assert.Equal("I agree", nodes[0].Props["label"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Switch, nodes[1].Type);
+        Assert.Equal("notify", nodes[1].Props["name"]);
+        Assert.Equal(DigitalBrain.Core.Ui.TextArea, nodes[2].Type);
+        Assert.Equal("About you", nodes[2].Props["placeholder"]);
+    }
 }
