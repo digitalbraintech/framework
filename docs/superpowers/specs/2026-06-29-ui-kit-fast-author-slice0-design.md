@@ -30,7 +30,7 @@ Hello World is the **acceptance test** for the whole loop. Once the slice exists
 - **Build order:** thin vertical slice first (this doc), then fan out the kit.
 - **App unit:** an app **is an `Experience`** (guided hops) rendered by the existing experience-host. Hello World = 2 hops (`ask` → `greeting`).
 - **Render path (Approach 1):** components are **typed kit nodes** carried as a `UiWidgetTree` on the wire, rendered by **one-Dart-file-per-component ForUI covers**. RFW is kept only for rich custom widgets outside the core kit.
-- **Flag A — kit prefix:** new `kit:` node prefix (clean curated catalog) rather than overloading `neuron:`/`forui:`.
+- **Flag A — ui prefix:** new `ui:` node prefix (clean curated catalog) rather than overloading `neuron:`/`forui:`.
 - **Flag B — launch trigger:** the client routes a `kind:"experience"` marketplace action to `/#/experience/<pack>/<experienceId>` (one small, documented piece of client routing knowledge for Slice 0; can move fully server-driven later).
 - **Flag C — hot-reload surface:** a dev-only CLI watch command (`dbt author <file.cs> [--watch]`), not an Aspire resource.
 
@@ -50,23 +50,23 @@ HelloWorldExperience.cs       ──►   Roslyn → collectible ALC      ──
 
 ### A. Kit vocabulary — Core (`DigitalBrain.Core`)
 
-Extend the kit vocabulary with **5 stable `kit:` node types** and a typed builder per node that produces `UiWidgetTree` (the existing record in `UiSurfaces.cs`). No new wire types beyond `UiWidgetTree`.
+Extend the kit vocabulary with **5 stable `ui:` node types** and a typed builder per node that produces `UiWidgetTree` (the existing record in `UiSurfaces.cs`). No new wire types beyond `UiWidgetTree`.
 
-| Kit node | Role | App ForUI cover |
+| UI node | Role | App ForUI cover |
 |---|---|---|
-| `kit:Screen` | vertical hop root container | `kit/kit_screen.dart` → `FScaffold`/`Column` |
-| `kit:Text` | text/label (static or `ctx`-bound) | `kit/kit_text.dart` → ForUI text style |
-| `kit:TextField` | bound input (writes a named value into hop state) | `kit/kit_text_field.dart` → `FTextField` |
-| `kit:Button` | action button (fires `ExperienceStep` to advance) | `kit/kit_button.dart` → `FButton` |
-| `kit:Panel` | surface card | `kit/kit_panel.dart` → `FCard` |
+| `ui:Screen` | vertical hop root container | `ui_kit/ui_screen.dart` → `FScaffold`/`Column` |
+| `ui:Text` | text/label (static or `ctx`-bound) | `ui_kit/ui_text.dart` → ForUI text style |
+| `ui:TextField` | bound input (writes a named value into hop state) | `ui_kit/ui_text_field.dart` → `FTextField` |
+| `ui:Button` | action button (fires `ExperienceStep` to advance) | `ui_kit/ui_button.dart` → `FButton` |
+| `ui:Panel` | surface card | `ui_kit/ui_panel.dart` → `FCard` |
 
-The kit constants live alongside `NeuronUiKit` in `DigitalBrain.Core/UiSurfaces.cs` (e.g. a `Kit` static class). Each builder is a small pure function `UiWidgetTree` factory.
+The `ui:` constants live alongside `NeuronUiKit` in `DigitalBrain.Core/UiSurfaces.cs` (a `Ui` static class). Each builder is a small pure-function `UiWidgetTree` factory.
 
-### B. Kit covers — app (`app/lib/kit/`)
+### B. Kit covers — app (`app/lib/ui_kit/`)
 
-New folder, **one Dart file per component**, each a thin cover over a ForUI widget, plus `kit_registry.dart` mapping `kit:<Name>` → builder. The existing tree-walk in `lib/rfw_host/rfw_runtime_host.dart` (which already dispatches `neuron:*` / `forui:*` nodes) gains an **additive** `kit:*` branch delegating to the registry. No rewrite of existing rendering.
+New folder, **one Dart file per component**, each a thin cover over a ForUI widget, plus `ui_registry.dart` mapping `ui:<Name>` → builder. The existing tree-walk in `lib/rfw_host/rfw_runtime_host.dart` (which already dispatches `neuron:*` / `forui:*` nodes) gains an **additive** `ui:*` branch delegating to the registry. No rewrite of existing rendering.
 
-Pattern for the future 20–30: add a Core node const + builder, add one `kit/kit_x.dart` cover, register it — nothing else.
+Pattern for the future 20–30: add a Core node const + builder, add one `ui_kit/ui_x.dart` cover, register it — nothing else.
 
 ### C. Authoring API — Core (`DigitalBrain.Core`)
 
@@ -129,8 +129,8 @@ Faster than today because the current path edits `MarketplaceSeeds.cs` → **rec
 
 ## Testing & verification
 
-- **Core/Kernel (TDD, fast suite `--filter Category!=E2E`):** `KitExperience` state machine + value capture; `ForExperienceHopTree` marker round-trip; each `kit:` builder's node output.
-- **App:** widget test per `kit/kit_*.dart` cover + a hop-render test mirroring `test/features/experience/experience_hop_view_test.dart`.
+- **Core/Kernel (TDD, fast suite `--filter Category!=E2E`):** `KitExperience` state machine + value capture; `ForExperienceHopTree` marker round-trip; each `ui:` builder's node output.
+- **App:** widget test per `ui_kit/ui_*.dart` cover + a hop-render test mirroring `test/features/experience/experience_hop_view_test.dart`.
 - **E2E (gated, runs real):** Hello World on `ExperienceFlowDriver` (~10 lines): open from marketplace → assert `ask` hop → type "Alice" → tap `Greet` → assert `greeting` shows "Hello Alice!" via `flt-semantics-identifier`.
 - **Ritual after changes:** `dotnet build`; fast `dotnet test`; `flutter analyze` + `flutter test`; `aspire doctor`; one intentional `aspire run` to watch the hot-loop drive Hello World live before declaring done.
 
@@ -142,20 +142,20 @@ Faster than today because the current path edits `MarketplaceSeeds.cs` → **rec
 | Hand-written RFW/JSON | yes | **none** |
 | Kernel recompile + restart to see it | yes | **no** (hot-loop) |
 | Launch from marketplace UI | deep-link / E2E only | **click → full-screen** |
-| New kit component | edit the 50-widget mega-file | 1 Core const+builder + 1 `kit/` file + register |
+| New kit component | edit the 50-widget mega-file | 1 Core const+builder + 1 `ui_kit/` file + register |
 
 ## Edit-points map (where the work lands)
 
 **brain:**
-- `DigitalBrain.Core/UiSurfaces.cs` — `Kit` node consts + `ForExperienceHopTree`.
+- `DigitalBrain.Core/UiSurfaces.cs` — `Ui` node consts (`ui:*`) + `ForExperienceHopTree`.
 - `DigitalBrain.Core/` (new) — kit fluent builder + `KitExperience` base.
 - `DigitalBrain.Core/MarketplaceSeeds.cs` — seed the Hello World pack; `UiSurfaceLiveData` experience-kind run action.
 - `DigitalBrain.Cli/` — `dbt author [--watch]` command.
 - `DigitalBrain.Tests/` — unit tests + the E2E driver test (under `E2E/`).
 
 **app:**
-- `lib/kit/` (new) — 5 `kit_*.dart` covers + `kit_registry.dart`.
-- `lib/rfw_host/rfw_runtime_host.dart` — additive `kit:*` dispatch branch.
+- `lib/ui_kit/` (new) — 5 `ui_*.dart` covers + `ui_registry.dart`.
+- `lib/rfw_host/rfw_runtime_host.dart` — additive `ui:*` dispatch branch.
 - `lib/features/experience/experience_hop_view.dart` — typed-tree render branch.
 - `lib/grpc/action_dispatch.dart` (or router) — `kind:"experience"` → experience route (Flag B).
 - `test/` — kit cover widget tests + hop-render test.
