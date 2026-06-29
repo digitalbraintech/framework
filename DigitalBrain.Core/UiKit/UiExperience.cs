@@ -158,4 +158,31 @@ public sealed class UiHop
         Factories.Add(_ => new UiWidgetTree(Ui.Gap, new Dictionary<string, object?> { ["size"] = size }));
         return this;
     }
+
+    public UiHop Heading(string text)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Heading, new Dictionary<string, object?> { ["text"] = text }));
+        return this;
+    }
+
+    public UiHop Icon(string name)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Icon, new Dictionary<string, object?> { ["name"] = name }));
+        return this;
+    }
+
+    public UiHop Avatar(string? imageUrl = null, string? fallback = null)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Avatar, new Dictionary<string, object?>
+        {
+            ["imageUrl"] = imageUrl ?? string.Empty, ["fallback"] = fallback ?? string.Empty
+        }));
+        return this;
+    }
+
+    public UiHop Badge(string text)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Badge, new Dictionary<string, object?> { ["text"] = text }));
+        return this;
+    }
 }

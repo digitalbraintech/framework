@@ -147,4 +147,20 @@ public class KitExperienceTests
         Assert.Equal(DigitalBrain.Core.Ui.Gap, nodes[3].Type);
         Assert.Equal(8.0, nodes[3].Props["size"]);
     }
+
+    [Fact]
+    public void Display_a_nodes_emit_typed_props()
+    {
+        var hop = new UiHop("h");
+        hop.Heading("Title").Icon("star").Avatar(fallback: "AB").Badge("New");
+        var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
+        Assert.Equal(DigitalBrain.Core.Ui.Heading, nodes[0].Type);
+        Assert.Equal("Title", nodes[0].Props["text"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Icon, nodes[1].Type);
+        Assert.Equal("star", nodes[1].Props["name"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Avatar, nodes[2].Type);
+        Assert.Equal("AB", nodes[2].Props["fallback"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Badge, nodes[3].Type);
+        Assert.Equal("New", nodes[3].Props["text"]);
+    }
 }

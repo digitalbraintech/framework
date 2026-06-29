@@ -163,6 +163,10 @@ public static class Ui
     public const string Divider = "ui:Divider";
     public const string Header = "ui:Header";
     public const string Gap = "ui:Gap";
+    public const string Heading = "ui:Heading";
+    public const string Icon = "ui:Icon";
+    public const string Avatar = "ui:Avatar";
+    public const string Badge = "ui:Badge";
 }
 
 [GenerateSerializer]
