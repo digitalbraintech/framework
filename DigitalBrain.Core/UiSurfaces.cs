@@ -84,6 +84,28 @@ public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)
 
         return new UiSurface(WidgetTreeKind, props);
     }
+
+    // Typed-tree sibling of ForExperienceHop: an experience hop whose payload is a UiWidgetTree of ui:* nodes.
+    // Markers live in Props; UiSurfaceRfwBridge merges them into the wire dataJson and keys correlation on surfaceId.
+    public static UiSurface ForExperienceHopTree(
+        string pack,
+        string experienceId,
+        string surfaceId,
+        UiWidgetTree tree,
+        string? title = null,
+        string? emitter = null)
+    {
+        var props = new Dictionary<string, object?>
+        {
+            ["tree"] = tree,
+            ["activeExperience"] = $"{pack}/{experienceId}",
+            ["experienceId"] = experienceId,
+            [UiSurfaceKeys.SurfaceId] = surfaceId,
+        };
+        if (title is not null) props[UiSurfaceKeys.Title] = title;
+        if (emitter is not null) props[UiSurfaceKeys.Emitter] = emitter;
+        return new UiSurface(WidgetTreeKind, props);
+    }
 }
 
 /// Declarative widget tree emitted by neurons inside UiSurface (WidgetTreeKind).
@@ -119,6 +141,16 @@ public static class NeuronUiKit
     public const string Select = "forui:FSelect";
     public const string Notification = "forui:FNotification";
     public const string Toast = "forui:Toast";
+}
+
+// Curated UI-kit vocabulary (Slice 0). Each node is a thin ForUI cover on the client.
+public static class Ui
+{
+    public const string Screen = "ui:Screen";
+    public const string Text = "ui:Text";
+    public const string TextField = "ui:TextField";
+    public const string Button = "ui:Button";
+    public const string Panel = "ui:Panel";
 }
 
 [GenerateSerializer]
