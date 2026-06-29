@@ -298,3 +298,45 @@ Spec+plan under docs/superpowers/{specs,plans}/2026-06-28-experiences-shell-host
   ExperienceStep gateway mapping (host `_onSurfaceEvent` is a no-op; E2E drives hops natively); per-user (not
   per-install) flow state; NeuroPack→Domain rename; cross-origin E2E; unit test for the ForExperienceHop
   empty/malformed-dataJson guard branch.
+
+## 2026-06-29 — Slice 0: typed `ui:` UI-kit + fast authoring loop ("Hello World on rails")
+Subagent-driven (11 tasks, TDD, per-task spec+quality review). Spec+plan under
+docs/superpowers/{specs,plans}/2026-06-29-ui-kit-fast-author-slice0*. Branch `ui-kit-fast-author-slice0`
+(both repos), merged locally to master/main (no push). Goal: a new UI app authorable as ONE ~15-line C#
+file, rendered full-screen from the marketplace with NO kernel recompile/restart. Hello World
+(name → Greet → "Hello {name}!") is the acceptance test, proven by a browser E2E that RAN+PASSED.
+- **Render path (Approach 1, typed nodes on the wire).** Components are typed `ui:` nodes (`Ui` consts in
+  `DigitalBrain.Core/UiSurfaces.cs`: Screen/Text/TextField/Button/Panel) carried as a `UiWidgetTree`.
+  `UiSurface.ForExperienceHopTree(pack, experienceId, surfaceId, tree, title?, emitter?)` emits a
+  `WidgetTreeKind` hop. The Kernel bridge `UiSurfaceRfwBridge` (widget-tree branch) now merges the
+  `activeExperience`/`experienceId`/`surfaceId` markers into the wire dataJson and keys `CorrelationId` on
+  `surfaceId` (root widget `WidgetTreeHost`). App side: one Dart file per component in `app/lib/ui_kit/` as
+  ForUI covers (FButton/FCard/FTextField-via-`FTextFieldControl.lifted`), assembled by `ui_registry.buildUiNode`;
+  an ADDITIVE `ui:*` branch in `UiSurfaceTreeRenderer.build` (rfw_runtime_host.dart) delegates to it;
+  `experience_hop_view.dart` renders a typed tree under `Semantics(identifier: surfaceId)` (the E2E linchpin),
+  falling back to the RFW path otherwise.
+- **Authoring API.** `KitExperience : IPackBehavior` (Core/UiKit) + fluent `UiExperience`/`UiHop` builders.
+  Author writes only `Define()`. The base runs the ExperienceStep state machine, accumulates flow state,
+  bakes state-dependent text at emit time (client stays dumb), injects pack/experienceId into `ui:Button`
+  nodes (recursively, incl. panel-nested), and emits each hop via `ForExperienceHopTree`. pack==experienceId.
+- **Marketplace open/run.** `hello-world` pack seeded (`MarketplaceSeeds.HelloWorldPackCode` = single source of
+  truth; `HelloWorldPackSource.Code` in tests delegates to it). `UiSurfaceLiveData.ExperiencesForPack` gives it
+  a Run action with `targetSurfaceKind = "/experience/hello-world/hello-world"` → shell `_goTo` → route; the
+  host auto-fires `start` on the first feed card (race-free). Button taps fire `ExperienceStep` via
+  `buildActionEnvelope` over the unary Send.
+- **Hot-loop.** `dbt author <file> [--watch]` (DigitalBrain.Cli, gRPC client generated from digitalbrain.proto):
+  self-signs a NeuroPack (passes the install signing gate), publishes+installs into the LIVE cluster — no
+  kernel recompile/restart. `--watch` surfaces errors + cancels cleanly on Ctrl+C.
+- **Key trap (re)confirmed.** A pack source string MUST NOT use `\"` escapes inside a C# raw string literal
+  (`"""`): `\` is literal there, so the Roslyn/ALC standalone compile fails → PackEmbodimentException → the
+  pack silently never embodies. The seed hit this; fixed via string concat + a `{ Length: >0 }` property
+  pattern. The E2E is the regression guard.
+- **Verification.** brain build clean + 174 pass/1 skip/0 fail; app analyze clean + 35/35; aspire doctor 4/4;
+  HelloWorld browser E2E RAN+PASSED (ask + greeting hops full-screen, "Hello Alice!"). Final whole-branch
+  reviews (opus ×2) BOTH "Ready to merge", 0 Critical/0 Important.
+- **Deferred follow-ups (non-blocking):** (1) bridge drops `title` for widget-tree hops — forward
+  `UiSurfaceKeys.Title` in the marker loop, or drop the arg; (2) `buildActionEnvelope` could coerce props to
+  `Map<String,String>` to future-proof non-string `ui:` inputs; (3) per-pack (not per-user) flow state in
+  `KitExperience._state`; (4) CLI default gateway `https://localhost:7080` — wire to the real Aspire port;
+  (5) live `aspire run` hot-loop demo (the file-watch reload path is not covered by the E2E); (6) fan the kit
+  out to the full ~20–30 components (sub-project B).
