@@ -54,12 +54,19 @@ public static class UiSurfaceRfwBridge
 
         if (surface.Kind == UiSurface.WidgetTreeKind && surface.Props.TryGetValue("tree", out var treeObj))
         {
-            // For widget trees we still use a lightweight RFW wrapper that the client knows how to expand into ForUI + sub RFW.
-            // Real power: neuron can emit ForRfw or ForWidgetTree and client renders the tree.
-            var dataJson = JsonSerializer.Serialize(new { tree = treeObj, kind = surface.Kind });
-            return new RfwCard("digitalbrain", "WidgetTreeHost", dataJson)
+            var payload = new Dictionary<string, object?> { ["tree"] = treeObj, ["kind"] = surface.Kind };
+            // Carry experience markers so the experience host can match the hop and key its semantics on the surfaceId.
+            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId })
             {
-                CorrelationId = surface.CorrelationId ?? surface.SynapseId
+                if (surface.Props.TryGetValue(markerKey, out var markerValue) && markerValue is not null)
+                    payload[markerKey] = markerValue;
+            }
+            var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
+                ? sidStr
+                : surface.CorrelationId ?? surface.SynapseId;
+            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload))
+            {
+                CorrelationId = correlation
             };
         }
 
