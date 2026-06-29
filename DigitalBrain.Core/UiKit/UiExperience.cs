@@ -27,9 +27,9 @@ public sealed class UiExperience
 public sealed class UiHop
 {
     public string Id { get; }
-    public List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = new();
+    internal List<Func<IReadOnlyDictionary<string, string>, UiWidgetTree>> Factories { get; } = new();
 
-    public UiHop(string id) => Id = id;
+    internal UiHop(string id) => Id = id;
 
     public UiHop Text(string text)
     {
