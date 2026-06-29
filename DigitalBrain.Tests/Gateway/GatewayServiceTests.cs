@@ -33,7 +33,9 @@ public class GatewayServiceTests : IAsyncLifetime
     public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
 
     private GatewayService NewService() =>
-        new(_cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus, NullLogger<GatewayService>.Instance);
+        new(_cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+            new FakeHostEnvironment(),
+            NullLogger<GatewayService>.Instance);
 
     [Fact]
     public async Task Ask_Ino_ReturnsNonEmptyReply()
@@ -58,6 +60,21 @@ public class GatewayServiceTests : IAsyncLifetime
 
         var timeline = await svc.Timeline(new TimelineRequest { NeuronId = "demo-fire", MaxEntries = 10 }, TestContext());
         Assert.Contains(timeline.Entries, e => e.Type == nameof(DemoMessageSynapse) && e.Text.Contains("ping-123"));
+    }
+
+    [Fact]
+    public async Task WatchHomeFeed_Writes_Login_Surface_To_New_Client()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var writer = new CapturingServerStreamWriter<RfwCardEnvelope>(() => cts.Cancel());
+        var svc = NewService();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            svc.WatchHomeFeed(new WatchHomeFeedRequest(), writer, TestContext(cts.Token)));
+
+        var card = Assert.Single(writer.Messages);
+        Assert.Contains("\"kind\":\"login\"", card.DataJson);
+        Assert.Contains("\"synapseType\":\"LoginRequest\"", card.DataJson);
     }
 
     [Fact]
@@ -110,7 +127,25 @@ public class GatewayServiceTests : IAsyncLifetime
             surface.CorrelationId == "ui-demo-test");
     }
 
-    private static ServerCallContext TestContext() => TestServerCallContext.Create();
+    private static ServerCallContext TestContext(CancellationToken cancellationToken = default) =>
+        TestServerCallContext.Create(cancellationToken);
+
+    private sealed class CapturingServerStreamWriter<T>(Action? afterFirstWrite = null) : IServerStreamWriter<T>
+    {
+        public List<T> Messages { get; } = new();
+        public WriteOptions? WriteOptions { get; set; }
+
+        public Task WriteAsync(T message)
+        {
+            Messages.Add(message);
+            if (Messages.Count == 1)
+            {
+                afterFirstWrite?.Invoke();
+            }
+
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class GatewaySiloConfig : ISiloConfigurator
     {
@@ -119,6 +154,8 @@ public class GatewayServiceTests : IAsyncLifetime
         public void Configure(ISiloBuilder siloBuilder) => siloBuilder
             .AddMemoryGrainStorageAsDefault()
             .AddMemoryStreams("Default")
+            .AddMemoryStreams("HomeFeed")
+            .AddMemoryGrainStorage("PubSubStore")
             .ConfigureServices(services =>
             {
                 services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());

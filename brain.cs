@@ -25,11 +25,47 @@ if (withTelegram)
 }
 if (withFlutter)
 {
-    var flutterPath = System.IO.Path.GetFullPath(System.IO.Path.Combine(builder.AppHostDirectory, "..", "app"));
-    if (System.IO.Directory.Exists(flutterPath))
+    var flutterPath = ResolveFlutterAppPath(builder);
+    if (!string.IsNullOrEmpty(flutterPath))
     {
         ctx.AddFlutterClient("flutter-ui", flutterPath, "windows");
     }
+    else
+    {
+        Console.WriteLine("[brain.cs] WARNING: Flutter app directory not found. Use --flutter only when the 'app' folder is discoverable or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+    }
+}
+
+static string? ResolveFlutterAppPath(IDistributedApplicationBuilder b)
+{
+    var flutterPathEnv = Environment.GetEnvironmentVariable("DIGITALBRAIN_FLUTTER_APP_PATH");
+    if (!string.IsNullOrWhiteSpace(flutterPathEnv) && System.IO.Directory.Exists(flutterPathEnv))
+        return System.IO.Path.GetFullPath(flutterPathEnv);
+
+    var appHostDir = b.AppHostDirectory;
+    var candidates = new[]
+    {
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "app")),
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(appHostDir, "..", "..", "app")),
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "app")),
+        System.IO.Path.GetFullPath(System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "..", "app")),
+    };
+
+    foreach (var c in candidates)
+    {
+        if (System.IO.Directory.Exists(c) && System.IO.File.Exists(System.IO.Path.Combine(c, "pubspec.yaml")))
+            return c;
+    }
+
+    var dir = new System.IO.DirectoryInfo(appHostDir);
+    for (int i = 0; i < 6 && dir?.Parent != null; i++)
+    {
+        var candidate = System.IO.Path.Combine(dir.FullName, "app");
+        if (System.IO.Directory.Exists(candidate) && System.IO.File.Exists(System.IO.Path.Combine(candidate, "pubspec.yaml")))
+            return System.IO.Path.GetFullPath(candidate);
+        dir = dir.Parent;
+    }
+    return null;
 }
 
 builder.Build().Run();

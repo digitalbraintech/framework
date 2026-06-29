@@ -9,7 +9,9 @@ public class UiSurfaceContractTests
     {
         { UiSurfaceSamples.ActivityGraph(), new[] { "nodes", "edges", "events" } },
         { UiSurfaceSamples.TaskWindow(), new[] { "taskId", "state", "body", UiSurfaceKeys.Actions } },
+        { UiSurfaceSamples.TaskManager(), new[] { "totals", "tasks" } },
         { UiSurfaceSamples.UserInput(), new[] { "prompt", "schema", "submitAction", "cancelAction" } },
+        { UiSurfaceSamples.Login(), new[] { "clientId", "fields", "submitAction", "tree" } },
         { UiSurfaceSamples.MarketplaceList(), new[] { "packs", "installAction", "updateAction" } },
         { UiSurfaceSamples.InstalledBundles(), new[] { "bundles", "experiences" } },
         { UiSurfaceSamples.Timeline(), new[] { "events", "filters" } },
@@ -39,7 +41,9 @@ public class UiSurfaceContractTests
     {
         Assert.Equal("activity-graph", UiSurfaceKinds.ActivityGraph);
         Assert.Equal("task-window", UiSurfaceKinds.TaskWindow);
+        Assert.Equal("task-manager", UiSurfaceKinds.TaskManager);
         Assert.Equal("user-input", UiSurfaceKinds.UserInput);
+        Assert.Equal("login", UiSurfaceKinds.Login);
         Assert.Equal("marketplace-list", UiSurfaceKinds.MarketplaceList);
         Assert.Equal("installed-bundles", UiSurfaceKinds.InstalledBundles);
         Assert.Equal("timeline", UiSurfaceKinds.Timeline);
@@ -52,6 +56,9 @@ public class UiSurfaceContractTests
         var userInput = UiSurfaceSamples.UserInput();
         AssertSynapseAction(userInput.Props["submitAction"], nameof(InoRequest));
         AssertSynapseAction(userInput.Props["cancelAction"], nameof(DemoMessageSynapse));
+
+        var login = UiSurfaceSamples.Login();
+        AssertSynapseAction(login.Props["submitAction"], nameof(LoginRequest));
 
         var marketplace = UiSurfaceSamples.MarketplaceList();
         AssertSynapseAction(marketplace.Props["installAction"], nameof(InstallFromMarketplace));
@@ -108,6 +115,35 @@ public class UiSurfaceContractTests
     }
 
     [Fact]
+    public void Live_Marketplace_Surface_Scopes_Install_Actions_To_User_Session()
+    {
+        var surface = UiSurfaceLiveData.MarketplaceListFromPacks(
+            new[]
+            {
+                new NeuroPack(
+                    "DigitalBrain.UIKit.ForUI",
+                    "0.1.0",
+                    "digitalbraintech",
+                    Description: "ForUI primitive pack")
+            },
+            Array.Empty<NeuroPack>(),
+            "alice",
+            "session-1");
+
+        Assert.Equal("alice", surface.Props["userId"]);
+        Assert.Equal("session-1", surface.Props["sessionId"]);
+
+        var installProps = AssertActionProps(surface.Props["installAction"], nameof(InstallFromMarketplace));
+        Assert.Equal("alice", installProps["buyerId"]);
+        Assert.Equal("alice", installProps["userId"]);
+        Assert.Equal("session-1", installProps["sessionId"]);
+
+        var updateProps = AssertActionProps(surface.Props["updateAction"], nameof(InstallFromMarketplace));
+        Assert.Equal("alice", updateProps["buyerId"]);
+        Assert.Equal("session-1", updateProps["sessionId"]);
+    }
+
+    [Fact]
     public void Live_InstalledBundles_Surface_Exposes_Runnable_Experiences()
     {
         var surface = UiSurfaceLiveData.InstalledBundlesFromPacks(
@@ -126,6 +162,64 @@ public class UiSurfaceContractTests
 
         var workbench = experiences.Single(experience => Equals(experience["name"], "Open Workbench"));
         AssertSynapseAction(workbench["action"], nameof(InoRequest));
+
+        // Launcher scenarios for dev dogfood: Dummy.DevPack must expose runnable self-test + emit surface (ExperienceUsed)
+        Assert.Contains(bundles, b => Equals(b["name"], "Dummy.BehaviorPack") || Equals(b["name"], "Dummy.DevPack"));
+        Assert.Contains(experiences, e => Equals(e["name"], "Run self-test"));
+        Assert.Contains(experiences, e => Equals(e["name"], "Emit test surface"));
+        Assert.Contains(experiences, e => Equals(e["name"], "Gmail Insights"));
+    }
+
+    [Fact]
+    public void Live_InstalledBundles_Surface_Scopes_Experience_Actions_To_User_Session()
+    {
+        var surface = UiSurfaceLiveData.InstalledBundlesFromPacks(
+            MarketplaceSeeds.LocalUiPacks,
+            Array.Empty<NeuroPack>(),
+            "alice",
+            "session-1");
+
+        Assert.Equal("alice", surface.Props["userId"]);
+        Assert.Equal("session-1", surface.Props["sessionId"]);
+
+        var experiences = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            surface.Props["experiences"]);
+        var selfTest = experiences.Single(experience => Equals(experience["name"], "Run self-test"));
+        var actionProps = AssertActionProps(selfTest["action"], nameof(ExperienceUsed));
+
+        Assert.Equal("alice", selfTest["userId"]);
+        Assert.Equal("session-1", selfTest["sessionId"]);
+        Assert.Equal("alice", actionProps["userId"]);
+        Assert.Equal("session-1", actionProps["sessionId"]);
+    }
+
+    [Fact]
+    public void Live_TaskManager_Surface_Scopes_Task_Actions_To_User_Session()
+    {
+        var taskId = new TaskId("task-alice-1");
+        var surface = UiSurfaceLiveData.TaskManagerFromTasks(
+            new Synapse[] { new TaskCreated(taskId, "Summarize latest mail") },
+            userId: "alice",
+            sessionId: "session-1");
+
+        Assert.Equal("alice", surface.Props["userId"]);
+        Assert.Equal("session-1", surface.Props["sessionId"]);
+
+        var runProps = AssertActionProps(surface.Props["runAction"], nameof(RunTask));
+        Assert.Equal("alice", runProps["userId"]);
+        Assert.Equal("session-1", runProps["sessionId"]);
+
+        var rows = Assert.IsAssignableFrom<IEnumerable<IReadOnlyDictionary<string, object?>>>(
+            surface.Props["tasks"]);
+        var row = Assert.Single(rows);
+        Assert.Equal("task-alice-1", row["taskId"]);
+        Assert.Equal("alice", row["userId"]);
+        Assert.Equal("session-1", row["sessionId"]);
+
+        var cancelProps = AssertActionProps(row["cancelAction"], nameof(CancelTask));
+        Assert.Equal("task-alice-1", cancelProps["taskId"]);
+        Assert.Equal("alice", cancelProps["userId"]);
+        Assert.Equal("session-1", cancelProps["sessionId"]);
     }
 
     [Fact]
@@ -178,13 +272,63 @@ public class UiSurfaceContractTests
     private static void AssertCommonProp(UiSurface surface, string key) =>
         Assert.True(surface.Props.ContainsKey(key), $"{surface.Kind} is missing common prop '{key}'.");
 
-    private static void AssertSynapseAction(object? value, string expectedSynapseType)
+    private static IReadOnlyDictionary<string, object?> AssertSynapseAction(object? value, string expectedSynapseType)
     {
         var action = Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(value);
         Assert.NotEmpty((string)action[UiSurfaceKeys.ActionId]!);
         Assert.NotEmpty((string)action[UiSurfaceKeys.Label]!);
         Assert.Equal(expectedSynapseType, action[UiSurfaceKeys.SynapseType]);
         Assert.True(action.ContainsKey(UiSurfaceKeys.Props));
+        return action;
+    }
+
+    private static IReadOnlyDictionary<string, object?> AssertActionProps(object? value, string expectedSynapseType)
+    {
+        var action = AssertSynapseAction(value, expectedSynapseType);
+        return Assert.IsAssignableFrom<IReadOnlyDictionary<string, object?>>(action[UiSurfaceKeys.Props]);
+    }
+
+    [Fact]
+    public void NeuronUiKit_Consts_Are_Stable_For_Server_Driven_Trees()
+    {
+        Assert.Equal("neuron:Menu", DigitalBrain.Core.NeuronUiKit.Menu);
+        Assert.Equal("neuron:MenuItem", DigitalBrain.Core.NeuronUiKit.MenuItem);
+        Assert.Equal("neuron:ActionButton", DigitalBrain.Core.NeuronUiKit.ActionButton);
+        Assert.Equal("neuron:NeuronButton", DigitalBrain.Core.NeuronUiKit.NeuronButton);
+        Assert.Equal("neuron:Form", DigitalBrain.Core.NeuronUiKit.Form);
+        Assert.Equal("neuron:Header", DigitalBrain.Core.NeuronUiKit.Header);
+        Assert.Equal("neuron:Divider", DigitalBrain.Core.NeuronUiKit.Divider);
+    }
+
+    [Fact]
+    public void AppShell_Tree_Can_Use_NeuronUiKit_Menu_Items()
+    {
+        var shell = new DigitalBrain.Core.UiWidgetTree(
+            "app-shell",
+            new Dictionary<string, object?> { ["activeContent"] = "marketplace-list" },
+            new List<DigitalBrain.Core.UiWidgetTree>
+            {
+                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Header, new Dictionary<string, object?> { ["title"] = "DigitalBrain" }),
+                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Menu, new Dictionary<string, object?>(),
+                    new[]
+                    {
+                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
+                            new Dictionary<string, object?> { ["label"] = "Marketplace", ["targetSurfaceKind"] = "marketplace-list" }),
+                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>()),
+                        new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.MenuItem,
+                            new Dictionary<string, object?> { ["label"] = "Tasks", ["targetSurfaceKind"] = "task-manager" })
+                    })
+            });
+
+        Assert.Equal("app-shell", shell.Type);
+        // header + menu
+        Assert.Equal(2, shell.Children!.Count);
+        var menu = shell.Children[1];
+        Assert.Equal(DigitalBrain.Core.NeuronUiKit.Menu, menu.Type);
+        Assert.Equal(3, menu.Children!.Count); // item + divider + item
+        Assert.Equal(DigitalBrain.Core.NeuronUiKit.MenuItem, menu.Children[0].Type);
+        Assert.Equal("Marketplace", menu.Children[0].Props["label"]);
+        Assert.Equal(DigitalBrain.Core.NeuronUiKit.Divider, menu.Children[1].Type);
     }
 }
 

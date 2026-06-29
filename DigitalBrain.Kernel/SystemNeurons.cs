@@ -71,6 +71,279 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             ["workbenchPanels"] = new[] { "tasks", "graph", "market", "chat", "timeline" }
         };
         await FireAsync(new UiSurface(KernelUiSurfaceKinds.Dashboard, dashboardProps));
+
+        // Emit task manager surface (via kit) so user sees productive task view immediately on start.
+        var recentEvents = OutgoingJournal.Concat(IncomingJournal).ToList();
+        var taskSurface = UiSurfaceLiveData.TaskManagerFromTasks(recentEvents);
+        await FireAsync(taskSurface);
+
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var card = UiSurfaceRfwBridge.FromUiSurface(taskSurface, Self.Value);
+            bus.Broadcast(card);
+
+            // Direct card using prepared client template root (matches kTaskManagerCardSource shape).
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = taskSurface.Props.GetValueOrDefault("totals"),
+                tasks = taskSurface.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
+
+        // Server enrichment (#5): emit task-manager surface carrying a UiWidgetTree (list primitive) for pure renderer body.
+        var taskItems = taskSurface.Props.TryGetValue("tasks", out var tk) ? tk : null;
+        var taskTree = new UiWidgetTree(
+            "list",
+            new Dictionary<string, object?> { ["items"] = taskItems });
+        var taskTreeSurface = new UiSurface(
+            UiSurfaceKinds.TaskManager,
+            new Dictionary<string, object?>
+            {
+                ["tree"] = taskTree,
+                [UiSurfaceKeys.Title] = taskSurface.Props.TryGetValue(UiSurfaceKeys.Title, out var tt) ? tt : "Tasks",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                ["tasks"] = taskItems
+            });
+        await FireAsync(taskTreeSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(taskTreeSurface, Self.Value));
+        }
+
+        // Seed a visible startup task so the manager shows real work item right away.
+        var demoId = new TaskId("startup-" + cmd.AppName);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var kt = GrainFactory.GetGrain<IKernelTask>(demoId);
+                await kt.FireAsync(new RunTask(demoId, "Explore the live Task Manager (UI kit on startup)"));
+            }
+            catch { /* best effort seed */ }
+        });
+
+        // Emit live marketplace surfaces on start (UI kit driven: lists with install/run actions as synapses).
+        // Uses seeds for immediate visibility; refreshed post-install in MarketplaceNeuron.
+        var publishedForStart = MarketplaceSeeds.LocalUiPacks;
+        var marketList = UiSurfaceLiveData.MarketplaceListFromPacks(publishedForStart, Array.Empty<NeuroPack>());
+        await FireAsync(marketList);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketList, Self.Value));
+        }
+
+        // Server enrichment (#5): emit marketplace-list surface carrying a UiWidgetTree (list primitive).
+        // Client now renders via UiSurfaceTreeRenderer (pure neuron-driven, no client synthesis for packs).
+        var marketPacks = marketList.Props.TryGetValue("packs", out var p) ? p : null;
+        // Buddy search via forui:FAutocomplete (Neuron UI Kit). Static names for demo; select/query fires UiInputSynapse.
+        var acItems = new[] { "DigitalBrain.UIKit.ForUI", "kernel", "INO", "Marketplace", "Tasks" };
+        var acProps = new Dictionary<string, object?> { ["hint"] = "Search buddies / packs", ["items"] = acItems };
+        var marketTree = new UiWidgetTree(
+            "column",
+            new Dictionary<string, object?>(),
+            new List<UiWidgetTree>
+            {
+                new UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Autocomplete, acProps),
+                new UiWidgetTree("list", new Dictionary<string, object?> { ["items"] = marketPacks })
+            });
+        var marketTreeSurface = new UiSurface(
+            UiSurfaceKinds.MarketplaceList,
+            new Dictionary<string, object?>
+            {
+                ["tree"] = marketTree,
+                [UiSurfaceKeys.Title] = marketList.Props.TryGetValue(UiSurfaceKeys.Title, out var t) ? t : "Marketplace",
+                [UiSurfaceKeys.Emitter] = Self.Value,
+                ["packs"] = marketPacks
+            });
+        await FireAsync(marketTreeSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketTreeSurface, Self.Value));
+        }
+
+        // Main UI is UiSurface based. Emit an app-shell surface that can drive the entire thin host chrome + nav.
+        // Neurons (and packs after embodiment) build and own this dynamically.
+        // Dynamic menu data - populated from seeds (in full system a neuron would provide the list of interesting/activated experiences as UiWidgetTree nodes)
+        static IEnumerable<DigitalBrain.Core.UiWidgetTree> BuildShellMenuItems()
+        {
+            var items = new List<(string Label, string? TargetSurfaceKind, IReadOnlyDictionary<string, object?>? Action)>
+            {
+                ("Marketplace", UiSurfaceKinds.MarketplaceList, null),
+                ("Installed", UiSurfaceKinds.InstalledBundles, null),
+                ("SE Hello World", "hello-world-se", null),
+                ("Tasks", UiSurfaceKinds.TaskManager, null),
+                ("INO Chat", "chat", null),
+                ("Timeline", UiSurfaceKinds.Timeline, null)
+            };
+            // Dynamic add from MarketplaceSeeds (example of neuron-driven list)
+            foreach (var seed in MarketplaceSeeds.LocalUiPacks.Where(p => p.Name.StartsWith("DigitalBrain.UI")).Take(1))
+            {
+                items.Add(($"Open {seed.Name}", "marketplace-list", null));
+            }
+            foreach (var (label, target, action) in items)
+            {
+                var itemProps = new Dictionary<string, object?> { ["label"] = label };
+                if (action != null) itemProps["action"] = action;
+                else if (target != null) itemProps["targetSurfaceKind"] = target;
+                yield return new(DigitalBrain.Core.NeuronUiKit.MenuItem, itemProps);
+            }
+            yield return new(DigitalBrain.Core.NeuronUiKit.Divider, new Dictionary<string, object?>());
+        }
+
+        var mainShellTree = new DigitalBrain.Core.UiWidgetTree(
+            DigitalBrain.Core.NeuronUiKit.Scaffold,
+            new Dictionary<string, object?>
+            {
+                ["title"] = "DigitalBrain",
+                ["activeContent"] = UiSurfaceKinds.MarketplaceList
+            },
+            new List<DigitalBrain.Core.UiWidgetTree>
+            {
+                new DigitalBrain.Core.UiWidgetTree(DigitalBrain.Core.NeuronUiKit.Header, new Dictionary<string, object?>
+                {
+                    ["title"] = "DigitalBrain"
+                }),
+                new DigitalBrain.Core.UiWidgetTree("forui:sidebar", new Dictionary<string, object?> { ["title"] = "DigitalBrain" },
+                    new List<DigitalBrain.Core.UiWidgetTree>(BuildShellMenuItems())),
+                new DigitalBrain.Core.UiWidgetTree("content", new Dictionary<string, object?>
+                {
+                    ["defaultView"] = UiSurfaceKinds.MarketplaceList
+                })
+            });
+
+        var appShellSurface = DigitalBrain.Core.UiSurface.ForWidgetTree(mainShellTree, title: "Main Shell", emitter: "shell-main");
+        // Also set the canonical kind so hosts can recognize it as the root chrome.
+        // (We keep the tree in Props; hosts that understand WidgetTreeKind render the full shell.)
+        await FireAsync(appShellSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(appShellSurface, Self.Value));
+        }
+
+        // Legacy shell chrome surface for incremental adoption (still useful for panels).
+        var shellSurface = new UiSurface(UiSurfaceKinds.ShellChrome, new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = "shell.primary",
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "NeuroUI Host Shell",
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["nav"] = new[]
+            {
+                new Dictionary<string, object?> { ["id"] = "market", ["label"] = "Marketplace", ["kind"] = UiSurfaceKinds.MarketplaceList },
+                new Dictionary<string, object?> { ["id"] = "tasks", ["label"] = "Tasks", ["kind"] = UiSurfaceKinds.TaskManager },
+                new Dictionary<string, object?> { ["id"] = "chat", ["label"] = "INO", ["kind"] = "chat" }
+            },
+            ["chrome"] = "forui-sidebar"
+        });
+        await FireAsync(shellSurface);
+        if (bus != null) bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(shellSurface, Self.Value));
+
+        var installedStart = UiSurfaceLiveData.InstalledBundlesFromPacks(publishedForStart, Array.Empty<NeuroPack>());
+        await FireAsync(installedStart);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(installedStart, Self.Value));
+        }
+
+        // Runtime-only Hello World from Software Engineering team (neuron driven, no Flutter view code).
+        // Button click flows as synapse to DemoNeuron which emits "toast" surface -> host shows ForUI notification.
+        var seHelloTree = new UiWidgetTree(
+            "fcard",
+            new Dictionary<string, object?> { ["title"] = "Software Engineering Team", ["subtitle"] = "Build • Pack • Bundle demo" },
+            new List<UiWidgetTree>
+            {
+                new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "All UI is neurons + synapses. Click to trigger ForUI notification at runtime." }),
+                new UiWidgetTree("fbutton", new Dictionary<string, object?>
+                {
+                    ["label"] = "Hello World!",
+                    [UiSurfaceKeys.SynapseType] = "DemoMessageSynapse",
+                    ["text"] = "hello-world"
+                })
+            });
+        var seHelloSurface = new UiSurface("hello-world-se", new Dictionary<string, object?>
+        {
+            ["tree"] = seHelloTree,
+            [UiSurfaceKeys.Title] = "SE Team Hello World",
+            [UiSurfaceKeys.Emitter] = Self.Value
+        });
+        await FireAsync(seHelloSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(seHelloSurface, Self.Value));
+        }
+
+        // Rich UI Kit demo surface (replaces static gallery .dart screen). Neurons emit full forui components via kit.
+        var richKitTree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
+        {
+            new UiWidgetTree("forui:fcard", new Dictionary<string, object?> { ["title"] = "ForUI Rich Kit (neuron emitted)" }),
+            new UiWidgetTree("forui:ftextfield", new Dictionary<string, object?> { ["label"] = "Pack name", ["hint"] = "Enter name" }),
+            new UiWidgetTree("forui:fbutton", new Dictionary<string, object?> { ["label"] = "Primary Action", ["variant"] = "primary" }),
+            new UiWidgetTree("forui:fbutton", new Dictionary<string, object?> { ["label"] = "Outline", ["variant"] = "outline" }),
+            new UiWidgetTree("forui:fselect", new Dictionary<string, object?> { ["label"] = "Choose demo", ["items"] = new[] { "Hello", "Market", "Tasks" } }),
+            new UiWidgetTree("neuron:divider", new Dictionary<string, object?>()),
+            new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "All UI is runtime from neurons using forui kit. No static .dart screens." })
+        });
+        var richKitSurface = new UiSurface("ui-kit-rich", new Dictionary<string, object?>
+        {
+            ["tree"] = richKitTree,
+            [UiSurfaceKeys.Title] = "ForUI Kit Demo",
+            [UiSurfaceKeys.Emitter] = Self.Value
+        });
+        await FireAsync(richKitSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(richKitSurface, Self.Value));
+        }
+
+        // Kit-driven INO Chat surface (replaces ino_chat_screen.dart). Messages list + input using forui kit.
+        var chatTree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
+        {
+            new UiWidgetTree("forui:fcard", new Dictionary<string, object?> { ["title"] = "INO Chat (neuron kit)" }),
+            new UiWidgetTree("list", new Dictionary<string, object?> { ["items"] = new[] {
+                new Dictionary<string, object?> { ["label"] = "User: Hello", ["subtitle"] = "" },
+                new Dictionary<string, object?> { ["label"] = "INO: How can I help build today?", ["subtitle"] = "" }
+            }}),
+            new UiWidgetTree("forui:ftextfield", new Dictionary<string, object?> { ["label"] = "Message", ["hint"] = "Ask INO..." }),
+            new UiWidgetTree("forui:fbutton", new Dictionary<string, object?> { ["label"] = "Send", ["synapseType"] = "InoRequest" })
+        });
+        var chatSurface = new UiSurface("chat", new Dictionary<string, object?>
+        {
+            ["tree"] = chatTree,
+            [UiSurfaceKeys.Title] = "INO Chat",
+            [UiSurfaceKeys.Emitter] = Self.Value
+        });
+        await FireAsync(chatSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(chatSurface, Self.Value));
+        }
+
+        // Seed a first-class live chart surface (uses GraphicSpec for rich interactive rendering via graphic package).
+        var demoChartData = new[]
+        {
+            new Dictionary<string, object?> { ["month"] = "Jan", ["sales"] = 42 },
+            new Dictionary<string, object?> { ["month"] = "Feb", ["sales"] = 58 },
+            new Dictionary<string, object?> { ["month"] = "Mar", ["sales"] = 31 },
+            new Dictionary<string, object?> { ["month"] = "Apr", ["sales"] = 71 },
+        };
+        var gspec = new GraphicSpec(
+            Title: "Demo Sales Trend (live chart)",
+            Data: demoChartData,
+            Variables: new Dictionary<string, object?>
+            {
+                ["month"] = new Dictionary<string, object?> { ["type"] = "ordinal" },
+                ["sales"] = new Dictionary<string, object?> { ["type"] = "linear" }
+            },
+            Marks: new[] { new Dictionary<string, object?> { ["kind"] = "line", ["position"] = "month*sales" } as IReadOnlyDictionary<string, object?> },
+            Summary: "4 months. Click points or use commands to filter/transform.");
+        var chartSurface = UiSurfaceSamples.Chart("surface.chart.demo", Self.Value, gspec);
+        await FireAsync(chartSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(chartSurface, Self.Value));
+        }
     }
 
     public async Task HandleAsync(RestartResource cmd)
@@ -230,15 +503,33 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     {
     }
 
-    public Task HandleAsync(PublishToMarketplace cmd)
+    public async Task HandleAsync(PublishToMarketplace cmd)
     {
+        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
+        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
+
+        if (useRemote && remote is not null)
+        {
+            await remote.PublishAsync(cmd);
+            // Remote is source of truth for catalog; still allow local journal for offline/hybrid.
+        }
+
         Logger.LogInformation("Marketplace PUBLISHED real pack {Name}@{Ver} owner={Owner} private={Private} commission={Rate:P0}",
             cmd.PackName, cmd.Version, cmd.OwnerId, cmd.IsPrivate, cmd.CommissionRate);
 
         // Update view for fast subsequent queries. The Publish synapse itself is journaled by the caller Fire.
         EnsureCache();
         _publishedCache![KeyFor(cmd.PackName, cmd.Version)] = ToNeuroPack(cmd);
-        return Task.CompletedTask;
+
+        // Emit refreshed marketplace surface so thin NeuroUI hosts (Flutter + future) see the update live from the neuron.
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        var published = _publishedCache!.Values.ToList();
+        var listSurface = UiSurfaceLiveData.MarketplaceListFromPacks(published, published);
+        await FireAsync(listSurface);
+        if (bus != null)
+        {
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(listSurface, Self.Value));
+        }
     }
 
     private static string KeyFor(string name, string version) => $"{name}@{version}";
@@ -248,6 +539,14 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 
     public async Task HandleAsync(InstallFromMarketplace cmd)
     {
+        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
+        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
+
+        if (useRemote && remote is not null)
+        {
+            await remote.InstallAsync(cmd);
+        }
+
         var pack = FindPublishedPack(cmd.PackName, cmd.Version);
         if (pack == null)
         {
@@ -322,7 +621,19 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         var generated = GrainFactory.GetGrain<IGeneratedNeuron>(genKey);
         // Deliver the full pack (with Code) so the host neuron can compile + embody it; then trigger a use.
         await generated.DeliverAsync(new NeuroPackInstalled(pack));
-        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated"));
+        await generated.FireAsync(new ExperienceUsed(pack.Name, "installed-and-activated", cmd.BuyerId, cmd.SessionId));
+
+        // Refresh installed bundles surface (and marketplace list) so UI sees update live via kit.
+        // (Real query uses journals/cache; seeds + this pack for immediate.)
+        var pub = new List<NeuroPack> { pack };
+        var inst = new List<NeuroPack> { pack };
+        var refInst = UiSurfaceLiveData.InstalledBundlesFromPacks(pub, inst, cmd.BuyerId, cmd.SessionId);
+        await FireAsync(refInst);
+        var bus2 = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus2 != null)
+        {
+            bus2.Broadcast(UiSurfaceRfwBridge.FromUiSurface(refInst, Self.Value));
+        }
 
         Logger.LogInformation("Marketplace INSTALL {Key} by {Buyer}. Commission {Rate:P0} taken for seller {Seller}.",
             cmd.PackName + "@" + cmd.Version, cmd.BuyerId, pack.CommissionRate, pack.OwnerId);
@@ -330,6 +641,16 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 
     public async Task HandleAsync(ListPublished _cmd)
     {
+        var remote = ServiceProvider.GetService<IRemoteMarketplaceClient>();
+        var useRemote = ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:UseRemote", false) ?? false;
+
+        if (useRemote && remote is not null)
+        {
+            var list = await remote.ListAsync();
+            await FireAsync(list);
+            return;
+        }
+
         var packs = GetPublishedPacks();
         Logger.LogInformation("Marketplace listing {Count} real packs", packs.Count);
         await FireAsync(new PublishedList(packs));
@@ -618,7 +939,21 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         if (_embodied is not null) return;
         var last = OutgoingJournal.Concat(IncomingJournal).OfType<NeuroPackInstalled>().LastOrDefault();
         if (last is not null)
+        {
             TryEmbody(last.Pack);
+            return;
+        }
+        // Preinstalled local seed packs (e.g. ui-gallery, hello-world) are shown in the installer but never
+        // receive a NeuroPackInstalled, so they were never embodied — opening one stalled on "Waiting for the
+        // experience to start". Embody such a pack on first use from the local catalog, keyed by grain id.
+        const string generatedPrefix = "generated-";
+        var packName = this.GetPrimaryKeyString() ?? string.Empty;
+        if (packName.StartsWith(generatedPrefix, StringComparison.OrdinalIgnoreCase))
+            packName = packName[generatedPrefix.Length..];
+        var seed = MarketplaceSeeds.LocalUiPacks.FirstOrDefault(pack =>
+            string.Equals(pack.Name, packName, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(pack.Code));
+        if (seed is not null)
+            TryEmbody(seed);
     }
 
     private async Task<bool> TryDispatchEmbodiedAsync(Synapse synapse)
@@ -689,6 +1024,12 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
 
     private async Task UseExperienceAsync(ExperienceUsed used)
     {
+        if (IsGmailInsightsExperience(used))
+        {
+            await RunGmailInsightsExperienceAsync(used);
+            return;
+        }
+
         EnsureEmbodied();
 
         // Real path: the pack's compiled code runs and we emit its actual output.
@@ -697,7 +1038,14 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
             var output = _embodied.Respond(used.Action);
             await FireAsync(new PackEmission(_embodied.PackName, used.Action, output));
             Logger.LogInformation("GeneratedNeuron ran embodied pack '{Pack}' for action '{Action}'", _embodied.PackName, used.Action);
-            return;
+            if (used.Action is "open" or "emit-test-surface" or "self-test")
+            {
+                var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live from embodied " + used.Pack }) });
+                var surf = new UiSurface(used.Pack, new Dictionary<string, object?> { [UiSurfaceKeys.Title] = used.Pack, ["pack"] = used.Pack, ["tree"] = winTree });
+                await FireAsync(surf);
+                var b = ServiceProvider.GetService<HomeFeedBus>();
+                b?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+            }
         }
 
         // Fallback for natural-language packs with no compilable Code: LLM "embodiment" (the legacy behavior).
@@ -713,17 +1061,196 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         if (chat is null)
         {
             await FireAsync(new LlmResponse(used.Pack, $"[Embodied: {packKey}] Simulated response to {used.Action} using installed experience.", "sim"));
-            return;
+        }
+        else
+        {
+            var behaviorPrompt = $"You are now the installed experience '{packKey}'.\n" +
+                                 $"Description: {desc}\n" +
+                                 $"Implementation guidance/code:\n{code}\n\n" +
+                                 $"Handle the following usage: {used.Action} on input related to '{used.Pack}'.\n" +
+                                 "Respond in character as this specific installed neuron/experience would. Be concise and useful.";
+            var response = await chat.GetResponseAsync(behaviorPrompt);
+            await FireAsync(new LlmResponse(behaviorPrompt, response.Text.Trim(), "embodied-pack"));
+            Logger.LogInformation("GeneratedNeuron LLM-embodied pack '{Pack}' for action '{Action}'", packKey, used.Action);
         }
 
-        var behaviorPrompt = $"You are now the installed experience '{packKey}'.\n" +
-                             $"Description: {desc}\n" +
-                             $"Implementation guidance/code:\n{code}\n\n" +
-                             $"Handle the following usage: {used.Action} on input related to '{used.Pack}'.\n" +
-                             "Respond in character as this specific installed neuron/experience would. Be concise and useful.";
-        var response = await chat.GetResponseAsync(behaviorPrompt);
-        await FireAsync(new LlmResponse(behaviorPrompt, response.Text.Trim(), "embodied-pack"));
-        Logger.LogInformation("GeneratedNeuron LLM-embodied pack '{Pack}' for action '{Action}'", packKey, used.Action);
+        if (used.Action is "open" or "emit-test-surface" or "self-test")
+        {
+            var winTree = new UiWidgetTree("fcard", new Dictionary<string, object?> { ["title"] = used.Pack + " - " + used.Action }, new List<UiWidgetTree> { new UiWidgetTree("text", new Dictionary<string, object?> { ["text"] = "Live surface from " + used.Pack + " pack scenario." }) });
+            var surf = new UiSurface(used.Pack, new Dictionary<string, object?>
+            {
+                [UiSurfaceKeys.Title] = used.Pack,
+                ["pack"] = used.Pack,
+                ["tree"] = winTree
+            });
+            await FireAsync(surf);
+            var bus = ServiceProvider.GetService<HomeFeedBus>();
+            if (bus != null)
+            {
+                bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surf, Self.Value));
+            }
+        }
+    }
+
+    private async Task RunGmailInsightsExperienceAsync(ExperienceUsed used)
+    {
+        var userId = EffectiveUserId(used.UserId);
+        var emails = BuildGmailSampleRows(100);
+        var categoryRows = emails
+            .GroupBy(row => row["category"]?.ToString() ?? "Other", StringComparer.OrdinalIgnoreCase)
+            .OrderByDescending(group => group.Count())
+            .Select(group => new Dictionary<string, object?>
+            {
+                ["category"] = group.Key,
+                ["count"] = group.Count()
+            })
+            .ToArray();
+
+        var summary = await SummarizeGmailRowsAsync(emails);
+        var chartRequestId = "gmail-last-100-" + StableKey(userId);
+        await FireAsync(new PackEmission(used.Pack, used.Action, summary));
+
+        var surface = BuildGmailInsightsSurface(used, summary, emails.Count, chartRequestId);
+        await FireAsync(surface);
+        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+
+        var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-" + chartRequestId);
+        await chart.FireAsync(new VisualizeDataRequest(
+            "Gmail last 100 emails by category",
+            System.Text.Json.JsonSerializer.Serialize(categoryRows),
+            "bar",
+            chartRequestId,
+            userId,
+            used.SessionId));
+    }
+
+    private async Task<string> SummarizeGmailRowsAsync(IReadOnlyList<IReadOnlyDictionary<string, object?>> emails)
+    {
+        var fallback = $"Local Gmail Insights analyzed {emails.Count} messages. Top categories: " +
+            string.Join(", ", emails
+                .GroupBy(row => row["category"]?.ToString() ?? "Other", StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(group => group.Count())
+                .Take(3)
+                .Select(group => group.Key + " " + group.Count()));
+
+        var chat = ServiceProvider.GetService<IChatClient>();
+        if (chat is null)
+        {
+            return fallback;
+        }
+
+        var sample = string.Join("\n", emails.Take(20).Select(row =>
+            "- " + row["from"] + " | " + row["subject"] + " | " + row["category"]));
+        try
+        {
+            var response = await chat.GetResponseAsync(
+                "You are the local DigitalBrain Gmail insights experience. " +
+                "Summarize these recent Gmail messages in two concise bullets and name the dominant categories.\n" +
+                sample);
+            var text = response.Text.Trim();
+            return string.IsNullOrWhiteSpace(text) ? fallback : text;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Local LLM Gmail summary failed; using deterministic fallback.");
+            return fallback;
+        }
+    }
+
+    private UiSurface BuildGmailInsightsSurface(ExperienceUsed used, string summary, int emailCount, string chartRequestId)
+    {
+        var tree = new UiWidgetTree(
+            "fcard",
+            new Dictionary<string, object?>
+            {
+                ["title"] = "Gmail Insights",
+                ["subtitle"] = emailCount + " messages analyzed locally"
+            },
+            new List<UiWidgetTree>
+            {
+                new("text", new Dictionary<string, object?> { ["text"] = summary }),
+                new("text", new Dictionary<string, object?> { ["text"] = "Chart request: " + chartRequestId })
+            });
+
+        return new UiSurface("gmail-insights", new Dictionary<string, object?>
+        {
+            [UiSurfaceKeys.SurfaceId] = "surface.gmail-insights." + chartRequestId,
+            [UiSurfaceKeys.Emitter] = Self.Value,
+            [UiSurfaceKeys.Title] = "Gmail Insights",
+            [UiSurfaceKeys.Priority] = 30,
+            [UiSurfaceKeys.RequiresInput] = false,
+            [UiSurfaceKeys.Layout] = UiSurfaceLayouts.Panel,
+            ["pack"] = used.Pack,
+            ["action"] = used.Action,
+            ["userId"] = EffectiveUserId(used.UserId),
+            ["sessionId"] = used.SessionId,
+            ["emailCount"] = emailCount,
+            ["summary"] = summary,
+            ["chartRequestId"] = chartRequestId,
+            ["source"] = "local-sample",
+            ["tree"] = tree
+        });
+    }
+
+    private static bool IsGmailInsightsExperience(ExperienceUsed used) =>
+        used.Pack.Equals("DigitalBrain.Experience.GmailInsights", StringComparison.OrdinalIgnoreCase) ||
+        used.Action.StartsWith("gmail:", StringComparison.OrdinalIgnoreCase);
+
+    private static string EffectiveUserId(string? userId) =>
+        string.IsNullOrWhiteSpace(userId) ? "anonymous" : userId.Trim();
+
+    private static string StableKey(string value)
+    {
+        var chars = value
+            .Select(ch => char.IsLetterOrDigit(ch) ? char.ToLowerInvariant(ch) : '-')
+            .ToArray();
+        var key = new string(chars).Trim('-');
+        return string.IsNullOrWhiteSpace(key) ? "anonymous" : key;
+    }
+
+    private static IReadOnlyList<IReadOnlyDictionary<string, object?>> BuildGmailSampleRows(int count)
+    {
+        string[] senders =
+        [
+            "alerts@github.com",
+            "billing@cloud.local",
+            "calendar@google.com",
+            "team@digitalbrain.local",
+            "newsletter@aiweekly.example",
+            "support@customer.example",
+            "security@accounts.google.com",
+            "noreply@stripe.com"
+        ];
+        string[] categories = ["Engineering", "Billing", "Calendar", "Team", "Newsletter", "Support", "Security", "Payments"];
+        string[] subjects =
+        [
+            "Build completed for kernel runtime",
+            "Invoice available for review",
+            "Meeting moved to tomorrow",
+            "Product surface review notes",
+            "Local AI tooling digest",
+            "Customer follow-up requested",
+            "Security alert for account access",
+            "Payment receipt"
+        ];
+
+        var now = DateTimeOffset.UtcNow;
+        var rows = new List<IReadOnlyDictionary<string, object?>>(count);
+        for (var i = 0; i < count; i++)
+        {
+            var ix = i % categories.Length;
+            rows.Add(new Dictionary<string, object?>
+            {
+                ["id"] = "gmail-local-" + (i + 1).ToString("000"),
+                ["receivedAt"] = now.AddMinutes(-37 * i).ToString("O"),
+                ["from"] = senders[ix],
+                ["subject"] = subjects[ix] + " #" + (i + 1),
+                ["category"] = categories[ix],
+                ["importance"] = ix is 0 or 5 or 6 ? "high" : "normal"
+            });
+        }
+
+        return rows;
     }
 
     private (string Key, string Code, string Description)? LastInstalledPack()
@@ -1162,11 +1689,42 @@ public class KernelTaskNeuron : Neuron, IKernelTask
         }
         await FireAsync(new TaskProgress(cmd.TaskId, "finalizing"));
         await FireAsync(new TaskCompleted(cmd.TaskId, result));
+
+        // Refresh task manager card on feed so UI sees live state (UI kit driven).
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = tm.Props.GetValueOrDefault("totals"),
+                tasks = tm.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
     }
 
     public async Task HandleAsync(CancelTask cmd)
     {
         await FireAsync(new TaskCancelled(cmd.TaskId));
+
+        var bus = ServiceProvider.GetService<HomeFeedBus>();
+        if (bus != null)
+        {
+            var recent = OutgoingJournal.Concat(IncomingJournal).ToList();
+            var tm = UiSurfaceLiveData.TaskManagerFromTasks(recent, userId: cmd.UserId, sessionId: cmd.SessionId);
+            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(tm, Self.Value));
+
+            var directData = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                totals = tm.Props.GetValueOrDefault("totals"),
+                tasks = tm.Props.GetValueOrDefault("tasks")
+            });
+            bus.Broadcast(new RfwCard("digitalbrain", "TaskManagerCard", directData));
+        }
     }
 
     public Task<TaskInfo> GetInfoAsync()

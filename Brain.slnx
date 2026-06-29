@@ -1,4 +1,11 @@
 <Solution>
+  <Folder Name="/Clients/">
+    <!-- Flutter client as first-class integration (source under ../app, coordination via Flutter.proj).
+         Mirrors historical pattern from Projects/final and Projects/digitalbrain.
+         The .proj participates in dotnet build (pub get, web bundle prep) while Aspire AddFlutterClient
+         drives `flutter run -d windows` for the live NeuroUI host. -->
+    <Project Path="../app/Flutter.proj" Type="C#" />
+  </Folder>
   <Project Path="DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
   <Project Path="DigitalBrain.Gateway/DigitalBrain.Gateway.csproj" />
   <Project Path="DigitalBrain.Cli/DigitalBrain.Cli.csproj" />

@@ -4,6 +4,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
+using DigitalBrain.Kernel.Ui;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,11 +29,20 @@ builder.WebHost.ConfigureKestrel(options =>
 {
     if (isAspireHosted)
     {
-        options.ConfigureEndpointDefaults(listen => listen.Protocols = HttpProtocols.Http2);
-        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
-        if (int.TryParse(webPort, out var port))
+        var grpcPorts = (Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS") ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var grpcPort in grpcPorts)
         {
-            options.ListenAnyIP(port, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
+            if (int.TryParse(grpcPort, out var grpcEndpointPort))
+            {
+                options.ListenAnyIP(grpcEndpointPort, listen => listen.Protocols = HttpProtocols.Http2);
+            }
+        }
+
+        var webPort = Environment.GetEnvironmentVariable("DIGITALBRAIN_WEB_PORT");
+        if (int.TryParse(webPort, out var webEndpointPort))
+        {
+            options.ListenAnyIP(webEndpointPort, listen => listen.Protocols = HttpProtocols.Http1AndHttp2);
         }
         return;
     }
@@ -54,6 +64,8 @@ builder.Services.AddCors(options => options.AddPolicy("browser", policy => polic
     .WithExposedHeaders("Grpc-Status", "Grpc-Message", "Grpc-Encoding", "Grpc-Accept-Encoding")));
 
 // Server-driven UI fanout: neurons broadcast RfwCards; WatchHomeFeed gRPC subscribers stream them.
+// The per-silo HomeFeedStreamSubscriber (wired into the silo below) re-fans cards from the shared Orleans
+// MemoryStream so cards broadcast on any silo reach all replicas.
 builder.Services.AddSingleton<HomeFeedBus>();
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
@@ -82,6 +94,14 @@ builder.Services.AddEconomics(builder.Configuration);
 builder.Services.AddContextStore(builder.Configuration);
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
+
+// Proxy to private marketplace (new separate repo) when enabled.
+// Register the stub here; real impl uses HttpClient to the marketplace service.
+var useRemote = builder.Configuration.GetValue("DigitalBrain:Marketplace:UseRemote", false);
+if (useRemote)
+{
+    builder.Services.AddSingleton<IRemoteMarketplaceClient, DigitalBrain.Kernel.Marketplace.RemoteMarketplaceClientStub>();
+}
 
 builder.UseOrleans(siloBuilder =>
 {
@@ -115,6 +135,9 @@ builder.UseOrleans(siloBuilder =>
             .UseJsonJournalFormat(DigitalBrain.Kernel.JournalJsonContext.Default);
     }
 
+    siloBuilder.AddMemoryStreams("HomeFeed");
+    siloBuilder.AddMemoryGrainStorage("PubSubStore");
+    siloBuilder.ConfigureServices(services => services.AddHomeFeedStreamSubscriber());
     siloBuilder.AddFoundry();
 });
 
@@ -157,12 +180,26 @@ if (serveWebBundle)
 var grainFactory = app.Services.GetService<IGrainFactory>();
 if (grainFactory != null)
 {
-    var status = grainFactory.GetGrain<ISystemStatus>("status-main");
-    _ = status.GetTimelineAsync();
-    _ = grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
-    _ = grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var status = grainFactory.GetGrain<ISystemStatus>("status-main");
+                await status.GetTimelineAsync();
+                await grainFactory.GetGrain<IInoCodeEditor>("ino-editor-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IContextNeuron>("context-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IDbSupportNeuron>("db-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IDataVisualizationNeuron>("chart-main").GetTimelineAsync();
+                await grainFactory.GetGrain<IUserSessionNeuron>("session-main").GetTimelineAsync();
+            }
+            catch (Exception ex)
+            {
+                app.Logger.LogWarning(ex, "Kernel startup neuron warmup failed.");
+            }
+        });
+    });
 }
 
 app.Run();

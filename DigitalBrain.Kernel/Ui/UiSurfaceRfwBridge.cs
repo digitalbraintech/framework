@@ -39,6 +39,37 @@ public static class UiSurfaceRfwBridge
 
     public static RfwCard FromUiSurface(UiSurface surface, string emitter)
     {
+        // If the surface already carries a full RFW or widget tree definition, honor it directly.
+        if (surface.Kind == UiSurface.RfwKind || surface.Props.ContainsKey("source") || surface.Props.ContainsKey("rfwSource"))
+        {
+            var lib = ValueOrDefault(surface, "libraryName", "digitalbrain");
+            var root = ValueOrDefault(surface, "rootWidget", "root");
+            var dataJson = surface.Props.TryGetValue("dataJson", out var dj) && dj is string s ? s
+                : JsonSerializer.Serialize(surface.Props);
+            var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
+                ? sidStr
+                : surface.CorrelationId ?? surface.SynapseId;
+            return new RfwCard(lib, root, dataJson) { CorrelationId = correlation };
+        }
+
+        if (surface.Kind == UiSurface.WidgetTreeKind && surface.Props.TryGetValue("tree", out var treeObj))
+        {
+            var payload = new Dictionary<string, object?> { ["tree"] = treeObj, ["kind"] = surface.Kind };
+            // Carry experience markers so the experience host can match the hop and key its semantics on the surfaceId.
+            foreach (var markerKey in new[] { "activeExperience", "experienceId", UiSurfaceKeys.SurfaceId, UiSurfaceKeys.Title })
+            {
+                if (surface.Props.TryGetValue(markerKey, out var markerValue) && markerValue is not null)
+                    payload[markerKey] = markerValue;
+            }
+            var correlation = surface.Props.TryGetValue(UiSurfaceKeys.SurfaceId, out var sid) && sid is string sidStr && sidStr.Length > 0
+                ? sidStr
+                : surface.CorrelationId ?? surface.SynapseId;
+            return new RfwCard("digitalbrain", "WidgetTreeHost", JsonSerializer.Serialize(payload))
+            {
+                CorrelationId = correlation
+            };
+        }
+
         var title = ValueOrDefault(surface, UiSurfaceKeys.Title, "Live embodied surface");
         var body = ValueOrDefault(surface, "body", "A typed C# pack emitted this UiSurface through the kernel.");
         var status = ValueOrDefault(surface, "status", "live");

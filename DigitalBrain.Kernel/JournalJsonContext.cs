@@ -26,6 +26,14 @@ namespace DigitalBrain.Kernel;
 [JsonSerializable(typeof(WiringOptimizationProposed))]
 [JsonSerializable(typeof(DemoMessageSynapse))]
 [JsonSerializable(typeof(ExperienceUsed))]
+[JsonSerializable(typeof(LoginRequest))]
+[JsonSerializable(typeof(LoginSucceeded))]
+[JsonSerializable(typeof(LoginFailed))]
+[JsonSerializable(typeof(LogoutRequest))]
+[JsonSerializable(typeof(UserSessionCreated))]
+[JsonSerializable(typeof(UserSessionEnded))]
+[JsonSerializable(typeof(LocalUserRegistered))]
+[JsonSerializable(typeof(UserSessionState))]
 [JsonSerializable(typeof(LlmPrompt))]
 [JsonSerializable(typeof(LlmResponse))]
 [JsonSerializable(typeof(CreateSimpleApp))]
@@ -64,6 +72,9 @@ namespace DigitalBrain.Kernel;
 [JsonSerializable(typeof(VisualizeDataRequest))]
 [JsonSerializable(typeof(DataChartGenerated))]
 [JsonSerializable(typeof(DataChartFailed))]
+[JsonSerializable(typeof(ChartCommand))]
+[JsonSerializable(typeof(ChartInteraction))]
+[JsonSerializable(typeof(GraphicSpec))]
 [JsonSerializable(typeof(WidgetTreeInspected))]
 [JsonSerializable(typeof(UIModificationProposed))]
 [JsonSerializable(typeof(SystemModificationProposed))]
@@ -115,6 +126,8 @@ namespace DigitalBrain.Kernel;
 // Server-driven UI
 [JsonSerializable(typeof(RfwCard))]
 [JsonSerializable(typeof(PerformKernelSelfUpdate))]
+// Experience domain
+[JsonSerializable(typeof(ExperienceStep))]
 // Task records (universal core protocol, used by kernel grain + INO + MCP)
 [JsonSerializable(typeof(DigitalBrain.Core.TaskCreated))]
 [JsonSerializable(typeof(DigitalBrain.Core.TaskStarted))]

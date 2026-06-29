@@ -52,7 +52,11 @@ public record WiringOptimizationProposed(string Proposal, string FromNeuron) : S
 public record DemoMessageSynapse(string Text) : Synapse(nameof(DemoMessageSynapse), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record ExperienceUsed(string Pack, string Action) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
+public record ExperienceUsed(
+    string Pack,
+    string Action,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
 // Core system neuron interfaces (everything is a Neuron)
 public interface IAspire : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
@@ -64,6 +68,95 @@ public interface ICompiler : INeuron, IHandle<CreateNeuronRequest> { }
 public interface IAspireNeuron : IAspire { }
 
 public interface IMarketplaceNeuron : IMarketplace { }
+
+// IUser contract lives in Core so kernel can run standalone for security/air-gapped scenarios.
+// Full user accounts, auth, billing live in the private marketplace service.
+[GenerateSerializer]
+public readonly record struct UserId([property: Id(0)] string Value)
+{
+    public static UserId Anonymous => new("anonymous");
+}
+
+[GenerateSerializer]
+public record LoginRequest(
+    string Username,
+    string Password,
+    string ClientId = "flutter") : Synapse(nameof(LoginRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LoginSucceeded(
+    UserId UserId,
+    string SessionId,
+    string DisplayName,
+    IReadOnlyList<string> Roles,
+    string ClientId) : Synapse(nameof(LoginSucceeded), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LoginFailed(
+    string Username,
+    string Reason,
+    string ClientId) : Synapse(nameof(LoginFailed), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LogoutRequest(
+    string SessionId,
+    string ClientId = "flutter") : Synapse(nameof(LogoutRequest), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionCreated(
+    UserId UserId,
+    string SessionId,
+    DateTimeOffset ExpiresAt,
+    string ClientId) : Synapse(nameof(UserSessionCreated), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionEnded(
+    string SessionId,
+    string ClientId) : Synapse(nameof(UserSessionEnded), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record LocalUserRegistered(
+    UserId UserId,
+    string Username,
+    string DisplayName,
+    string PasswordHashBase64,
+    string PasswordSaltBase64,
+    IReadOnlyList<string> Roles) : Synapse(nameof(LocalUserRegistered), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record UserSessionState(
+    UserId UserId,
+    string SessionId,
+    string DisplayName,
+    IReadOnlyList<string> Roles,
+    DateTimeOffset ExpiresAt,
+    bool Active);
+
+public interface IUserSessionNeuron : INeuron, IHandle<LoginRequest>, IHandle<LogoutRequest>
+{
+    Task<UserSessionState?> GetSessionAsync(string sessionId);
+    Task<UiSurface> BuildLoginSurfaceAsync(string? clientId = null);
+}
+
+public interface IUserGrain : IGrainWithStringKey
+{
+    Task<UserProfile> GetProfileAsync();
+    Task<bool> HasEntitlementAsync(string bundleOrResource, string actionOrCapability);
+}
+
+[GenerateSerializer]
+public record UserProfile(UserId Id, string DisplayName, IReadOnlyList<string> Roles);
+
+// Remote client contract for the private marketplace service (new repo).
+// Kernel's MarketplaceNeuron becomes a thin proxy when RemoteMarketplaceBaseUrl is configured.
+// This keeps local stub mode for security/air-gapped while enabling cloud pay-go distribution.
+public interface IRemoteMarketplaceClient
+{
+    Task PublishAsync(PublishToMarketplace cmd);
+    Task InstallAsync(InstallFromMarketplace cmd);
+    Task<PublishedList> ListAsync();
+    // Security policy, user entitlement queries etc. added as the private service is built.
+}
 
 public interface IMetaOptimizerNeuron : INeuron, IHandle<NeuronTelemetry>, IHandle<WiringOptimizationProposed> { }
 
@@ -165,7 +258,8 @@ public record PublishToMarketplace(
 public record InstallFromMarketplace(
     string PackName, 
     string Version, 
-    string BuyerId = "anonymous"
+    string BuyerId = "anonymous",
+    string? SessionId = null
 ) : Synapse(nameof(InstallFromMarketplace), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
@@ -210,10 +304,17 @@ public record TaskCompleted(TaskId TaskId, string? Result = null) : Synapse(name
 public record TaskCancelled(TaskId TaskId) : Synapse(nameof(TaskCancelled), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record RunTask(TaskId TaskId, string Description) : Synapse(nameof(RunTask), DateTimeOffset.UtcNow);
+public record RunTask(
+    TaskId TaskId,
+    string Description,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(RunTask), DateTimeOffset.UtcNow);
 
 [GenerateSerializer]
-public record CancelTask(TaskId TaskId) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
+public record CancelTask(
+    TaskId TaskId,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(CancelTask), DateTimeOffset.UtcNow);
 
 // Rich task state returned by the task grain.
 [GenerateSerializer]
@@ -322,7 +423,9 @@ public record VisualizeDataRequest(
     string Prompt,
     string DataJson,
     string? ChartHint = null,
-    string? RequestId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
+    string? RequestId = null,
+    string UserId = "anonymous",
+    string? SessionId = null) : Synapse(nameof(VisualizeDataRequest), DateTimeOffset.UtcNow, CorrelationId: RequestId);
 
 // Company brain skill knowledge ingestion (narrow for process playbooks + transcripts).
 // Used to feed raw domain knowledge into context for crystallization.
@@ -340,7 +443,17 @@ public record DataChartGenerated(string RequestId, UiSurface Surface) : Synapse(
 [GenerateSerializer]
 public record DataChartFailed(string RequestId, string Reason) : Synapse(nameof(DataChartFailed), DateTimeOffset.UtcNow);
 
+// First-class chart interaction and modification (conversational + selection driven)
+[GenerateSerializer]
+public record ChartCommand(string SurfaceId, string Instruction, string? Context = null) : Synapse(nameof(ChartCommand), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record ChartInteraction(string SurfaceId, string Kind, IReadOnlyDictionary<string, object?> Payload) : Synapse(nameof(ChartInteraction), DateTimeOffset.UtcNow);
+
 public interface IDataVisualizationNeuron : INeuron, IHandle<VisualizeDataRequest> { }
+
+// Chart neuron supports agent metadata for routing + full conversational + selection driven updates.
+public interface IChartNeuron : INeuronAgent, IHandle<VisualizeDataRequest>, IHandle<ChartCommand>, IHandle<ChartInteraction> { }
 
 // Closed loops for marketplace (UI authoring via Dart MCP + widget tree; SoftwareEngineering runtime mod via Aspire MCP + LLM)
 
