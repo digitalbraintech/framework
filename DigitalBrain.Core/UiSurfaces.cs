@@ -169,6 +169,10 @@ public static class Ui
     public const string Badge = "ui:Badge";
     public const string Tile = "ui:Tile";
     public const string List = "ui:List";
+    public const string Alert = "ui:Alert";
+    public const string Progress = "ui:Progress";
+    public const string Spinner = "ui:Spinner";
+    public const string Tooltip = "ui:Tooltip";
 }
 
 [GenerateSerializer]

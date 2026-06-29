@@ -205,4 +205,35 @@ public sealed class UiHop
             inner.Factories.Select(f => f(state)).ToList()));
         return this;
     }
+
+    public UiHop Alert(string title, string? subtitle = null)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Alert, new Dictionary<string, object?>
+        {
+            ["title"] = title, ["subtitle"] = subtitle ?? string.Empty
+        }));
+        return this;
+    }
+
+    public UiHop Progress(double value)
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Progress, new Dictionary<string, object?> { ["value"] = value }));
+        return this;
+    }
+
+    public UiHop Spinner()
+    {
+        Factories.Add(_ => new UiWidgetTree(Ui.Spinner, new Dictionary<string, object?>()));
+        return this;
+    }
+
+    public UiHop Tooltip(string tip, Action<UiHop> body)
+    {
+        var inner = new UiHop(Id);
+        body(inner);
+        Factories.Add(state => new UiWidgetTree(Ui.Tooltip,
+            new Dictionary<string, object?> { ["tip"] = tip },
+            inner.Factories.Select(f => f(state)).ToList()));
+        return this;
+    }
 }

@@ -183,6 +183,22 @@ public class KitExperienceTests
             .Hop("next", s => s.Text("done"));
     }
 
+    [Fact]
+    public void Feedback_nodes_emit_typed_props()
+    {
+        var hop = new UiHop("h");
+        hop.Alert("Heads up", "details").Progress(0.4).Spinner().Tooltip("hint", t => t.Text("hover me"));
+        var nodes = hop.Factories.Select(f => f(new Dictionary<string, string>())).ToList();
+        Assert.Equal(DigitalBrain.Core.Ui.Alert, nodes[0].Type);
+        Assert.Equal("Heads up", nodes[0].Props["title"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Progress, nodes[1].Type);
+        Assert.Equal(0.4, nodes[1].Props["value"]);
+        Assert.Equal(DigitalBrain.Core.Ui.Spinner, nodes[2].Type);
+        Assert.Equal(DigitalBrain.Core.Ui.Tooltip, nodes[3].Type);
+        Assert.Equal("hint", nodes[3].Props["tip"]);
+        Assert.Single(nodes[3].Children!);
+    }
+
     private static UiWidgetTree FindByType(UiWidgetTree node, string type)
     {
         if (node.Type == type) return node;
