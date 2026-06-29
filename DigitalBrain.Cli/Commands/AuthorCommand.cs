@@ -12,13 +12,27 @@ public static class AuthorCommand
 {
     public static async Task<int> RunAsync(string file, bool watch, string gatewayUrl)
     {
-        if (!File.Exists(file))
+        if (string.IsNullOrWhiteSpace(file))
         {
-            AnsiConsole.MarkupLine($"[red]File not found:[/] {file}");
+            AnsiConsole.MarkupLine("[yellow]Usage:[/] " + Markup.Escape("author <file.cs> [--watch] [--gateway URL]"));
             return 1;
         }
 
-        await PublishAndInstallAsync(file, gatewayUrl);
+        if (!File.Exists(file))
+        {
+            AnsiConsole.MarkupLine($"[red]File not found:[/] {Markup.Escape(file)}");
+            return 1;
+        }
+
+        try
+        {
+            await PublishAndInstallAsync(file, gatewayUrl);
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]author failed:[/] {Markup.Escape(ex.Message)}");
+            if (!watch) return 1;
+        }
 
         if (!watch) return 0;
 
@@ -28,7 +42,7 @@ public static class AuthorCommand
             NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
             EnableRaisingEvents = true
         };
-        AnsiConsole.MarkupLine($"[green]Watching[/] {file} (Ctrl+C to stop)…");
+        AnsiConsole.MarkupLine($"[green]Watching[/] {Markup.Escape(file)} (Ctrl+C to stop)…");
         var gate = new SemaphoreSlim(1, 1);
         watcher.Changed += async (_, _) =>
         {
@@ -38,9 +52,17 @@ public static class AuthorCommand
                 await Task.Delay(150); // let the editor finish writing
                 await PublishAndInstallAsync(file, gatewayUrl);
             }
+            catch (Exception ex)
+            {
+                AnsiConsole.MarkupLine($"[red]author failed:[/] {Markup.Escape(ex.Message)}");
+            }
             finally { gate.Release(); }
         };
-        await Task.Delay(Timeout.Infinite);
+
+        using var cts = new CancellationTokenSource();
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+        try { await Task.Delay(Timeout.Infinite, cts.Token); } catch (OperationCanceledException) { }
+        AnsiConsole.MarkupLine("[grey]stopped watching[/]");
         return 0;
     }
 
