@@ -53,9 +53,11 @@ public class SignalTests
         var bytes = serializer.SerializeToArray(original);
         var restored = serializer.Deserialize<Signal>(bytes);
 
+        Assert.Equal("user.clicked", restored.Type);
         Assert.Equal(original.Type, restored.Type);
         Assert.Equal(original.Name, restored.Name);
         Assert.Equal(original.Props["buttonId"], restored.Props["buttonId"]);
+        Assert.Equal(3, restored.Props["count"]);
     }
 
     [Fact]
