@@ -2,6 +2,45 @@ namespace DigitalBrain.Core;
 
 public static class MarketplaceSeeds
 {
+    // Single source of truth for the Telegram responder pack. The embodiment test references this const
+    // directly so there is no duplicated copy of the pack source.
+    public const string TelegramResponderPackCode = """
+using System.Collections.Generic;
+using DigitalBrain.Core;
+
+public sealed class TelegramResponderNeuron : IPackBehavior
+{
+    public PackManifest GetManifest() => new(
+        new[] { new SynapseType("TelegramMessageReceived") },
+        new PackConfigField[]
+        {
+            new("telegram_token", "Bot token",    PackConfigFieldKind.Secret),
+            new("llm_provider",   "LLM",          PackConfigFieldKind.Choice, new[] { "ollama", "openai" }),
+            new("llm_key",        "API key",       PackConfigFieldKind.Secret,
+                DependsOnKey: "llm_provider", DependsOnValue: "openai"),
+        });
+
+    public string Respond(string input) => input;
+
+    public IReadOnlyList<Synapse> Handle(Synapse synapse)
+    {
+        if (synapse is not Signal s || s.Name != "TelegramMessageReceived")
+            return System.Array.Empty<Synapse>();
+
+        var text   = s.Props.TryGetValue("text",   out var t) ? t?.ToString() ?? "" : "";
+        var chatId = s.Props.TryGetValue("chatId", out var c) ? c : null;
+
+        return new Synapse[]
+        {
+            new AskLlm(
+                text,
+                "TelegramReplyRequested",
+                new Dictionary<string, object?> { ["chatId"] = chatId })
+        };
+    }
+}
+""";
+
     public const string HelloWorldPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
@@ -166,15 +205,14 @@ public sealed class UiGalleryExperience : KitExperience
             "",
             "Preinstalled Gmail insights experience. Retrieves the last 100 Gmail-shaped messages from the local connector/sample path, summarizes them with the local Ollama model, and emits a chart surface."),
 
-        // Example of reusable packed integration (like Telegram bot): no logic in core, just published pack.
         new NeuroPack(
-            "Telegram.Bot",
-            "1.0",
+            "DigitalBrain.Telegram.Responder",
+            "1.0.0",
             "digitalbraintech",
             false,
             0.05,
-            "Packed Telegram bot integration. No core logic; install via marketplace, configure token, wires via synapses or gRPC. Reusable across brains.",
-            "Installable Telegram bot experience. Aspire-executable or process pack for distribution and reuse."),
+            TelegramResponderPackCode,
+            "Telegram bot responder: receives TelegramMessageReceived signals, emits AskLlm to the LLM layer, configurable for Ollama or OpenAI. Install via marketplace, supply token and LLM config."),
 
         new NeuroPack(
             "hello-world",

@@ -36,6 +36,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Gateway\DigitalBrain.Gateway.csproj" Aliases="GatewayAssembly" />
+    <ProjectReference Include="..\DigitalBrain.Telegram\DigitalBrain.Telegram.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Tools\DigitalBrain.Mcp.Tools.csproj" />
     <ProjectReference Include="..\DigitalBrain.Kernel\DigitalBrain.Kernel.csproj" />
