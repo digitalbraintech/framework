@@ -10,3 +10,8 @@ public record Signal(string Name, IReadOnlyDictionary<string, object?> Props)
 [GenerateSerializer]
 public record AskLlm(string Prompt, string ReplyType, IReadOnlyDictionary<string, object?> ReplyProps)
     : Synapse(nameof(AskLlm), DateTimeOffset.UtcNow);
+
+public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
+{
+    Task EnsureActiveAsync();
+}
