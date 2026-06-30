@@ -18,11 +18,11 @@ public class PackConfigManifestTests
             new[] { new SynapseType(nameof(ExperienceUsed)) },
             new[]
             {
-                new PackConfigField("bot_token", "Telegram Bot Token", PackConfigFieldKind.Secret),
-                new PackConfigField("mode", "Mode", PackConfigFieldKind.Choice,
-                    Choices: new[] { "polling", "webhook" }),
-                new PackConfigField("webhook_url", "Webhook URL", PackConfigFieldKind.Text,
-                    DependsOnKey: "mode", DependsOnValue: "webhook")
+                new PackConfigField("api_key", "API Key", PackConfigFieldKind.Secret),
+                new PackConfigField("deployment_mode", "Deployment Mode", PackConfigFieldKind.Choice,
+                    Choices: new[] { "cloud", "local" }),
+                new PackConfigField("endpoint_url", "Endpoint URL", PackConfigFieldKind.Text,
+                    DependsOnKey: "deployment_mode", DependsOnValue: "cloud")
             });
     }
 
@@ -46,23 +46,23 @@ public class PackConfigManifestTests
         Assert.NotNull(manifest.RequiredConfig);
         Assert.Equal(3, manifest.RequiredConfig!.Count);
 
-        var token = manifest.RequiredConfig[0];
-        Assert.Equal("bot_token", token.Key);
-        Assert.Equal("Telegram Bot Token", token.Label);
-        Assert.Equal(PackConfigFieldKind.Secret, token.Kind);
-        Assert.Null(token.Choices);
-        Assert.Null(token.DependsOnKey);
+        var apiKey = manifest.RequiredConfig[0];
+        Assert.Equal("api_key", apiKey.Key);
+        Assert.Equal("API Key", apiKey.Label);
+        Assert.Equal(PackConfigFieldKind.Secret, apiKey.Kind);
+        Assert.Null(apiKey.Choices);
+        Assert.Null(apiKey.DependsOnKey);
 
-        var mode = manifest.RequiredConfig[1];
-        Assert.Equal("mode", mode.Key);
-        Assert.Equal(PackConfigFieldKind.Choice, mode.Kind);
-        Assert.Equal(new[] { "polling", "webhook" }, mode.Choices);
+        var deploymentMode = manifest.RequiredConfig[1];
+        Assert.Equal("deployment_mode", deploymentMode.Key);
+        Assert.Equal(PackConfigFieldKind.Choice, deploymentMode.Kind);
+        Assert.Equal(new[] { "cloud", "local" }, deploymentMode.Choices);
 
-        var webhookUrl = manifest.RequiredConfig[2];
-        Assert.Equal("webhook_url", webhookUrl.Key);
-        Assert.Equal(PackConfigFieldKind.Text, webhookUrl.Kind);
-        Assert.Equal("mode", webhookUrl.DependsOnKey);
-        Assert.Equal("webhook", webhookUrl.DependsOnValue);
+        var endpointUrl = manifest.RequiredConfig[2];
+        Assert.Equal("endpoint_url", endpointUrl.Key);
+        Assert.Equal(PackConfigFieldKind.Text, endpointUrl.Kind);
+        Assert.Equal("deployment_mode", endpointUrl.DependsOnKey);
+        Assert.Equal("cloud", endpointUrl.DependsOnValue);
     }
 
     [Fact]
@@ -70,15 +70,15 @@ public class PackConfigManifestTests
     {
         var values = new Dictionary<string, string>
         {
-            ["bot_token"] = "secret123",
-            ["mode"] = "polling"
+            ["api_key"] = "secret123",
+            ["deployment_mode"] = "cloud"
         };
 
-        var synapse = new ConfigurationProvided("TelegramBot", values);
+        var synapse = new ConfigurationProvided("GenericPack", values);
 
-        Assert.Equal("TelegramBot", synapse.PackName);
-        Assert.Equal("secret123", synapse.Values["bot_token"]);
-        Assert.Equal("polling", synapse.Values["mode"]);
+        Assert.Equal("GenericPack", synapse.PackName);
+        Assert.Equal("secret123", synapse.Values["api_key"]);
+        Assert.Equal("cloud", synapse.Values["deployment_mode"]);
         Assert.Equal(nameof(ConfigurationProvided), synapse.Type);
     }
 
