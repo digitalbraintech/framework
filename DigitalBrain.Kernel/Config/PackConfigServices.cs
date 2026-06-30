@@ -8,17 +8,19 @@ namespace DigitalBrain.Kernel.Config;
 public static class PackConfigServices
 {
     // Registers IPackConfigStore.
-    // When BlobServiceClient is available (Aspire-hosted, multi-replica): DataProtection keys are persisted
-    // to blob storage so all replicas share the same key ring. Without it (integration tests, fast path):
-    // falls back to the default ephemeral/filesystem key ring (single-process only).
-    public static IServiceCollection AddPackConfigStore(this IServiceCollection services)
+    // Pass blobsForKeyRing (Aspire-hosted path) to share the DataProtection key ring across all replicas via
+    // blob storage — without it (integration tests, fast path) each process gets an ephemeral key ring.
+    public static IServiceCollection AddPackConfigStore(
+        this IServiceCollection services,
+        BlobServiceClient? blobsForKeyRing = null)
     {
-        services.AddDataProtection()
+        var dp = services.AddDataProtection()
             .SetApplicationName("DigitalBrain.PackConfig");
 
-        // Register the DataProtection key persistence and blob backing as a deferred decision:
-        // resolve BlobServiceClient only after the host is built, so missing it in test hosts
-        // does not fail startup.
+        if (blobsForKeyRing is not null)
+            dp.PersistKeysToAzureBlobStorage(
+                blobsForKeyRing.GetBlobContainerClient("pack-config").GetBlobClient("dp-keys/keys.xml"));
+
         services.AddSingleton<IPackConfigBackingStore>(sp =>
         {
             var blobs = sp.GetService<BlobServiceClient>();
@@ -30,10 +32,4 @@ public static class PackConfigServices
         services.AddSingleton<IPackConfigStore, PackConfigStore>();
         return services;
     }
-
-    // Call this on the DataProtectionBuilder after BlobServiceClient is available to enable cluster-wide
-    // shared key ring. Intended to be called from the Aspire-hosted path in Program.cs.
-    public static void PersistPackConfigKeys(this IDataProtectionBuilder builder, BlobServiceClient blobs)
-        => builder.PersistKeysToAzureBlobStorage(
-            blobs.GetBlobContainerClient("pack-config").GetBlobClient("dp-keys/keys.xml"));
 }

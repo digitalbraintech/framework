@@ -1,4 +1,5 @@
 using System.IO;
+using Azure.Storage.Blobs;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.Kernel.Company;
@@ -97,7 +98,17 @@ builder.Services.AddDigitalBrainChat(builder.Configuration);
 builder.Services.AddKernelSecurity(builder.Configuration, builder.Environment);
 builder.Services.AddEconomics(builder.Configuration);
 builder.Services.AddContextStore(builder.Configuration);
-builder.Services.AddPackConfigStore();
+
+// Aspire path: supply a BlobServiceClient so DataProtection keys are shared across all 3 HA replicas.
+// Non-Aspire (local/test): no blobs → ephemeral key ring (single process only).
+BlobServiceClient? packConfigBlobs = null;
+if (isAspireHosted)
+{
+    var grainStateConnStr = builder.Configuration.GetConnectionString("grainstate");
+    if (!string.IsNullOrEmpty(grainStateConnStr))
+        packConfigBlobs = new BlobServiceClient(grainStateConnStr);
+}
+builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
