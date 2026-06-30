@@ -54,8 +54,9 @@ public interface IScopedAskLlmEmitter : INeuron
         string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps,
         string? configPack, string? configScope);
 
-    // Stores config through the SILO's IPackConfigStore so the responder grain (also in the silo)
-    // reads the same backing store instance.
+    // Stores config through the silo's IPackConfigStore. The fast-path store keeps config in a per-silo
+    // in-memory backing dictionary encrypted with that silo's ephemeral DataProtection keys, so the emitter
+    // and responder must share a silo to read the same plaintext — the tests pin a single-silo cluster.
     Task StoreConfigAsync(string scope, string pack, Dictionary<string, string> values);
 }
 
@@ -122,7 +123,10 @@ public class LlmResponderScopedConfigTests
     {
         ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
 
-        var builder = new TestClusterBuilder();
+        // Single silo: the in-memory PackConfigStore lives per silo, so emitter and responder must co-locate
+        // to share the stored config (and its silo-local DataProtection keys). The default 2-silo cluster
+        // places them nondeterministically, which made this test flaky (responder read an empty store → global).
+        var builder = new TestClusterBuilder(initialSilosCount: 1);
         builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
         builder.AddSiloBuilderConfigurator<ScopedLlmResponderSiloConfigurator>();
         var cluster = builder.Build();
@@ -170,7 +174,8 @@ public class LlmResponderScopedConfigTests
     {
         ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
 
-        var builder = new TestClusterBuilder();
+        // Single silo keeps the responder co-located with the emitter (see the scoped test for why).
+        var builder = new TestClusterBuilder(initialSilosCount: 1);
         builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
         builder.AddSiloBuilderConfigurator<ScopedLlmResponderSiloConfigurator>();
         var cluster = builder.Build();
@@ -207,7 +212,8 @@ public class LlmResponderScopedConfigTests
     {
         NullScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
 
-        var builder = new TestClusterBuilder();
+        // Single silo so the responder reads the same in-memory config the emitter stored (see the scoped test).
+        var builder = new TestClusterBuilder(initialSilosCount: 1);
         builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
         builder.AddSiloBuilderConfigurator<NullScopedLlmResponderSiloConfigurator>();
         var cluster = builder.Build();
