@@ -14,8 +14,6 @@ public class LlmResponderNeuron : Neuron, ILlmResponderNeuron
     public LlmResponderNeuron(ILogger<LlmResponderNeuron> logger, NeuronJournals journals)
         : base(logger, journals) { }
 
-    public Task EnsureActiveAsync() => Task.CompletedTask;
-
     public async Task HandleAsync(AskLlm ask)
     {
         var chat = ServiceProvider.GetService<IChatClient>();

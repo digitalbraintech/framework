@@ -11,7 +11,6 @@ namespace DigitalBrain.Tests.Kernel;
 // Emitter grain that broadcasts AskLlm so the responder can receive it from the timeline.
 public interface IAskLlmEmitter : INeuron
 {
-    Task EnsureActiveAsync();
     Task BroadcastAskAsync(string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps);
 }
 
@@ -19,8 +18,6 @@ public sealed class AskLlmEmitter : Neuron, IAskLlmEmitter
 {
     public AskLlmEmitter(Microsoft.Extensions.Logging.ILogger<AskLlmEmitter> logger, NeuronJournals journals)
         : base(logger, journals) { }
-
-    public Task EnsureActiveAsync() => Task.CompletedTask;
 
     public Task BroadcastAskAsync(string prompt, string replyType, IReadOnlyDictionary<string, object?> replyProps) =>
         Broadcast(new AskLlm(prompt, replyType, replyProps));
@@ -74,7 +71,7 @@ public class LlmResponderTests
         {
             // Activate responder so it subscribes to the timeline before the ask arrives.
             var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-1");
-            await responder.EnsureActiveAsync();
+            await responder.GetTimelineAsync();
 
             var emitter = cluster.GrainFactory.GetGrain<IAskLlmEmitter>("emitter-1");
             var replyProps = new Dictionary<string, object?> { ["chatId"] = 7 };

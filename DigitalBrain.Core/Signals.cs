@@ -11,7 +11,4 @@ public record Signal(string Name, IReadOnlyDictionary<string, object?> Props)
 public record AskLlm(string Prompt, string ReplyType, IReadOnlyDictionary<string, object?> ReplyProps)
     : Synapse(nameof(AskLlm), DateTimeOffset.UtcNow);
 
-public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm>
-{
-    Task EnsureActiveAsync();
-}
+public interface ILlmResponderNeuron : INeuron, IHandle<AskLlm> { }
