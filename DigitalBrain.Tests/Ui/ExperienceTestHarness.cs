@@ -1,60 +1,9 @@
 using DigitalBrain.Core;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 
 namespace DigitalBrain.Tests.Ui;
-
-/// <summary>
-/// Fast, in-memory, type-safe harness for testing <see cref="KitExperience"/> (and by extension
-/// the ui:/neuron: widget trees they emit).
-///
-/// This is the primary tool for fast iteration on the UI kit.
-/// No browser, no Aspire, no RFW — just the model.
-///
-/// Use <see cref="LiveRenderVerifier"/> (or the old ExperienceFlowDriver) when you need to
-/// prove that the live Flutter client (RFW + ui_kit + ForUI) actually turned the tree
-/// into visible/accessible widgets.
-/// </summary>
-/// <typeparam name="TExperience">A KitExperience subclass</typeparam>
-public sealed class ExperienceTestHarness<TExperience> where TExperience : KitExperience, new()
-{
-    private readonly TExperience _experience = new();
-    private readonly Dictionary<string, string> _state = new();
-
-    /// <summary>
-    /// Sends an ExperienceStep (simulating a user action from the rendered UI).
-    /// Returns the surface that would be emitted for the target hop.
-    /// </summary>
-    public UiSurface Trigger(string eventName, params (string key, string value)[] args)
-    {
-        var step = new ExperienceStep(_experience.GetType().Name, _experience.GetType().Name, eventName,
-            args.ToDictionary(a => a.key, a => a.value));
-
-        var outputs = _experience.Handle(step);
-        return (UiSurface)outputs.FirstOrDefault(s => s is UiSurface) 
-               ?? throw new InvalidOperationException($"No UiSurface emitted for step {eventName}");
-    }
-
-    /// <summary>
-    /// Gets the UiWidgetTree for a specific hop using the current accumulated state.
-    /// Useful for deep assertions on the declarative structure.
-    /// </summary>
-    public UiWidgetTree GetTreeForHop(string hopId)
-    {
-        // We re-trigger to let the experience build the tree for that hop.
-        // This keeps the harness simple and faithful to the real KitExperience state machine.
-        var surface = Trigger(hopId);
-        if (surface.Props.TryGetValue("tree", out var t) && t is UiWidgetTree tree)
-            return tree;
-
-        // Fallback for non-tree surfaces (legacy)
-        throw new NotSupportedException("Hop did not produce a widget tree. Use legacy surface assertions.");
-    }
-
-    public IReadOnlyDictionary<string, string> CurrentState => _state;
-}
 
 /// <summary>
 /// Lightweight, type-safe assertions over UiWidgetTree.
