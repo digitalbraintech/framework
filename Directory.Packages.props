@@ -74,9 +74,8 @@
     <PackageVersion Include="Aspire.Hosting.Testing" Version="13.4.6" />
     <PackageVersion Include="Microsoft.Playwright" Version="1.49.0" />
     <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
-    <!-- Telegram transport host (external process; only System.Net in the feature). Pinned to the
-         9.6.0 API surface harvested from the ino archive (SetWebhookAsync/SendMessageAsync/Update). -->
-    <PackageVersion Include="Telegram.BotAPI" Version="9.6.0" />
+    <!-- Telegram transport host (external process; only System.Net in the feature). -->
+    <PackageVersion Include="Telegram.BotAPI" Version="10.1.0" />
     <!-- TUI -->
     <PackageVersion Include="Spectre.Console" Version="0.57.0" />
     <PackageVersion Include="Spectre.Console.Cli" Version="0.55.0" />
