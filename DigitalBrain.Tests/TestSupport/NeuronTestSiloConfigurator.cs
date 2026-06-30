@@ -23,6 +23,7 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
             .AddMemoryGrainStorageAsDefault()
             .AddMemoryStreams("Default")
             .AddMemoryStreams("HomeFeed")
+            .AddMemoryStreams("DigitalBrainTimeline")
             .AddMemoryGrainStorage("PubSubStore")
             .ConfigureServices(services =>
             {

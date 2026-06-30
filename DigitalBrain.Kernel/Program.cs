@@ -136,6 +136,7 @@ builder.UseOrleans(siloBuilder =>
     }
 
     siloBuilder.AddMemoryStreams("HomeFeed");
+    siloBuilder.AddMemoryStreams("DigitalBrainTimeline");
     siloBuilder.AddMemoryGrainStorage("PubSubStore");
     siloBuilder.ConfigureServices(services => services.AddHomeFeedStreamSubscriber());
     siloBuilder.AddFoundry();
