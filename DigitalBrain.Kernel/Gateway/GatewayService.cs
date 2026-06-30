@@ -138,16 +138,16 @@ public sealed class GatewayService(
                 return request;
             }
 
-            // Fallback to resolver for other surface actions (experience run etc.)
-            try
-            {
-                var neuron = NeuronResolver.Resolve(grains, request.TypeName.Contains("market", StringComparison.OrdinalIgnoreCase) ? "market-main" : "ino-main");
-                await neuron.FireAsync(new DemoMessageSynapse("surface-action:" + request.TypeName));
-                return request;
-            }
-            catch { }
-
-            throw new RpcException(new Status(StatusCode.InvalidArgument, "Unsupported synapse envelope type: " + request.TypeName));
+            // Generic fallback: any unknown type_name becomes a named Signal broadcast on the timeline.
+            // External clients (e.g. Telegram transport) can fire arbitrary named synapses without kernel knowing their type.
+            var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+            var rawProps = string.IsNullOrWhiteSpace(payloadJson)
+                ? new Dictionary<string, object?>()
+                : System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadJson) ?? new();
+            var signalProps = NormalizeJsonProps(rawProps);
+            var ingress = grains.GetGrain<IIngressNeuron>(request.CorrelationId);
+            await ingress.IngestAsync(request.TypeName, signalProps);
+            return request;
         }
         catch (RpcException)
         {
@@ -182,6 +182,27 @@ public sealed class GatewayService(
     // A case-insensitive view lets one set of key lookups serve both without silent misses.
     private static Dictionary<string, object?> CaseInsensitive(Dictionary<string, object?>? source) =>
         new(source ?? new(), StringComparer.OrdinalIgnoreCase);
+
+    // STJ deserializes JSON numbers/booleans as JsonElement when the target type is object?.
+    // Unwrap them to CLR primitives so Signal consumers read int/long/double/bool/string directly.
+    private static Dictionary<string, object?> NormalizeJsonProps(Dictionary<string, object?> raw)
+    {
+        var result = new Dictionary<string, object?>(raw.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in raw)
+        {
+            result[key] = value is System.Text.Json.JsonElement el ? UnwrapElement(el) : value;
+        }
+        return result;
+    }
+
+    private static object? UnwrapElement(System.Text.Json.JsonElement el) => el.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.True => true,
+        System.Text.Json.JsonValueKind.False => false,
+        System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined => null,
+        System.Text.Json.JsonValueKind.Number => el.TryGetInt64(out var l) ? (object)l : el.GetDouble(),
+        _ => el.GetString()
+    };
 
     private static Task WriteCardAsync(
         IServerStreamWriter<RfwCardEnvelope> responseStream,
