@@ -907,6 +907,7 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
         {
             case NeuroPackInstalled installed:
                 TryEmbody(installed.Pack);
+                await EmitConfigFormIfRequiredAsync();
                 return;
         }
 
@@ -951,6 +952,21 @@ public class GeneratedNeuron : Neuron, IGeneratedNeuron, IHandle<NeuronTelemetry
             _embodied = null;
             Logger.LogWarning(ex, "Pack '{Pack}' is not a compilable IPackBehavior; using LLM fallback on use.", pack.Name);
         }
+    }
+
+    // After a successful embodiment, surface the pack's RequiredConfig as an in-app config form the thin client
+    // renders; submitting it round-trips a ConfigurationProvided (persisted via IPackConfigStore in the gateway).
+    private async Task EmitConfigFormIfRequiredAsync()
+    {
+        if (_embodied is null) return;
+
+        var required = _embodied.GetManifest().RequiredConfig;
+        if (required is null || required.Count == 0) return;
+
+        var surface = ConfigFormSurface.Build(_embodied.PackName, required, Self.Value);
+        await FireAsync(surface);
+        ServiceProvider.GetService<HomeFeedBus>()?.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        Logger.LogInformation("GeneratedNeuron emitted config form for pack '{Pack}' ({FieldCount} fields).", _embodied.PackName, required.Count);
     }
 
     private void EnsureEmbodied()

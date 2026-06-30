@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Core.Config;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Kernel;
 using Grpc.Core;
@@ -13,7 +14,8 @@ public sealed class GatewayService(
     IConfiguration configuration,
     HomeFeedBus homeFeedBus,
     IHostEnvironment environment,
-    ILogger<GatewayService> logger) : DigitalBrainGateway.DigitalBrainGatewayBase
+    ILogger<GatewayService> logger,
+    IPackConfigStore? packConfigStore = null) : DigitalBrainGateway.DigitalBrainGatewayBase
 {
     public override async Task<SynapseEnvelope> Send(SynapseEnvelope request, ServerCallContext context)
     {
@@ -61,6 +63,33 @@ public sealed class GatewayService(
                 var sessionId = p.TryGetValue("sessionId", out var sid) ? sid?.ToString() : null;
                 if (string.IsNullOrWhiteSpace(packName)) packName = request.CorrelationId; // fallback
                 await market.FireAsync(new InstallFromMarketplace(packName, ver, string.IsNullOrWhiteSpace(buyer) ? "anonymous" : buyer, sessionId));
+                return request;
+            }
+
+            // A submitted config form round-trips here. Persist the field values for the pack via the encrypted
+            // config store. The values may include secrets, so they are NEVER logged.
+            if (request.TypeName == nameof(ConfigurationProvided) || request.TypeName.Contains("ConfigurationProvided", StringComparison.OrdinalIgnoreCase))
+            {
+                if (packConfigStore is null)
+                    throw new RpcException(new Status(StatusCode.FailedPrecondition, "Pack config store is not configured."));
+
+                var payloadStr = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
+                var p = CaseInsensitive(System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(payloadStr));
+                string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
+
+                var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
+                var scope = Field("scope") ?? Field("sessionId") ?? Field("buyerId") ?? "default";
+
+                var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "pack", "packName", "scope", "sessionId", "buyerId", "userId", "synapseType", "eventName"
+                };
+                var values = p
+                    .Where(kv => !controlKeys.Contains(kv.Key))
+                    .ToDictionary(kv => kv.Key, kv => kv.Value?.ToString() ?? string.Empty);
+
+                await packConfigStore.SetAsync(scope, pack, values);
+                logger.LogInformation("Stored configuration for pack {Pack} ({FieldCount} fields).", pack, values.Count);
                 return request;
             }
 
