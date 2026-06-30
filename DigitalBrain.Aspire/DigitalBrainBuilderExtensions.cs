@@ -194,6 +194,12 @@ public static class DigitalBrainBuilderExtensions
             transport = transport.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
         }
 
+        // Tell the transport which marketplace pack's stored config carries its bot token.
+        // Matches the pack name in MarketplaceSeeds and the ConfigPack constant inside the pack code.
+        transport = transport
+            .WithEnvironment("Telegram__PackName", "DigitalBrain.Telegram.Responder")
+            .WithEnvironment("Telegram__ConfigScope", "default");
+
         return transport;
     }
 }

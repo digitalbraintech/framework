@@ -18,7 +18,7 @@ public sealed class RecordingScopedChatClientFactory : IScopedChatClientFactory
 {
     public readonly List<(string Provider, string? ApiKey)> Requests = new();
 
-    public IChatClient Create(string provider, string? apiKey)
+    public IChatClient? Create(string provider, string? apiKey)
     {
         Requests.Add((provider, apiKey));
         return new ScopedPrefixChatClient();
@@ -78,6 +78,33 @@ public sealed class ScopedAskLlmEmitter : Neuron, IScopedAskLlmEmitter
 public sealed class ScopedLlmResponderSiloConfigurator : ISiloConfigurator
 {
     public static readonly RecordingScopedChatClientFactory Factory = new();
+
+    public void Configure(ISiloBuilder siloBuilder) =>
+        siloBuilder.ConfigureServices(services =>
+        {
+            services.AddSingleton<IChatClient, AnswerPrefixChatClient>();
+            services.AddSingleton<IScopedChatClientFactory>(Factory);
+            services.AddPackConfigStore(blobsForKeyRing: null);
+        });
+}
+
+// Returns null for every Create call — simulates the graceful-fallback path (e.g. openai with no key).
+public sealed class NullScopedChatClientFactory : IScopedChatClientFactory
+{
+    public readonly List<(string Provider, string? ApiKey)> Requests = new();
+
+    public IChatClient? Create(string provider, string? apiKey)
+    {
+        Requests.Add((provider, apiKey));
+        return null;
+    }
+}
+
+// Wires the NullScopedChatClientFactory + global AnswerPrefixChatClient + real in-memory PackConfigStore.
+// The null factory forces the responder to fall back to the global client.
+public sealed class NullScopedLlmResponderSiloConfigurator : ISiloConfigurator
+{
+    public static readonly NullScopedChatClientFactory Factory = new();
 
     public void Configure(ISiloBuilder siloBuilder) =>
         siloBuilder.ConfigureServices(services =>
@@ -168,6 +195,55 @@ public class LlmResponderScopedConfigTests
             Assert.NotNull(signal);
             Assert.Equal("ANSWER:hi", signal.Props["text"]);
             Assert.Empty(ScopedLlmResponderSiloConfigurator.Factory.Requests);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+        }
+    }
+
+    [Fact]
+    public async Task AskLlm_scoped_factory_returns_null_falls_back_to_global_client()
+    {
+        NullScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
+
+        var builder = new TestClusterBuilder();
+        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
+        builder.AddSiloBuilderConfigurator<NullScopedLlmResponderSiloConfigurator>();
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+        try
+        {
+            const string pack = "DigitalBrain.Telegram.Responder";
+            const string scope = "default";
+
+            var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-nullfactory-1");
+            await responder.GetTimelineAsync();
+
+            var emitter = cluster.GrainFactory.GetGrain<IScopedAskLlmEmitter>("emitter-nullfactory-1");
+            // Store openai config but with no key — factory will be asked and return null.
+            await emitter.StoreConfigAsync(scope, pack, new Dictionary<string, string>
+            {
+                ["llm_provider"] = "openai",
+                ["llm_key"] = "",
+            });
+            var replyProps = new Dictionary<string, object?> { ["chatId"] = 42 };
+            await emitter.BroadcastScopedAskAsync("hi", "TelegramReplyFallback", replyProps, pack, scope);
+
+            // Should still get a reply — from the global AnswerPrefixChatClient, not silence.
+            Signal? signal = null;
+            for (var attempt = 0; attempt < 20 && signal is null; attempt++)
+            {
+                await Task.Delay(50);
+                var timeline = await responder.GetTimelineAsync();
+                signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "TelegramReplyFallback");
+            }
+
+            Assert.NotNull(signal);
+            Assert.Equal("ANSWER:hi", signal.Props["text"]);
+            // Factory was called (it attempted to build) but returned null.
+            var request = Assert.Single(NullScopedLlmResponderSiloConfigurator.Factory.Requests);
+            Assert.Equal("openai", request.Provider);
         }
         finally
         {

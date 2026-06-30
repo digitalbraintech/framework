@@ -46,6 +46,8 @@ public class LlmResponderNeuron : Neuron, ILlmResponderNeuron
         if (!_scopedClients.TryGetValue(key, out var client))
         {
             client = factory.Create(provider, key.Item2);
+            if (client is null)
+                return ServiceProvider.GetService<IChatClient>();
             _scopedClients[key] = client;
         }
 

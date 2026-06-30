@@ -72,8 +72,9 @@ builder.Services.AddSingleton<HomeFeedBus>();
 
 // Signal egress fanout: neurons broadcast Signals on the timeline; WatchSynapses gRPC subscribers stream them
 // filtered by type name. The per-silo SignalEgressStreamSubscriber (wired into the silo below) forwards Signals
-// from this silo's DigitalBrainTimeline stream to the SignalEgressBus. NOTE: like HomeFeed, the timeline is a
-// silo-local MemoryStream — a gRPC client connected to one replica observes only Signals broadcast on that replica.
+// from the DigitalBrainTimeline stream to the SignalEgressBus. Like HomeFeed (proven in
+// HomeFeedCrossSiloTests), Orleans MemoryStream explicit subscriptions deliver cluster-wide — every silo's
+// subscriber receives every Signal regardless of which replica it was broadcast on.
 builder.Services.AddSingleton<SignalEgressBus>();
 
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
