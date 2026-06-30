@@ -93,6 +93,30 @@ public class PackConfigPullTests : IAsyncLifetime
         Assert.Equal("ollama", reply.Values["llm_provider"]);
     }
 
+    // Regression: a form submitted with a sessionId (but no explicit scope) must still land under "default" —
+    // the scope every reader (responder pack, LlmResponderNeuron, transport) actually pulls from. Deriving the
+    // scope from sessionId would strand the token where no reader looks.
+    [Fact]
+    public async Task ConfigurationProvided_WithSessionIdButNoScope_StoredUnderDefaultScope()
+    {
+        var svc = NewService();
+        var payload = System.Text.Encoding.UTF8.GetBytes(
+            "{\"pack\":\"TelegramResponderNeuron\",\"sessionId\":\"user-session-42\",\"telegram_token\":\"123:ABC\"}");
+        await svc.Send(new SynapseEnvelope
+        {
+            TypeName = nameof(ConfigurationProvided),
+            CorrelationId = "cfg-session",
+            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+        }, TestServerCallContext.Create());
+
+        var reply = await svc.GetPackConfig(
+            new GetPackConfigRequest { Scope = "default", Pack = "TelegramResponderNeuron" },
+            TestServerCallContext.Create());
+
+        Assert.Equal("123:ABC", reply.Values["telegram_token"]);
+        Assert.False(reply.Values.ContainsKey("sessionId"), "sessionId is a control key, not a stored config value.");
+    }
+
     [Fact]
     public async Task ConfigurationProvided_BroadcastsNonSecretPackConfigured_WithoutToken()
     {

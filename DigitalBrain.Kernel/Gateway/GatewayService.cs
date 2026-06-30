@@ -79,7 +79,11 @@ public sealed class GatewayService(
                 string? Field(string key) => p.TryGetValue(key, out var v) ? v?.ToString() : null;
 
                 var pack = Field("pack") ?? Field("packName") ?? request.CorrelationId;
-                var scope = Field("scope") ?? Field("sessionId") ?? Field("buyerId") ?? "default";
+                // The storage scope MUST be one the readers actually look under. The responder pack,
+                // LlmResponderNeuron, and the Telegram transport all read scope "default", so honor an explicit
+                // "scope" field when supplied and otherwise fall back to "default" — never a per-session/buyer
+                // scope, which would silently strand the configured token/key where no reader ever looks.
+                var scope = Field("scope") ?? "default";
 
                 var controlKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
                 {
@@ -151,10 +155,16 @@ public sealed class GatewayService(
                 return request;
             }
 
-            // Generic fallback: any unknown type_name becomes a named Signal broadcast on the timeline.
-            // External clients (e.g. Telegram transport) can fire arbitrary named synapses without kernel knowing their type.
+            // Generic fallback: any unknown type_name becomes a named Signal broadcast on the cluster timeline.
+            // This path is INTERNAL-ONLY. Trusted in-cluster transports (the Telegram transport) present the shared
+            // InternalServiceKey to fire arbitrary named synapses; an untrusted browser on the same external ingress
+            // must not, or it could forge egress/reply signals (e.g. TelegramReplyRequested → arbitrary outbound
+            // Telegram messages) or spoof inbound events. The known surface-action branches above stay open to the
+            // Flutter client; only this arbitrary-type path is gated (same key + fail-closed rules as GetPackConfig).
             if (string.IsNullOrWhiteSpace(request.TypeName))
                 throw new RpcException(new Status(StatusCode.InvalidArgument, "Empty synapse type"));
+
+            EnforceInternalCaller(context);
 
             var payloadJson = System.Text.Encoding.UTF8.GetString(request.Payload.ToArray());
             var rawProps = string.IsNullOrWhiteSpace(payloadJson)

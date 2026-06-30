@@ -12,10 +12,20 @@ public sealed class SignalEgressBus
 {
     private readonly ConcurrentDictionary<Guid, Subscriber> _subscribers = new();
 
+    // Per-subscriber buffer cap. Egress is best-effort: a stuck/slow WatchSynapses client must not let its
+    // channel grow without bound as every cluster-wide Signal is fanned in. At the cap the oldest queued Signal
+    // is dropped (DropOldest) rather than blocking Publish or leaking memory.
+    private const int SubscriberCapacity = 1024;
+
     public Subscription Subscribe(IReadOnlyCollection<string>? typeFilter)
     {
         var id = Guid.NewGuid();
-        var channel = Channel.CreateUnbounded<Signal>(new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+        var channel = Channel.CreateBounded<Signal>(new BoundedChannelOptions(SubscriberCapacity)
+        {
+            FullMode = BoundedChannelFullMode.DropOldest,
+            SingleReader = true,
+            SingleWriter = false
+        });
         var filter = typeFilter is { Count: > 0 }
             ? new HashSet<string>(typeFilter, StringComparer.Ordinal)
             : null;

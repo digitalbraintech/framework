@@ -56,7 +56,8 @@ public sealed class TransportContractTests
     {
         var fakeGateway = new RecordingGatewayClient();
         var forwarder = new Transport.TelegramUpdateForwarder(
-            fakeGateway, NullLogger<Transport.TelegramUpdateForwarder>.Instance);
+            fakeGateway, new Transport.TelegramTransportOptions(),
+            NullLogger<Transport.TelegramUpdateForwarder>.Instance);
 
         var update = JsonSerializer.Deserialize<global::Telegram.BotAPI.GettingUpdates.Update>(RecordedUpdateJson)!;
         await forwarder.ForwardAsync(update);

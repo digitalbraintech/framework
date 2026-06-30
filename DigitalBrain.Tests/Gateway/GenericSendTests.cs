@@ -4,6 +4,7 @@ using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Gateway;
 using DigitalBrain.Runtime.Grpc;
 using DigitalBrain.Tests.TestSupport;
+using Grpc.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -67,6 +68,41 @@ public class GenericSendTests : IAsyncLifetime
         Assert.True(signal.Props.TryGetValue("chatId", out var chatId), "Props should contain 'chatId'");
         Assert.True(chatId is 7 or 7L, $"chatId should be 7 (numeric), was {chatId} ({chatId?.GetType().Name})");
         Assert.Equal("hi", signal.Props["text"]);
+    }
+
+    // SECURITY: the generic fallback broadcasts an arbitrary named Signal onto the cluster timeline. It sits on
+    // the same external gRPC service a browser reaches, so it is internal-only. An untrusted caller (no internal
+    // key, non-Development) must be rejected before any forged egress/reply signal can ride the timeline.
+    [Fact]
+    public async Task Send_UnknownType_FromUntrustedCaller_InProduction_IsRejected()
+    {
+        var prodService = new GatewayService(
+            _cluster.GrainFactory,
+            new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:InternalServiceKey"] = "the-key" })
+                .Build(),
+            _homeFeedBus, new SignalEgressBus(), new FakeHostEnvironment("Production"),
+            NullLogger<GatewayService>.Instance);
+
+        var payload = Google.Protobuf.ByteString.CopyFrom(System.Text.Encoding.UTF8.GetBytes("{\"chatId\":7,\"text\":\"hi\"}"));
+
+        // No x-internal-key header → forged egress injection rejected.
+        var ex = await Assert.ThrowsAsync<RpcException>(() => prodService.Send(new SynapseEnvelope
+        {
+            TypeName = "TelegramReplyRequested",
+            CorrelationId = "attacker-1",
+            Payload = payload
+        }, TestServerCallContext.Create()));
+        Assert.Equal(StatusCode.Unauthenticated, ex.StatusCode);
+
+        // Correct internal key → trusted in-cluster transport is admitted.
+        var accepted = await prodService.Send(new SynapseEnvelope
+        {
+            TypeName = "TelegramMessageReceived",
+            CorrelationId = "transport-1",
+            Payload = payload
+        }, TestServerCallContext.WithHeaders(("x-internal-key", "the-key")));
+        Assert.NotNull(accepted);
     }
 
     private sealed class SignalSinkSiloConfig : ISiloConfigurator
