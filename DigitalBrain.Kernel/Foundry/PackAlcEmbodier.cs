@@ -21,6 +21,8 @@ public sealed class EmbodiedPack(string packName, AssemblyLoadContext context, I
 
     public PackManifest GetManifest() => behavior.GetManifest();
 
+    public BundleManifest? GetBundleManifest() => behavior.GetBundleManifest();
+
     public string Respond(string input) => behavior.Respond(input);
 
     public bool CanHandle(Synapse synapse) => behavior.CanHandle(synapse);

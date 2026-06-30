@@ -21,6 +21,8 @@ public sealed class BundleHarness : IDisposable
         _experienceId = experienceId;
     }
 
+    public BundleManifest? Manifest => _pack.GetBundleManifest();
+
     public UiSurface Trigger(string eventName, params (string key, string value)[] args)
     {
         var step = new ExperienceStep(
