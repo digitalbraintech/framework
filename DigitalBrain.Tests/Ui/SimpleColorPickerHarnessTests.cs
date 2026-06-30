@@ -25,6 +25,10 @@ public class UiTestingFrameworkExamples
 
         tree.ShouldHaveNodeOfType(DigitalBrain.Core.Ui.TextField);
         tree.ShouldHaveButtonWithLabel("Greet");
+
+        // Example of other kit nodes (for experiences using Select etc.)
+        // tree.ShouldHaveSelect("some-field"); 
+    }
     }
 
     [Fact]

@@ -81,14 +81,35 @@ public static class UiTreeAssertions
     public static void ShouldHaveButtonWithLabel(this UiWidgetTree tree, string label)
     {
         var node = FindNode(tree, DigitalBrain.Core.Ui.Button);
-        if (node != null && node.Props.TryGetValue("label", out var l) && l?.ToString() == label)
+        if (node != null && MatchesLabel(node, label))
             return;
 
-        // Also check common aliases used in emission
+        // Also check common emission aliases (fbutton, neuron:button, etc.)
         if (FindByProp(tree, "label", label) != null)
             return;
 
         throw new Xunit.Sdk.XunitException($"No button with label '{label}' found.");
+    }
+
+    public static void ShouldHaveSelect(this UiWidgetTree tree, string name)
+    {
+        var node = FindNode(tree, DigitalBrain.Core.Ui.Select);
+        if (node != null && node.Props.TryGetValue("name", out var n) && n?.ToString() == name)
+            return;
+
+        // Support common emission names
+        if (FindByProp(tree, "name", name) != null)
+            return;
+
+        throw new Xunit.Sdk.XunitException($"No select with name '{name}' found.");
+    }
+
+    public static void ShouldContainPanelWithText(this UiWidgetTree tree, string containedText)
+    {
+        if (FindPanelContaining(tree, containedText) != null)
+            return;
+
+        throw new Xunit.Sdk.XunitException($"No panel containing text '{containedText}' found.");
     }
 
     private static bool ContainsTextRecursive(UiWidgetTree node, string text)
@@ -129,5 +150,17 @@ public static class UiTreeAssertions
             line += "\n" + string.Join("\n", node.Children.Select(c => DumpTree(c, indent + 1)));
 
         return line;
+    }
+
+    private static bool MatchesLabel(UiWidgetTree node, string label) =>
+        node.Props.TryGetValue("label", out var l) && l?.ToString() == label;
+
+    private static UiWidgetTree? FindPanelContaining(UiWidgetTree node, string text)
+    {
+        if (string.Equals(node.Type, DigitalBrain.Core.Ui.Panel, StringComparison.OrdinalIgnoreCase) &&
+            ContainsTextRecursive(node, text))
+            return node;
+
+        return node.Children?.Select(c => FindPanelContaining(c, text)).FirstOrDefault(c => c != null);
     }
 }
