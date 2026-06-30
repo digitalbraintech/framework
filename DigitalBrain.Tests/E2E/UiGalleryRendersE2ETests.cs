@@ -1,3 +1,4 @@
+using DigitalBrain.Core;
 using Xunit;
 
 namespace DigitalBrain.Tests.E2E;
@@ -19,19 +20,19 @@ public sealed class UiGalleryRendersE2ETests(DigitalBrainBrowserFixture fixture)
         await driver.OpenAsync();
 
         await driver.TriggerExperienceAsync();
-        await driver.AssertHopRendersAsync("inputs");
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Inputs);
 
-        await driver.TapAsync("display");
-        await driver.AssertHopRendersAsync("display");
+        await driver.TapAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Display);
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Display);
 
-        await driver.TapAsync("feedback");
-        await driver.AssertHopRendersAsync("feedback");
+        await driver.TapAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Feedback);
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Feedback);
 
-        await driver.TapAsync("navigation");
-        await driver.AssertHopRendersAsync("navigation");
+        await driver.TapAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Navigation);
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Navigation);
 
-        await driver.TapAsync("overlays");
-        await driver.AssertHopRendersAsync("overlays");
+        await driver.TapAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Overlays);
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Overlays);
     }
 
     [SkippableFact]
@@ -44,6 +45,6 @@ public sealed class UiGalleryRendersE2ETests(DigitalBrainBrowserFixture fixture)
         var driver = new ExperienceFlowDriver(_fx, pack: "ui-gallery", experienceId: "ui-gallery");
         await driver.OpenAsync();
 
-        await driver.AssertHopRendersAsync("inputs");
+        await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Inputs);
     }
 }

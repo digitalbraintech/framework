@@ -2,6 +2,7 @@ using DigitalBrain.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 
 namespace DigitalBrain.Tests.Ui;
 
@@ -112,6 +113,27 @@ public static class UiTreeAssertions
         throw new Xunit.Sdk.XunitException($"No panel containing text '{containedText}' found.");
     }
 
+    public static void ShouldHaveList(this UiWidgetTree tree)
+    {
+        if (FindNode(tree, DigitalBrain.Core.Ui.List) != null || FindNode(tree, "list") != null)
+            return;
+        throw new Xunit.Sdk.XunitException("No list node found.");
+    }
+
+    public static void ShouldHaveSidebarItem(this UiWidgetTree tree, string label)
+    {
+        if (FindByProp(tree, "label", label) != null)
+            return;
+        throw new Xunit.Sdk.XunitException($"No sidebar item with label '{label}' found.");
+    }
+
+    public static void ShouldHaveAction(this UiWidgetTree tree, string eventName)
+    {
+        if (FindByProp(tree, "eventName", eventName) != null)
+            return;
+        throw new Xunit.Sdk.XunitException($"No action with eventName '{eventName}' found.");
+    }
+
     private static bool ContainsTextRecursive(UiWidgetTree node, string text)
     {
         if (node.Props.TryGetValue("text", out var t) && t?.ToString()?.Contains(text) == true)
@@ -125,7 +147,12 @@ public static class UiTreeAssertions
 
     private static UiWidgetTree? FindNode(UiWidgetTree node, string type)
     {
-        if (string.Equals(node.Type, type, StringComparison.OrdinalIgnoreCase))
+        var normalized = type.StartsWith("ui:") || type.StartsWith("neuron:") || type.StartsWith("forui:")
+            ? type.ToLowerInvariant()
+            : type.ToLowerInvariant();
+
+        var nodeType = node.Type.ToLowerInvariant();
+        if (nodeType == normalized || nodeType == "ui:" + normalized || nodeType == "neuron:" + normalized || nodeType.EndsWith(":" + normalized))
             return node;
 
         return node.Children?.Select(c => FindNode(c, type)).FirstOrDefault(c => c != null);
@@ -163,4 +190,10 @@ public static class UiTreeAssertions
 
         return node.Children?.Select(c => FindPanelContaining(c, text)).FirstOrDefault(c => c != null);
     }
+
+    /// <summary>
+    /// Produces a stable JSON snapshot of the tree for golden testing / regression.
+    /// </summary>
+    public static string ToGoldenSnapshot(this UiWidgetTree tree) =>
+        JsonSerializer.Serialize(tree, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
 }

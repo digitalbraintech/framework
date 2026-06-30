@@ -19,6 +19,12 @@ public sealed class HelloWorldExperience : KitExperience
 }
 """;
 
+    public static class HelloWorldHops
+    {
+        public const string Ask = "ask";
+        public const string Greeting = "greeting";
+    }
+
 public const string SimpleColorPickerPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
@@ -35,6 +41,12 @@ public sealed class SimpleColorPickerExperience : KitExperience
             .Button("Choose again", "choose"));
 }
 """;
+
+    public static class SimpleColorPickerHops
+    {
+        public const string Choose = "choose";
+        public const string Result = "result";
+    }
 
 
     public const string UiGalleryPackCode = """
@@ -88,6 +100,15 @@ public sealed class UiGalleryExperience : KitExperience
         ("Overlays", "overlays"));
 }
 """;
+
+    public static class UiGalleryHops
+    {
+        public const string Inputs = "inputs";
+        public const string Display = "display";
+        public const string Feedback = "feedback";
+        public const string Navigation = "navigation";
+        public const string Overlays = "overlays";
+    }
 
     public static IReadOnlyList<NeuroPack> LocalUiPacks { get; } =
     [

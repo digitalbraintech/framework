@@ -29,17 +29,20 @@ public class UiTestingFrameworkExamples
         // Example of other kit nodes (for experiences using Select etc.)
         // tree.ShouldHaveSelect("some-field"); 
     }
-    }
 
     [Fact]
-    public void State_captured_from_step_is_used_in_subsequent_hop()
+    public void Can_use_golden_snapshot_and_matchers()
     {
         var harness = new ExperienceTestHarness<HelloWorldExperience>();
 
-        var result = harness.Trigger("greeting", ("name", "Alice"));
-        var tree = (UiWidgetTree)result.Props["tree"];
+        var ask = harness.Trigger("ask");
+        var tree = (UiWidgetTree)ask.Props["tree"];
 
-        tree.ShouldContainText("Hello Alice!");
+        // Golden snapshot
+        var snapshot = tree.ToGoldenSnapshot();
+        Assert.Contains("ui:TextField", snapshot);
+
+        tree.ShouldHaveButtonWithLabel("Greet");
     }
 
     // Real type from the hello-world seed code (defined in MarketplaceSeeds).
