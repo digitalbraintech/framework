@@ -15,6 +15,8 @@ jobs:
         with:
           dotnet-version: '11.0.x'
 
-      - run: dotnet build NeuroOS.slnx -c Release
+      - run: dotnet build Brain.slnx -c Release
 
-      - run: dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release
+      # E2E specs need the full Aspire stack (Ollama + replicas) + Playwright and are gated out of headless CI,
+      # mirroring the documented "DigitalBrain.Tests excluding gated E2E" verification.
+      - run: dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj -c Release --filter "FullyQualifiedName!~E2E"
