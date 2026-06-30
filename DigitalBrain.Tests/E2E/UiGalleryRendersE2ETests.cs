@@ -19,7 +19,7 @@ public sealed class UiGalleryRendersE2ETests(DigitalBrainBrowserFixture fixture)
         var driver = new ExperienceFlowDriver(_fx, pack: "ui-gallery", experienceId: "ui-gallery");
         await driver.OpenAsync();
 
-        await driver.TriggerExperienceAsync();
+        // Client auto-starts the experience for the preinstalled gallery seed
         await driver.AssertHopRendersAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Inputs);
 
         await driver.TapAsync(DigitalBrain.Core.MarketplaceSeeds.UiGalleryHops.Display);
