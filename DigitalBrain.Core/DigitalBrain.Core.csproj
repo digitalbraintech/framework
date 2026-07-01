@@ -17,4 +17,13 @@
     <PackageReference Include="Microsoft.Orleans.Serialization" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Single source of truth for the PersonalAssistant marketplace seed pack: the real neuron source
+         (DigitalBrain.Experience.PersonalAssistant, Task 9) is embedded and read back at runtime by
+         MarketplaceSeeds.PersonalAssistantPackCode, instead of a hand-copied duplicate that could drift. -->
+    <EmbeddedResource Include="..\DigitalBrain.Experience.PersonalAssistant\PersonalAssistantNeuron.cs">
+      <LogicalName>PersonalAssistantNeuron.cs</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

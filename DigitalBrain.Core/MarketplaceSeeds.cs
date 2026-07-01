@@ -53,6 +53,21 @@ public sealed class TelegramResponderNeuron : IPackBehavior
 }
 """;
 
+    // Single source of truth for the PersonalAssistant pack: the real PersonalAssistantNeuron.cs
+    // (DigitalBrain.Experience.PersonalAssistant) is embedded as a resource and read back here, so
+    // there is no hand-copied duplicate of the source that could drift.
+    public static string PersonalAssistantPackCode => _personalAssistantPackCode.Value;
+
+    private static readonly Lazy<string> _personalAssistantPackCode = new(() => ReadEmbeddedSource("PersonalAssistantNeuron.cs"));
+
+    private static string ReadEmbeddedSource(string logicalName)
+    {
+        using var stream = typeof(MarketplaceSeeds).Assembly.GetManifestResourceStream(logicalName)
+            ?? throw new InvalidOperationException($"Embedded resource '{logicalName}' not found.");
+        using var reader = new StreamReader(stream);
+        return reader.ReadToEnd();
+    }
+
     public const string HelloWorldPackCode = """
 using System.Collections.Generic;
 using DigitalBrain.Core;
@@ -292,6 +307,21 @@ public sealed class ExcelVizPack : IPackBehavior
             0.05,
             TelegramResponderPackCode,
             "Telegram bot responder: receives TelegramMessageReceived signals, emits AskLlm to the LLM layer, configurable for Ollama or OpenAI. Install via marketplace, supply token and LLM config."),
+
+        new NeuroPack(
+            "DigitalBrain.Experience.PersonalAssistant",
+            "0.1.0",
+            "digitalbraintech",
+            false,
+            0.0,
+            PersonalAssistantPackCode,
+            "Personal AI assistant: Telegram-triggered, recalls context before responding, visualizes results via the UI Kit when appropriate.",
+            Manifest: new(BundleTier.Content, null, new[] { BundleChannel.Telegram },
+                new[]
+                {
+                    new BundleDependency("DigitalBrain.Telegram.Responder", "1.0.0"),
+                    new BundleDependency("DigitalBrain.UIKit.ForUI", "0.1.0")
+                })),
 
         new NeuroPack(
             "DigitalBrain.Telegram.KeywordWatcher",
