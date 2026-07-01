@@ -514,6 +514,13 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
             // Remote is source of truth for catalog; still allow local journal for offline/hybrid.
         }
 
+        if (GatePublishing && !PublisherTrust.IsTrusted(ToNeuroPack(cmd), TrustedPublisherKeys()))
+        {
+            Logger.LogWarning("Publish REJECTED - pack {Name}@{Ver} is not from a trusted publisher (publishing gate enabled)",
+                cmd.PackName, cmd.Version);
+            return;
+        }
+
         Logger.LogInformation("Marketplace PUBLISHED real pack {Name}@{Ver} owner={Owner} private={Private} commission={Rate:P0}",
             cmd.PackName, cmd.Version, cmd.OwnerId, cmd.IsPrivate, cmd.CommissionRate);
 
@@ -693,9 +700,14 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
         _publishedCache = new Dictionary<string, NeuroPack>(StringComparer.OrdinalIgnoreCase);
 
         // Seed once from journals (recovery path). Subsequent publishes update in place for O(1) List/Find.
+        // Apply the same gate filter here so that gate-rejected packs stay excluded after a grain restart.
+        var gated = GatePublishing;
+        var trustedKeys = gated ? TrustedPublisherKeys() : null;
         foreach (var p in OutgoingJournal.Concat(IncomingJournal).OfType<PublishToMarketplace>())
         {
-            _publishedCache[KeyFor(p.PackName, p.Version)] = ToNeuroPack(p);
+            var pack = ToNeuroPack(p);
+            if (gated && !PublisherTrust.IsTrusted(pack, trustedKeys!)) continue;
+            _publishedCache[KeyFor(p.PackName, p.Version)] = pack;
         }
     }
 
@@ -708,6 +720,19 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
 
     private bool RejectUnsignedPacks =>
         ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:RejectUnsignedPacks", true) ?? true;
+
+    private bool GatePublishing =>
+        ServiceProvider.GetService<IConfiguration>()?.GetValue("DigitalBrain:Marketplace:GatePublishing", false) ?? false;
+
+    private IReadOnlyCollection<string> TrustedPublisherKeys()
+    {
+        var keys = new HashSet<string>(StringComparer.Ordinal) { TrustedPublisher.PublicKeyBase64 };
+        var configured = ServiceProvider.GetService<IConfiguration>()
+            ?.GetSection("DigitalBrain:Marketplace:TrustedPublisherKeys").Get<string[]>();
+        if (configured is not null)
+            foreach (var key in configured) keys.Add(key);
+        return keys;
+    }
 }
 
 [GrainType("digitalbrain.observability.v1")]
