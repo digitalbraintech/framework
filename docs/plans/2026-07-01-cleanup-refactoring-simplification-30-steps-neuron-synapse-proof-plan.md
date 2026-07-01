@@ -289,3 +289,14 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Targeted tests (TelegramChatNeuron|FlutterUiNeuron|Journal...|Marketplace): 0 failed (28 passed, 10 passed on narrow).
 - aspire__doctor: 4/4.
 - Tiny, delete (removed redundant explicit impl), marker only for now. Ready for further sharing or item 14.
+
+**Item 14 tiny start (routing prefer):**
+- Context7 (Orleans) patterns used from prior.
+- Updated DataVisualizationNeuron.BroadcastRfwCard (in Kernel) to prefer Deliver the UiSurface to IFlutterUiNeuron("flutter-ui") grain instead of direct HomeFeedBus.Broadcast.
+  - Deleted direct bus + bridge + special card logic in that path (delete > add); the dedicated neuron now owns conversion + broadcast via its Handle (which uses bridge).
+  - Preserves surface.CorrelationId for context.
+  - This routes through FlutterUiNeuron (the channel owner) as preferred.
+- Build: 0 errors.
+- Targeted tests (DataVisualization|Chart|...): 15 passed / 0 failed.
+- aspire__doctor: 4/4.
+- Tiny focused change in 1 file + plan. Further places (e.g. ChatNeuron) can follow in next tiny slice.

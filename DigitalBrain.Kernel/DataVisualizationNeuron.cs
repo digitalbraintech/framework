@@ -165,15 +165,10 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
 
     private async Task BroadcastRfwCard(UiSurface surface)
     {
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus == null) return;
-        var card = UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value);
-        if (surface.Props.TryGetValue("graphicSpec", out var g))
-        {
-            var data = JsonSerializer.Serialize(new { title = surface.Props.GetValueOrDefault(UiSurfaceKeys.Title), graphicSpec = g, summary = surface.Props.GetValueOrDefault("summary") });
-            card = new RfwCard("digitalbrain", "ChartCard", data) { CorrelationId = surface.CorrelationId ?? surface.SynapseId };
-        }
-        bus.Broadcast(card);
+        // Prefer routing through dedicated IFlutterUiNeuron (item 14) so it owns the UI channel, applies bridge, and broadcasts.
+        // Uses CorrelationId from surface for context sharing (per channel marker).
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(surface);
     }
 
     public new Task<IReadOnlyList<Synapse>> GetTimelineAsync() => Task.FromResult<IReadOnlyList<Synapse>>(OutgoingJournal.ToList());
