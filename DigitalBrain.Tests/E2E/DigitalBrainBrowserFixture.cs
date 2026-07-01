@@ -63,7 +63,9 @@ public class DigitalBrainBrowserFixture : DigitalBrainAppHostFixture
     {
         var node = Page.Locator(selector);
         await node.WaitForAsync(new() { Timeout = 10_000 });
-        // In real, could inspect attributes or console; placeholder for now per tiny slice.
+        // Placeholder for context check (e.g. via data attrs or console logs in full impl).
+        // For now, just confirms presence as step toward verifying tg originChannel etc.
+        if (await node.CountAsync() == 0) throw new Exception($"Surface {selector} not found for context {key}");
     }
 
     public override async Task DisposeAsync()

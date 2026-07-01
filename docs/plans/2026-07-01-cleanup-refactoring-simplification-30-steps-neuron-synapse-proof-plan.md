@@ -372,8 +372,8 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 **Next (after this continue slice green):**
 - 14 emitters in SystemNeurons startup (seHello, installedStart, richKit, chartSurface, chat, shell, appShell, marketList, taskTreeSurface, marketTreeSurface, FilterMarketplace) + rolling drain now prefer Deliver to IFlutterUiNeuron (direct bus deleted for UiSurfaces; some RfwCards remain for compat in rolling).
 - 15/16 polished with prop merge, visible title "(from Telegram)", test asserts for origin and title.
-- E2E/test slice for tg context flow started (enhanced viz test + comments in TestPacks + PackEmbodimentRendersE2ETests + browser fixture helper for full chain).
-- Move to more E2E (e.g., actual browser asserts in PackEmbodiment test for context) or manual aspire run (use MCP list_resources etc) to verify surfaces.
+- E2E/test slice for tg context flow started (enhanced viz test + comments + helper in fixture + usage + enhancement in PackEmbodiment for full chain).
+- Move to more E2E (e.g., real asserts checking context props in browser) or manual aspire run (use MCP list_resources etc) to verify surfaces.
 - Commit current when directed. (Startup 14 complete; E2E slice in progress).
 
 **15/16 polish (post b561984, this continue):**
@@ -496,6 +496,7 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Tiny E2E: added comment in PackEmbodimentRendersE2ETests tying surface render E2E to tg context flow.
 - Tiny E2E: added AssertSurfaceContext helper to DigitalBrainBrowserFixture for future browser asserts on routed surfaces/context (e.g. originChannel).
 - Tiny E2E continue: called the helper in PackEmbodimentRendersE2ETests after waiting for the node (placeholder for full context check).
+- Tiny E2E: enhanced helper with basic count check to fail if node not found.
 - Build 0e, test passed (E2E skippable as expected).
 - aspire__doctor 4/4.
 - Plan updated. (Startup 14 complete; E2E slice started).
