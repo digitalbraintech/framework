@@ -180,6 +180,8 @@ public class TelegramChatNeuronTests
             var flutter = cluster.GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
             var flIncoming = await flutter.GetIncomingTimelineAsync();
             Assert.Contains(flIncoming, s => s is UiSurface u && (u.Kind == UiSurfaceKinds.DataChart || u.Props.ContainsKey("chartSpec") || u.Props.ContainsKey("tree")));
+            // Item 15 polish: assert "from telegram" context arrived via stamped causation on the UiSurface.
+            Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("originChannel", out var oc) && oc?.ToString() == "telegram");
         }
         finally { await cluster.StopAllSilosAsync(); }
     }

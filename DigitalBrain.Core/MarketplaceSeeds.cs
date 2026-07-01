@@ -200,6 +200,32 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
 }
 """;
 
+    // Item 16: small ExcelVizPack seed (placed before list so initializer can reference the const).
+    public const string ExcelVizPackCode = """
+using System;
+using System.Collections.Generic;
+using System.Text.Json;
+using DigitalBrain.Core;
+
+public sealed class ExcelVizPack : IPackBehavior
+{
+    public PackManifest GetManifest() => new(
+        new[] { new SynapseType("VisualizeDataRequest") });
+
+    public IReadOnlyList<Synapse> Handle(Synapse synapse)
+    {
+        // Demo shape for excel/chart viz pack seed. Trigger example from tg channel (item 15 context via Sender/Causation).
+        if (synapse is VisualizeDataRequest req && (req.Prompt?.Contains("excel", StringComparison.OrdinalIgnoreCase) ?? false))
+        {
+            // Real viz + UiSurface emission stays with DataVisualizationNeuron routed to IFlutterUiNeuron.
+        }
+        return Array.Empty<Synapse>();
+    }
+
+    public BundleManifest? GetBundleManifest() => null;
+}
+""";
+
     public static IReadOnlyList<NeuroPack> LocalUiPacks { get; } =
     [
         new NeuroPack(
@@ -317,7 +343,19 @@ public class DummyBehaviorPack : DigitalBrain.Core.IPackBehavior
     public DigitalBrain.Core.PackManifest GetManifest() => new(new[] { new DigitalBrain.Core.SynapseType("ExperienceUsed") });
 }
 """,
-            "Dummy behavior pack for testing marketplace distribution of typed C# packs during kernel/experience development.")
+            "Dummy behavior pack for testing marketplace distribution of typed C# packs during kernel/experience development."),
+
+        // Item 16: small ExcelVizPack seed example. Self-contained typed-C# NeuroPack.
+        // Can be published/installed; Telegram viz trigger paths can target generated- versions or be extended to route excel data here.
+        // Demonstrates a pack that understands VisualizeDataRequest-like flows for chart surfaces from "excel" inputs.
+        new NeuroPack(
+            "excel-viz",
+            "0.1.0",
+            "digitalbraintech",
+            false,
+            0.0,
+            ExcelVizPackCode,
+            "Small ExcelViz example pack (seed). Accepts chart data (excel-like json), emits DataChart/UiSurface. Triggerable from Telegram channel flows.")
     ];
 
     public static IEnumerable<PublishToMarketplace> LocalUiPackPublishCommands() =>

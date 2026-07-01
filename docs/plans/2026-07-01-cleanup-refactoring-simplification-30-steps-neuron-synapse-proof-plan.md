@@ -341,3 +341,48 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Full manual `aspire run` (no flags) + doctor + spot check "hello-world" toast + tg viz before next big.
 - Strictly: Context7 if new Orleans/Aspire touch, aspire MCP, relative only, ritual after each, update plan, commit when user says.
 - Do not jump to P2 deletes or large refactors.
+
+**Commit after items 13-14 (b561984):**
+- Committed as b561984: "chore(items 13-14): finish prefer routing through IFlutterUiNeuron (DemoNeuron + helpers); add thin StampCurrent shared context helper for IChannelNeuron (tg/flutter paths); delete dead using"
+- Post-commit verification ritual:
+  - git status: clean.
+  - dotnet build: succeeded (0 errors, 0 new warnings).
+  - Targeted tests (Demo|TelegramChat|FlutterUi|DataViz|Chat|UiSurface): 36 passed / 0 failed.
+  - aspire__doctor (MCP): 4/4 pass.
+- Plan updated in the commit (baseline + 13/14 work + rituals documented).
+- All per rules: Context7 (orleans) before edits, relative paths, delete-first (bus code + unused using), neurons + I* + synapses only, tiny slices, high-sev tests green (aspire integration untouched).
+- Ready to continue into 15/16 without large jumps.
+- Tree now at b561984.
+
+**Continue (post b561984) - item 15/16 start (tiny slices):**
+- Context7 (orleans) re-done before touching grain Handle (Sender/Causation access + pack seeds).
+- Item 15: DataVisualizationNeuron (Chart) now accepts "from telegram" context.
+  - In HandleAsync(VisualizeDataRequest): detect via request.Sender or CurrentCause.Sender containing "tg-chat".
+  - If from tg, augments the UiSurface.Props with "originChannel":"telegram", "fromTelegram":true, "channelContext".
+  - Preserves full routing to IFlutterUiNeuron + StampCurrent.
+  - Ties to existing tg viz trigger (excel-like json) and stamped causation.
+- Item 16: small ExcelVizPack seed example.
+  - Added const string ExcelVizPackCode (minimal valid IPackBehavior handling VisualizeDataRequest for "excel" prompts; comments tie to tg + real viz routing).
+  - Added corresponding NeuroPack("excel-viz", "0.1.0", ..., ExcelVizPackCode, desc) entry in LocalUiPacks (visible in marketplace seeds, auto-published).
+  - Self-contained, can be triggered/extended from channel neurons.
+- After each: build (0e), targeted tests (DataViz|TelegramChat|Marketplace: 27p/0f), aspire__doctor 4/4, this plan update.
+- No large changes; kept root via channels + existing synapses.
+- Current tree dirty (new work); commit when directed.
+
+**Next (after this continue slice green):**
+- Light polish on 15/16 if needed (e.g. use the origin in chart title or test assert).
+- More 14 emitters if time, or move to test/E2E slice for the full tg context flow.
+- Manual aspire run recommended to see "from telegram" surface prop + seed visible.
+
+**15/16 polish (post b561984, this continue):**
+- Context7 (Orleans grain incoming Synapse Sender/Causation + record with for props) done before edits.
+- DataVisualizationNeuron polish:
+  - Fixed prop handling: now *merges* tg context props instead of overwriting (preserves title, data, chartSpec etc from ScopeSurface/UiSurfaceSamples).
+  - Uses context visibly: appends " (from Telegram)" to title when origin is tg-chat.
+  - Still routes via BroadcastRfwCard (which uses StampCurrent) + explicit Deliver to IFlutterUiNeuron.
+- Test polish: updated Telegram_viz_signal_produces_UiSurface_handled_by_FlutterUiNeuron to assert originChannel=="telegram" on the UiSurface received by FlutterUiNeuron.
+- Build: 0 errors (0 new warns).
+- Targeted tests (Telegram_viz... | DataVisualization | TelegramChat | Marketplace): 27 passed / 0 failed.
+- aspire__doctor: 4/4.
+- Tiny focused (2 files + plan). Keeps delete-first spirit, neurons/synapses, IChannel context via existing Stamp.
+- Tree now has the polish changes (on top of prior 15/16 start); ready for commit or next (e.g. one more emitter or aspire run).

@@ -36,6 +36,24 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
         var spec = BuildGraphicSpec(session, request.Prompt, request.ChartHint);
         var surface = ScopeSurface(UiSurfaceSamples.Chart(surfaceId, Self.Value, spec), request.UserId, request.SessionId);
 
+        // Item 15 polish: merge "from telegram" context (preserve title/data/etc) and make visible in title.
+        // Uses stamped Sender/Causation from tg neuron per IChannelNeuron patterns.
+        var sender = request.Sender?.Value ?? CurrentCause?.Sender?.Value ?? "";
+        if (sender.Contains("tg-chat", StringComparison.OrdinalIgnoreCase))
+        {
+            var merged = new Dictionary<string, object?>(surface.Props)
+            {
+                ["originChannel"] = "telegram",
+                ["fromTelegram"] = true,
+                ["channelContext"] = "excel-like from tg"
+            };
+            if (merged.TryGetValue("title", out var t) && t is string title)
+            {
+                merged["title"] = title + " (from Telegram)";
+            }
+            surface = surface with { Props = merged };
+        }
+
         await FireAsync(new DataChartGenerated(surfaceId, surface));
         await BroadcastRfwCard(surface);
 
