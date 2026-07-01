@@ -673,7 +673,7 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
     {
         var published = GetPublishedPacks();
         var surface = UiSurfaceLiveData.MarketplaceTreeSurface(
-            published, published, cmd.Tier, cmd.Channel, Self.Value);
+            published, Array.Empty<NeuroPack>(), cmd.Tier, cmd.Channel, Self.Value);
         await FireAsync(surface);
 
         var bus = ServiceProvider.GetService<HomeFeedBus>();
