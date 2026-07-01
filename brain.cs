@@ -27,9 +27,9 @@ kernel.WithEnvironment("DigitalBrain__InternalServiceKey", internalServiceKey);
 
 // Packed integrations added via their Aspire extensions from the marketplace pack's SDK.
 // No logic here for the bot or Flutter - just declare the resource from the pack.
-// Use args to include (e.g. dotnet run brain.cs --telegram --flutter).
+// Defaults: Windows Flutter client on (for fast local dev thin host). Telegram still opt-in via --telegram (pack model).
 bool withTelegram = args.Any(a => a.Contains("telegram", StringComparison.OrdinalIgnoreCase));
-bool withFlutter = args.Any(a => a.Contains("flutter", StringComparison.OrdinalIgnoreCase));
+bool withFlutter = true; // P0 default for local Windows client on dotnet run brain.cs ; remove flag requirement
 
 if (withTelegram)
 {
@@ -41,17 +41,16 @@ if (withTelegram)
     var telegramTransport = builder.AddProject<Projects.DigitalBrain_Telegram_Transport>("telegram-bot");
     ctx.WireTelegramTransport(telegramTransport, kernel, telegramBotToken, internalServiceKey);
 }
-if (withFlutter)
+
+// Always default Windows thin client (UI full impl stays marketplace NeuroPack).
+var flutterPath = ResolveFlutterAppPath(builder);
+if (!string.IsNullOrEmpty(flutterPath))
 {
-    var flutterPath = ResolveFlutterAppPath(builder);
-    if (!string.IsNullOrEmpty(flutterPath))
-    {
-        ctx.AddFlutterClient("flutter-ui", flutterPath, "windows");
-    }
-    else
-    {
-        Console.WriteLine("[brain.cs] WARNING: Flutter app directory not found. Use --flutter only when the 'app' folder is discoverable or set DIGITALBRAIN_FLUTTER_APP_PATH.");
-    }
+    ctx.AddFlutterClient("flutter-ui", flutterPath, "windows");
+}
+else
+{
+    Console.WriteLine("[brain.cs] Flutter path not resolved; default client skipped (set DIGITALBRAIN_FLUTTER_APP_PATH).");
 }
 
 static string? ResolveFlutterAppPath(IDistributedApplicationBuilder b)

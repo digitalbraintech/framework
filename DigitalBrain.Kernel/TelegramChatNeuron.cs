@@ -42,6 +42,17 @@ public sealed class TelegramChatNeuron : Neuron, ITelegramChatNeuron, IHandle<Si
             return;
         }
 
+        // P0-6 cross-channel: Telegram inbound -> "excel-like" data viz request (p2p to chart) -> emits UiSurface -> FlutterUiNeuron handles.
+        if (text.Contains("chart", StringComparison.OrdinalIgnoreCase) || text.Contains("viz", StringComparison.OrdinalIgnoreCase) || text.Contains("excel", StringComparison.OrdinalIgnoreCase))
+        {
+            var excelLike = "[{\"month\":\"Jan\",\"sales\":12},{\"month\":\"Feb\",\"sales\":18},{\"month\":\"Mar\",\"sales\":7}]";
+            var vizReq = new VisualizeDataRequest("sales chart from telegram", excelLike, "bar", "tg-" + Guid.NewGuid().ToString("N")[..8]);
+            var chart = GrainFactory.GetGrain<IDataVisualizationNeuron>("viz-default");
+            await chart.DeliverAsync(vizReq.Stamp(Self, CurrentCause)); // reuse chart -> surface delivered to flutter
+            await Broadcast(new Signal(ReplyName, new Dictionary<string, object?> { ["chatId"] = chatId, ["text"] = "Viz request sent (excel-like data). Check UI surface." }));
+            return;
+        }
+
         var bound = BoundBundle();
         if (bound is not null)
         {

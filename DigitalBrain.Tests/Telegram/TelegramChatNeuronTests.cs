@@ -161,4 +161,26 @@ public class TelegramChatNeuronTests
         }
         finally { await cluster.StopAllSilosAsync(); }
     }
+
+    [Fact]
+    public async Task Telegram_viz_signal_produces_UiSurface_handled_by_FlutterUiNeuron()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-viz1");
+            await chat.DeliverAsync(Inbound(300, "chart my excel sales data"));
+
+            // Chain: tg inbound -> p2p viz to chart -> chart emits surface p2p delivered to flutter (owns handle)
+            var chart = cluster.GrainFactory.GetGrain<IDataVisualizationNeuron>("viz-default");
+            var chartOut = await chart.GetOutgoingTimelineAsync();
+            Assert.Contains(chartOut, s => s is DataChartGenerated || s is UiSurface);
+
+            var flutter = cluster.GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+            var flIncoming = await flutter.GetIncomingTimelineAsync();
+            Assert.Contains(flIncoming, s => s is UiSurface u && (u.Kind == UiSurfaceKinds.DataChart || u.Props.ContainsKey("chartSpec") || u.Props.ContainsKey("tree")));
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
 }

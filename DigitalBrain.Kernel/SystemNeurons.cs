@@ -77,6 +77,10 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         var taskSurface = UiSurfaceLiveData.TaskManagerFromTasks(recentEvents);
         await FireAsync(taskSurface);
 
+        // P0-5 wire: deliver relevant UiSurface to FlutterUiNeuron owner (via IFlutterUiNeuron contract, point-to-point).
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(taskSurface.Stamp(Self, CurrentCause));
+
         var bus = ServiceProvider.GetService<HomeFeedBus>();
         if (bus != null)
         {
@@ -702,6 +706,13 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
             var pack = ToNeuroPack(p);
             if (gated && !PublisherTrust.IsTrusted(pack, trustedKeys!)) continue;
             _publishedCache[KeyFor(p.PackName, p.Version)] = pack;
+        }
+
+        // P0-8: auto-include seeds (Telegram Channel + UI Content) so visible in marketplace List/Filter without prior manual publish. Manifests enable Channel/Content faceting.
+        foreach (var s in MarketplaceSeeds.LocalUiPacks)
+        {
+            var k = KeyFor(s.Name, s.Version);
+            if (!_publishedCache.ContainsKey(k)) _publishedCache[k] = MaterializeManifest(s);
         }
     }
 

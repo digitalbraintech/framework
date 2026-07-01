@@ -209,7 +209,8 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
             false,
             0.0,
             "Trusted Flutter primitive pack: ForUI theme, shell chrome, icons, cards, forms, sidebars, menus, popovers, tooltips, resizable workbench controls, and common UiSurface renderers.",
-            "Preinstalled ForUI primitive kit for rendering DigitalBrain UiSurface contracts. Tier-1 changes require Flutter rebuild/restart."),
+            "Preinstalled ForUI primitive kit for rendering DigitalBrain UiSurface contracts. Tier-1 changes require Flutter rebuild/restart.",
+            Manifest: new(BundleTier.Content, null, new[] { BundleChannel.InApp })),
 
         new NeuroPack(
             "DigitalBrain.UI.Workbench",
@@ -245,7 +246,8 @@ public sealed class KeywordWatcherNeuron : IPackBehavior
             false,
             0.0,
             "Aspire Flutter integration recipe: one default Flutter UI client resource, start/restart descriptors, and rebuild guidance for trusted primitive pack updates.",
-            "Local Flutter client integration pack. Keeps startup to one UI resource by default."),
+            "Local Flutter client integration pack. Keeps startup to one UI resource by default.",
+            Manifest: new(BundleTier.Content, null, new[] { BundleChannel.InApp })),
 
         new NeuroPack(
             "DigitalBrain.Experience.GmailInsights",

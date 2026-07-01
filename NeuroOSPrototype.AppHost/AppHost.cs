@@ -35,19 +35,12 @@ var startUi = builder.AddProject<Projects.DigitalBrain_Cli>("start-ui")
     .WithReference(ctx.OrleansClient)
     .WithExplicitStart();
 
-// Flutter Windows client — automatically started by `aspire run`.
-// The client receives kernel endpoint via Aspire service discovery (services__kernel__http__0 etc.)
-// which resolveKernelEndpoint() in the Flutter app already understands.
-var flutterUiPath = ResolveFlutterAppPath(builder);
-if (!string.IsNullOrEmpty(flutterUiPath))
-{
-    ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")
-        .WithReference(kernel);
-}
-else
-{
-    Console.WriteLine("[Aspire] WARNING: Could not locate Flutter app directory (app/). Set DIGITALBRAIN_FLUTTER_APP_PATH env var or place the 'app' folder as a sibling of 'brain'. Flutter Windows client will not auto-start.");
-}
+// Default Windows Flutter thin client on local `aspire run` (P0).
+// Full UI logic remains in marketplace NeuroPack/bundle. Thin host only.
+// Always start for local dev (no --flutter, no env gate, no conditional).
+var flutterUiPath = ResolveFlutterAppPath(builder) ?? throw new InvalidOperationException("Flutter app path not resolved for default windows client. Ensure 'app' folder with pubspec.yaml is sibling or set DIGITALBRAIN_FLUTTER_APP_PATH.");
+ctx.AddFlutterClient("flutter-ui", flutterUiPath, "windows")
+    .WithReference(kernel);
 
 static string? ResolveFlutterAppPath(IDistributedApplicationBuilder b)
 {

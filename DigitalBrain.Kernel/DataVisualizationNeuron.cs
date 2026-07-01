@@ -38,6 +38,10 @@ public class ChartNeuron : Neuron, IChartNeuron, IDataVisualizationNeuron
 
         await FireAsync(new DataChartGenerated(surfaceId, surface));
         await BroadcastRfwCard(surface);
+
+        // P0-5: also deliver UiSurface to dedicated FlutterUiNeuron (point-to-point via I* contract) so it owns handling for thin client.
+        var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+        await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause));
     }
 
     public async Task HandleAsync(ChartCommand command)

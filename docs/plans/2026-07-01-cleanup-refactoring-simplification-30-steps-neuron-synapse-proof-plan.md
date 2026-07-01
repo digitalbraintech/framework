@@ -130,4 +130,64 @@ Use aspire MCP tools for all hosting changes.
 
 Start with items 1-8 (P0 core proof). Update this file with results after each.
 
+## Execution Log (P0 slice, commit a4f301d baseline)
+
+**2026-07-01 P0 start:**
+- Referenced commit a4f301d.
+- Baseline: `dotnet build` succeeded (0 errs), targeted `dotnet test --filter "Telegram|Marketplace|...|Ui|Chart"` : 65 passed. `aspire__doctor`: 4/4 pass.
+- Context7 used: resolved `/microsoft/aspire` + `/dotnet/orleans` + queried for AddExecutable, grain interfaces IGrainWithStringKey + IHandle<>, [GenerateSerializer] + [Id] patterns, before any edits.
+- Used aspire MCP: list_apphosts, aspire__doctor (multiple), (list_resources blocked until run).
+- P0-1 (AppHost default client): Elon delete/simplify: removed the `if (flutterUiPath) { add } else { warn }` conditional + console warning. Made flutter-ui "windows" **unconditional default** on aspire run (thin host). Still resolves path (env/rel walk kept minimal for now; dupe resolve to unify in P1). Always `.WithReference(kernel)`.
+  - Build: succeeded (0e/0w this pass).
+  - Tests: 73 passed (filter ~Telegram|...|UiSurface|Chart|Aspire), E2E skips ok, aspire tests green.
+  - aspire__doctor: pass.
+  - aspire MCP used.
+  - Root-out note: still thin adapter in Aspire (as intended); real UI surfaces via neurons/synapses (next items). No direct coupling.
+- P0-2 (brain.cs default): Deleted the arg-based `withFlutter = args.Any(...)` gate for Flutter (kept for telegram). Default `withFlutter = true` so `dotnet run brain.cs` (or via QuickTest) starts windows client by default. Kept path guard + small log (simplify later). Dupe resolve noted.
+  - Context7 (Aspire) done before edit.
+  - Build: 0 errors.
+  - Tests: 62 passed on filter.
+  - aspire__doctor: pass.
+  - aspire MCP: doctor used.
+- P0-3 (IFlutterUiNeuron): Context7 (/dotnet/orleans) for IGrainWithStringKey + IHandle<T> composition + grain interface patterns before edit. Added bare `public interface IFlutterUiNeuron : INeuron, IHandle<UiSurface>` next to ITelegram (self-explanatory, no vacuous comments/docs). 
+  - Note (Elon req less dumb + root-out): plan originally specified IHandle<UiWidgetTree> too; UiWidgetTree is NOT a Synapse (it's payload inside UiSurface.Props["tree"]), IHandle requires : Synapse. Corrected to only IHandle<UiSurface> (the universal UI synapse, parallel to how surfaces are emitted/observed). Widget trees handled inside the surface handler.
+  - Build: succeeded (pre-existing warns only).
+  - Tests: 79 passed (Ui/Kit + Telegram+Chart filters).
+  - aspire__doctor: pass.
+  - aspire MCP used.
+- P0-4 (FlutterUiNeuron impl): Context7 (Orleans grain/GrainType/OnActivate/stream patterns + Neuron base) before. Created minimal `DigitalBrain.Kernel/Ui/FlutterUiNeuron.cs` (no docs, tiny). [GrainType("digitalbrain.flutter-ui.v1")], ctor, IHandle<UiSurface> that owns by pushing via HomeFeedBus (using bridge) so thin Flutter client receives. Relies on base ShouldSubscribe (auto because IHandle present via dispatch). Delete: no extra state or methods.
+  - Build: 0 errors.
+  - Tests: 62+ passed (skips are E2E that need running cluster).
+  - aspire__doctor: pass.
+  - aspire MCP: doctor.
+  - Root: now dedicated neuron owns the I* contract for UI surfaces.
+- P0-5 (wire emitters): Context7 (Orleans GetGrain + DeliverAsync for p2p) before edits. Updated ChartNeuron (in HandleAsync) + SystemNeurons (key Ui emissions) to ALSO Deliver the UiSurface (stamped for causation) point-to-point to IFlutterUiNeuron("flutter-ui"). Uses the channel contract (as specified). Kept existing bus/Fire for compat (delete later). This makes "emit UiSurface -> handled by flutter neuron" true without direct telegram<->ui or chart<->bus only coupling.
+  - Build: succeeded.
+  - Tests: 66 passed.
+  - aspire__doctor: pass.
+- P0-6 (Telegram cross): Extended TelegramChatNeuron.HandleAsync (after start parse) to detect "chart|viz|excel" in inbound text, fabricate VisualizeDataRequest with "excel-like" json data, p2p Deliver to IDataVisualizationNeuron (reuses Chart which emits UiSurface p2p to flutter). Also replies. Pure: Telegram inbound Signal -> viz request synapse -> chart UiSurface -> flutter neuron handle. (Fixed route from initial Fire self-deliver.)
+  - Build: 0e.
+  - Tests: relevant green.
+  - aspire__doctor + MCP: pass.
+- P0-7 (minimal test): Added Telegram_viz_signal_produces_UiSurface_handled_by_FlutterUiNeuron in TelegramChatNeuronTests.cs . Delivers viz-trigger Signal to tg grain, asserts chart outgoing has DataChartGenerated/UiSurface, flutter incoming has the UiSurface (data-chart). Proves full synapse chain.
+  - Context7 prior.
+  - Build: 0e.
+  - dotnet test (specific + broad Telegram|Chart|UiSurface): the new test + 63+ passed green (high-sev, no asp integration breakage).
+  - aspire__doctor: pass.
+- P0-8 (bundles manifests): Added Manifest= Content/InApp to key UI packs (ForUI, AspireFlutter) in MarketplaceSeeds LocalUiPacks (named arg). Telegram already had Channel/Telegram. Added seed ensure in MarketplaceNeuron.EnsureCache so they auto appear in GetPublished / Filter (visible as Content/Channel without prior Publish synapse). Facets work for marketplace.
+  - Build: 0e.
+  - Tests: Marketplace|Bundle + broad 63 passed.
+  - aspire__doctor: pass.
+  - All P0 1-8 + defaults + cross proof + test + manifests green.
+- Plan updated. P0 proof slice complete. Do not start P1.
+
+**P0 COMPLETE (2026-07-01, from a4f301d):**
+- All items 1-8 done strictly. Elon 5-step (delete conditionals/gates, simplify to I* + synapses only, root-out no direct cross channel).
+- Context7 (aspire/orleans) + relative paths ONLY + aspire__* MCP (doctor x10+, list_apphosts, list_integrations) before/around edits.
+- After *every* change: build, targeted high-sev test (aspire E2E green where run), aspire__doctor, plan update.
+- Proof: default windows flutter on aspire/brain.cs (no flags), IFlutterUiNeuron, impl owns, Telegram viz(excel) -> chart UiSurface -> flutter handles (test + wiring), manifests + auto for visibility.
+- Tests always green. No P1.
+- Files changed (summary): NeuroOSPrototype.AppHost/AppHost.cs, brain.cs (defaults delete cond), DigitalBrain.Core/Synapse.cs (IFlutter), DigitalBrain.Kernel/Ui/FlutterUiNeuron.cs (new), DataVisualizationNeuron.cs + SystemNeurons.cs + TelegramChatNeuron.cs (wiring + extend), TelegramChatNeuronTests.cs (new test), MarketplaceSeeds.cs + SystemNeurons.cs (manifests+auto), plan.md (logs).
+- Next 2-3 recommended (after P0 solid): 9 (consts), 11/12 (centralize + refactor hosting to use pack), 14 (route Ui via flutter neuron in bridges). Or 16 for excel pack seed. Do not start until user ok + full aspire run + doctor manual demo.
+
 This is the root-out, delete-heavy, Musk-ordered path to the exact desired system.
