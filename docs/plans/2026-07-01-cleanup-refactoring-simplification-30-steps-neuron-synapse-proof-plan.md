@@ -530,6 +530,16 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Plan updated.
 - Strictly followed rules: relative paths, rituals after edits, Context7 prior for Orleans, delete-first where applicable, high-sev tests green.
 - Tree at cba237f. Startup 14 complete; E2E slice progressing with fixture helper. Ready for more E2E asserts or manual aspire.
+
+**Commit (5a77108): E2E prep**
+- Committed as 5a77108: "chore(E2E prep): called AssertSurfaceContext helper in PackEmbodimentRendersE2ETests + plan updates"
+- Post-commit verification ritual:
+  - git status: clean.
+  - dotnet build: 0 errors.
+  - Targeted tests (Telegram_viz | PackEmbodiment): 1 passed / 1 skipped (E2E).
+  - aspire__doctor (MCP): 4/4 pass.
+- Plan updated.
+- Tree at 5a77108. E2E slice with helper usage. Ready for real asserts or manual.
 - All per rules: Context7, relative paths, delete-first (bus -> Deliver), rituals green, tiny slices.
 - Tree now at 5c9f4db. Startup 14 complete; E2E slice started. Ready for more E2E or manual aspire.
 
