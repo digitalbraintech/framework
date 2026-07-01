@@ -30,6 +30,10 @@ public abstract class Neuron : DurableGrain, INeuron, IAsyncObserver<Synapse>
     // Grains are non-reentrant by Orleans contract, so plain field + finally-restore correctly nests causal chains.
     private Synapse? _currentCause;
 
+    // The synapse currently being handled (the cause of anything fired while handling it), exposed so
+    // subclasses doing manual point-to-point delivery can preserve causal lineage on stamped synapses.
+    protected Synapse? CurrentCause => _currentCause;
+
     protected NeuronId Self => new(this.GetPrimaryKeyString() ?? this.GetGrainId().ToString());
 
     protected Neuron(ILogger logger, NeuronJournals journals)

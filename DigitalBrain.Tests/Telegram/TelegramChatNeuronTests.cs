@@ -120,4 +120,25 @@ public class TelegramChatNeuronTests
         }
         finally { await cluster.StopAllSilosAsync(); }
     }
+
+    [Fact]
+    public async Task Forwarded_message_preserves_causation_from_the_inbound()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-105");
+            await chat.DeliverAsync(Inbound(105, "/start hello-world"));
+            await chat.DeliverAsync(Inbound(105, "hi there"));
+
+            var inbound = (await chat.GetIncomingTimelineAsync())
+                .OfType<Signal>().Last(s => s.Name == "TelegramMessageReceived" && s.Props["text"]?.ToString() == "hi there");
+            var forwarded = (await chat.GetOutgoingTimelineAsync())
+                .OfType<Signal>().Single(s => s.Name == "TelegramMessageReceived" && s.Receiver is not null && s.Props["text"]?.ToString() == "hi there");
+
+            Assert.Equal(inbound.SynapseId, forwarded.CausationId);
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
 }

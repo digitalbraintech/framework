@@ -42,7 +42,7 @@ public sealed class TelegramChatNeuron : Neuron, ITelegramChatNeuron, IHandle<Si
             var receiver = new NeuronId("generated-" + bound.ToLowerInvariant());
             // FireAsync routes point-to-point via GetGrain<INeuron>() which is ambiguous across all grain types.
             // Generated neurons are always IGeneratedNeuron, so journal + deliver via that interface directly.
-            var stamped = (signal with { Receiver = receiver }).Stamp(Self);
+            var stamped = (signal with { Receiver = receiver }).Stamp(Self, CurrentCause);
             OutgoingJournal.Add(stamped);
             await WriteStateAsync();
             await GrainFactory.GetGrain<IGeneratedNeuron>(receiver.Value).DeliverAsync(stamped);
