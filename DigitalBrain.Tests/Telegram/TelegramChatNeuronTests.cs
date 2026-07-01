@@ -99,4 +99,25 @@ public class TelegramChatNeuronTests
         }
         finally { await cluster.StopAllSilosAsync(); }
     }
+
+    [Fact]
+    public async Task Start_without_space_does_not_bind_and_broadcasts()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-104");
+            await chat.DeliverAsync(Inbound(104, "/startfoo"));
+
+            Assert.Null(await chat.GetBoundBundleAsync());
+
+            var broadcast = (await chat.GetOutgoingTimelineAsync())
+                .OfType<Signal>()
+                .Where(s => s.Name == "TelegramMessageReceived" && s.IsBroadcast)
+                .ToList();
+            Assert.Contains(broadcast, s => s.Props["text"]?.ToString() == "/startfoo");
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
 }

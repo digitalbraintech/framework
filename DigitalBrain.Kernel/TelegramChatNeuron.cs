@@ -72,7 +72,11 @@ public sealed class TelegramChatNeuron : Neuron, ITelegramChatNeuron, IHandle<Si
     {
         bundleId = "";
         var trimmed = text.Trim();
-        if (!trimmed.StartsWith(StartPrefix, StringComparison.Ordinal)) return false;
+        // "/startfoo" must NOT match — require exactly "/start" or "/start" followed by whitespace.
+        if (trimmed.Length != StartPrefix.Length
+            && (trimmed.Length < StartPrefix.Length || !trimmed.StartsWith(StartPrefix, StringComparison.Ordinal) || !char.IsWhiteSpace(trimmed[StartPrefix.Length])))
+            return false;
+        if (trimmed.Length == StartPrefix.Length) return false; // bare "/start" with no payload
         var rest = trimmed[StartPrefix.Length..].Trim();
         if (rest.Length == 0) return false;
         bundleId = rest;
