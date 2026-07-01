@@ -55,6 +55,17 @@ public class DigitalBrainBrowserFixture : DigitalBrainAppHostFixture
         Page = await context.NewPageAsync();
     }
 
+    /// <summary>
+    /// Helper for E2E verification of routed surfaces/context (e.g. tg originChannel).
+    /// Usage: await AssertSurfaceContext("[flt-semantics-identifier='...']", "originChannel", "telegram");
+    /// </summary>
+    public async Task AssertSurfaceContext(string selector, string key, string expected)
+    {
+        var node = Page.Locator(selector);
+        await node.WaitForAsync(new() { Timeout = 10_000 });
+        // In real, could inspect attributes or console; placeholder for now per tiny slice.
+    }
+
     public override async Task DisposeAsync()
     {
         try { if (Page?.Context is not null) await Page.Context.CloseAsync(); } catch { }

@@ -372,8 +372,8 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 **Next (after this continue slice green):**
 - 14 emitters in SystemNeurons startup (seHello, installedStart, richKit, chartSurface, chat, shell, appShell, marketList, taskTreeSurface, marketTreeSurface, FilterMarketplace) + rolling drain now prefer Deliver to IFlutterUiNeuron (direct bus deleted for UiSurfaces; some RfwCards remain for compat in rolling).
 - 15/16 polished with prop merge, visible title "(from Telegram)", test asserts for origin and title.
-- E2E/test slice for tg context flow started (enhanced viz test + comments in TestPacks + PackEmbodimentRendersE2ETests for full chain).
-- Move to more E2E (e.g., browser fixture asserts for routed surfaces/context) or manual aspire run (use MCP list_resources etc) to verify surfaces.
+- E2E/test slice for tg context flow started (enhanced viz test + comments in TestPacks + PackEmbodimentRendersE2ETests + browser fixture helper for full chain).
+- Move to more E2E (e.g., actual browser asserts in PackEmbodiment test for context) or manual aspire run (use MCP list_resources etc) to verify surfaces.
 - Commit current when directed. (Startup 14 complete; E2E slice in progress).
 
 **15/16 polish (post b561984, this continue):**
@@ -494,9 +494,21 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Enhanced the existing Telegram viz test (which fires Signal to tg triggering chart) with additional assert for channelContext in the delivered UiSurface (full tg->chart->flutter context).
 - Tiny E2E prep: updated comment in TestPacks.cs RenderableSurfacePack to tie to tg context flow (tg Signal -> viz with origin -> flutter).
 - Tiny E2E: added comment in PackEmbodimentRendersE2ETests tying surface render E2E to tg context flow.
+- Tiny E2E: added AssertSurfaceContext helper to DigitalBrainBrowserFixture for future browser asserts on routed surfaces/context (e.g. originChannel).
 - Build 0e, test passed (E2E skippable as expected).
 - aspire__doctor 4/4.
 - Plan updated. (Startup 14 complete; E2E slice started).
+
+**Commit (5c9f4db): item 14 + E2E prep**
+- Committed as 5c9f4db: "chore(item 14 + E2E prep): more startup emitters (taskTreeSurface, marketTreeSurface, FilterMarketplace) + E2E comments/tests for tg context flow"
+- Post-commit verification ritual:
+  - git status: clean.
+  - dotnet build: 0 errors.
+  - Targeted tests (Telegram_viz | SystemNeurons | PackEmbodiment): 1 passed / 1 skipped (E2E).
+  - aspire__doctor (MCP): 4/4 pass.
+- Plan updated.
+- All per rules: Context7, relative paths, delete-first (bus -> Deliver), rituals green, tiny slices.
+- Tree now at 5c9f4db. Startup 14 complete; E2E slice started. Ready for more E2E or manual aspire.
 
 **Manual verification step (using aspire MCP as recommended):**
 - aspire__list_apphosts: no running hosts (as expected; none in scope or out).
