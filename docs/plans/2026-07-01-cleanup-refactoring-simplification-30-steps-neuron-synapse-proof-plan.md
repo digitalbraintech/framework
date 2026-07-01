@@ -241,6 +241,17 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - After: item 15/16 for more cross viz proof + pack seeds if needed. Full manual `aspire run` + doctor + targeted E2E before bigger slices.
 - Update plan + commit after next slice.
 
+**Incidental fix during continue (post e27729f):**
+- Broad test run surfaced pre-existing gap: `JournalJsonContextTests.ContextCoversEverySynapseSubtype` failed with "JournalJsonContext missing: FilterMarketplace".
+- `FilterMarketplace` (defined in Core/Synapse.cs as a Synapse subtype used by IMarketplace + SystemNeurons.HandleAsync + facets) was missing its `[JsonSerializable(typeof(FilterMarketplace))]` entry.
+- Added it in DigitalBrain.Kernel/JournalJsonContext.cs (near other marketplace synapses: Publish/Install).
+- Context7 calls performed for System.Text.Json source gen patterns before edit.
+- Build: 0 errors.
+- `dotnet test --filter "JournalJsonContextTests"`: 2/2 passed.
+- Marketplace + Journal tests green.
+- This was latent (triggered by broader filter); our signals/Ui/kinds work exercised marketplace paths more visibly.
+- Plan updated + will be committed. No other subtypes missing at time of check.
+
 **Commit + continue (70ba57d):**
 - Committed as 70ba57d: "chore(items 10-12): complete signals centralization ... extract dev default Flutter helper (delete dupes)"
 - Post-commit verification ritual:

@@ -44,6 +44,7 @@ namespace DigitalBrain.Kernel;
 [JsonSerializable(typeof(SimulationResult))]
 [JsonSerializable(typeof(PublishToMarketplace))]
 [JsonSerializable(typeof(InstallFromMarketplace))]
+[JsonSerializable(typeof(FilterMarketplace))]
 [JsonSerializable(typeof(NeuroPackInstalled))]
 [JsonSerializable(typeof(PublishedList))]
 [JsonSerializable(typeof(CommissionTaken))]
