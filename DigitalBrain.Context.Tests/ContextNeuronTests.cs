@@ -4,16 +4,12 @@ using Xunit;
 
 namespace DigitalBrain.Context.Tests;
 
-public class ContextNeuronTests : IAsyncLifetime
+public class ContextNeuronTests : NeuronTestBase
 {
-    private readonly TestDigitalBrain _brain = new();
-    public Task InitializeAsync() => _brain.InitializeAsync();
-    public Task DisposeAsync() => _brain.DisposeAsync();
-
     [Fact]
     public async Task Remember_Then_Recall_Finds_The_Text()
     {
-        var context = _brain.Grain<IContextNeuron>("context-recall-test");
+        var context = Grain<IContextNeuron>("context-recall-test");
         await context.RememberAsync("the sky is blue today");
         var results = await context.RecallAsync("sky color");
         Assert.Contains("the sky is blue today", results);
@@ -22,7 +18,7 @@ public class ContextNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Signal_RecallRequested_Replies_With_Signal_RecallCompleted()
     {
-        var context = _brain.Grain<IContextNeuron>("context-signal-test");
+        var context = Grain<IContextNeuron>("context-signal-test");
         await context.RememberAsync("the launch date is March 5th");
 
         await context.DeliverAsync(new Signal(
