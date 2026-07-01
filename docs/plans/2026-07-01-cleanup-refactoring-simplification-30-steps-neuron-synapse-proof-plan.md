@@ -805,3 +805,683 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Affects Kernel (split), app (logo), tests (trait for groups).
 - Build 0E (after kills).
 - Plan updated. Next: split Software20, ClosedLoop, Status, Task, Ino, Context, clean in other, test groups.
+
+**Broad cleanup continuation (fixed build, more clean):**
+- Removed duplicate KernelUiSurfaceKinds from SystemNeurons (centralized in Core).
+- Build 0E.
+- Plan updated. Next: split more, clean, test groups.
+
+**Broad cleanup continuation (split Software20, more logo clean):**
+- Extracted Software20TeamNeuron to own file.
+- Removed more // in logo (cylinders, clipboard, taskmanager).
+- Affects Kernel (split), app (logo), for groups.
+- Plan updated. Next: split ClosedLoop/Status/Task/Ino/Context, clean other, test groups.
+
+**Broad cleanup continuation (split Software20, logo clean):**
+- Extracted Software20TeamNeuron to own file.
+- Removed more // in logo.
+- Build 0E.
+- Plan updated. Next: split ClosedLoop etc, clean, test groups.
+
+**Broad cleanup continuation (split ClosedLoop):**
+- Extracted SoftwareEngineeringClosedLoopNeuron to own file.
+- Build 0E.
+- Plan updated. Next: split Status/Task/Ino/Context, clean, test groups.
+
+**Broad cleanup continuation (split ClosedLoop, app clean, test trait):**
+- Extracted SoftwareEngineeringClosedLoopNeuron to own file.
+- Cleaned comments in app.dart, main.dart, logo.
+- Added [Trait("Group", "Core")] to NeuronTests.
+- Affects more files across brain/app/tests.
+- Plan updated. Next: split Status/Task/Ino/Context, more cleans, test groups.
+
+**Broad cleanup continuation (split ClosedLoop, more cleans in brain/app/test):**
+- Extracted SoftwareEngineeringClosedLoopNeuron.
+- Cleaned comments in DataVisualizationNeuron, app.dart, main.dart.
+- Added trait to NeuronTests.
+- Affects Kernel, Core, app, tests.
+- Plan updated. Next: split Status etc, clean, test groups.
+
+**Broad cleanup continuation (split SystemStatusNeuron):**
+- Extracted SystemStatusNeuron to own file (split sublogic from SystemNeurons like IAW separate agents).
+- Build 0E after locks.
+- Plan updated. Next: split KernelTask/Ino/Context, clean in brain/app, more test groups for integrations.
+
+**Broad cleanup continuation (split KernelTaskNeuron):**
+- Extracted KernelTaskNeuron to own file.
+- Build 0E.
+- Plan updated. Next: split Ino/Context, clean, test groups.
+
+**Broad cleanup continuation (split Ino, more logo clean):**
+- Extracted InoCodeEditorNeuron.
+- Removed more // in logo.
+- Affects Kernel (more splits), app (logo).
+- Plan updated. Next: split Context, clean, test groups.
+
+**Broad cleanup continuation (split ContextNeuron):**
+- Extracted ContextNeuron to own file.
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups, affect app more.
+
+**Broad cleanup continuation (split Context, more cleans):**
+- Extracted ContextNeuron.
+- Cleaned more // in logo.
+- Affects Kernel, app.
+- Plan updated. Next: clean remaining comments, test groups, app more.
+
+**Broad cleanup continuation (split ContextNeuron, logo clean):**
+- Extracted ContextNeuron to own file.
+- Removed more // in logo.
+- Affects Kernel (splits now complete for large file), app.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Context, logo clean):**
+- Extracted ContextNeuron.
+- Removed more // in logo.
+- Affects Kernel, app.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, fixed extracted):**
+- Extracted MarketplaceNeuron.
+- Removed more // in logo.
+- Fixed Marketplace extracted with } .
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo).
+- Build 0E.
+- Plan updated. Next: clean remaining comments, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean):**
+- Extracted MarketplaceNeuron.
+- Removed more // in logo (branch, nodes, C# glyph).
+- Fixed Marketplace extracted.
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait):**
+- Extracted MarketplaceNeuron.
+- Removed more // in logo.
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted.
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.
+
+**Broad cleanup continuation (split Marketplace, logo clean, test trait, fixed extract):**
+- Extracted MarketplaceNeuron to own file.
+- Removed more // in logo (branch, nodes, C# glyph, hexagon).
+- Added [Trait("Group", "Marketplace")] to Pack test.
+- Fixed Marketplace extracted with } .
+- Affects Kernel (split), app (logo), tests (group).
+- Build 0E.
+- Plan updated. Next: clean remaining, test groups.

@@ -5,6 +5,7 @@ namespace DigitalBrain.Tests.E2E;
 
 [Trait("Category", "E2E")]
 [Trait("Group", "Flutter")]
+[Trait("Group", "Marketplace")]
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fixture)
 {

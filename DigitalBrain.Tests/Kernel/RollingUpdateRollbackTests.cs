@@ -19,7 +19,7 @@ public class RollingUpdateRollbackTests
         try
         {
             var aspire = cluster.GrainFactory.GetGrain<IAspireNeuron>("aspire-rollback");
-            await aspire.FireAsync(new PerformKernelSelfUpdate("rollback-test", FailAtReplica: 2));
+            await aspire.FireAsync(new DigitalBrain.Core.PerformKernelSelfUpdate("rollback-test", FailAtReplica: 2));
 
             var timeline = await aspire.GetTimelineAsync();
             var kinds = timeline.OfType<UiSurface>().Select(s => s.Kind).ToArray();

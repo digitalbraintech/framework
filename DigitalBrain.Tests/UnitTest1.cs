@@ -7,6 +7,7 @@ using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests;
 
+[Trait("Group", "Core")]
 public class NeuronTests : IAsyncLifetime
 {
     private TestCluster? _cluster;
@@ -59,7 +60,7 @@ public class NeuronTests : IAsyncLifetime
     public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
     {
         var status = _cluster!.GrainFactory.GetGrain<ISystemStatus>("status-sim");
-        var cp = await status.CreateCheckpointAsync();  // capture clean checkpoint before driving failure
+        var cp = await status.CreateCheckpointAsync();
         await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
         var timeline = await status.GetTimelineAsync();
         Assert.Contains(timeline, s => s.Type == nameof(FixProposal));

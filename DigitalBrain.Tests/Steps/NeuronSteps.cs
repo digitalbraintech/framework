@@ -183,7 +183,7 @@ public class NeuronSteps : IAsyncDisposable
     {
         var aspire = _cluster.GrainFactory.GetGrain<IAspireNeuron>("aspire-kupdate");
         // Pack-driven: fire the command (exercises handler) + emit surfaces using consts for reliable assertion.
-        await aspire.FireAsync(new DigitalBrain.Kernel.PerformKernelSelfUpdate("rolling-2026.6"));
+        await aspire.FireAsync(new DigitalBrain.Core.PerformKernelSelfUpdate("rolling-2026.6"));
         var checkpoint = await aspire.CreateCheckpointAsync();
 
         for (int replica = 1; replica <= 3; replica++)

@@ -486,3 +486,6 @@ public record SystemModificationProposed(string Component, string Rationale, str
 
 [GenerateSerializer]
 public record ClosedLoopCompleted(string LoopType, string Outcome, bool AppliedViaMcpOrMarket) : Synapse(nameof(ClosedLoopCompleted), DateTimeOffset.UtcNow);
+
+[GenerateSerializer]
+public record PerformKernelSelfUpdate(string Version = "", int FailAtReplica = 0) : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
