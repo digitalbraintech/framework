@@ -36,6 +36,11 @@ public abstract class Neuron : DurableGrain, INeuron, IAsyncObserver<Synapse>
 
     protected NeuronId Self => new(this.GetPrimaryKeyString() ?? this.GetGrainId().ToString());
 
+    // Thin shared reply/context helper (item 13 continuation). IChannelNeuron impls (TelegramChatNeuron + FlutterUiNeuron)
+    // use this to propagate causation/reply context via existing Stamp + CorrelationId/CausationId patterns.
+    // Centralizes without duplication for cross-channel flows (e.g. Telegram viz -> chart UiSurface -> flutter).
+    protected Synapse StampCurrent(Synapse s) => s.Stamp(Self, CurrentCause);
+
     protected Neuron(ILogger logger, NeuronJournals journals)
     {
         Logger = logger;

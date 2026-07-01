@@ -25,11 +25,9 @@ public class DemoNeuron : Neuron, IDemoNeuron, IHandle<DemoMessageSynapse>
             });
             await FireAsync(toast);
 
-            var bus = ServiceProvider.GetService<HomeFeedBus>();
-            if (bus != null)
-            {
-                bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(toast, Self.Value));
-            }
+            // Prefer routing through IFlutterUiNeuron (item 14 complete for this emitter); flutter neuron owns bridge + broadcast.
+            var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
+            await flutter.DeliverAsync(toast.Stamp(Self, CurrentCause));
         }
     }
 

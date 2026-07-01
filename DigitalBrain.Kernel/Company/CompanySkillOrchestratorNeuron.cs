@@ -3,8 +3,6 @@ using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
 using System.IO;
 
-using DigitalBrain.Kernel; // for HomeFeedBus (server-driven UI fanout from neurons only)
-
 namespace DigitalBrain.Kernel.Company;
 
 [GrainType("company.skill.orchestrator.v1")]

@@ -29,7 +29,7 @@ public class ChatNeuron : Neuron, IChatNeuron
             ["chartHint"] = request.ChartHint
         });
         var flutter = GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui");
-        await flutter.DeliverAsync(surface.Stamp(Self, CurrentCause));
+        await flutter.DeliverAsync(StampCurrent(surface));
     }
 
     public Task<RfwCard[]> GetConversationAsync()

@@ -311,3 +311,33 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - aspire__doctor: 4/4.
 - Tiny. GetConversation remains RfwCard-based for now.
 - Plan updated. Advances item 14.
+
+**Baseline (cf5576f + this session start, mandatory):**
+- cd brain; git log --oneline -5 + git status (clean, ahead 4 from prior).
+- Read plan.
+- Baseline: dotnet build -c Debug --nologo -clp:NoSummary (0 errors); targeted filter (TelegramChat|FlutterUi|DataViz|Chat|UiSurface|Journal) 38 passed 0 fail; aspire__doctor via MCP 4/4 pass.
+- Context7: resolve /dotnet/orleans + query (grain interfaces, IHandle compose, GetGrain/Deliver, Stamp/Causation patterns) done before any Orleans edits.
+
+**Item 14 finish + item 13 light (P1 early, this session):**
+- Context7 (Orleans) done pre-edit.
+- Finished item 14: DemoNeuron no longer bypasses (deleted direct HomeFeedBus + UiSurfaceRfwBridge.From + broadcast). Now: FireAsync(toast) kept for journal + Deliver UiSurface to IFlutterUiNeuron("flutter-ui") via channel contract (Stamp for causation). Matches DataViz/Chat pattern. Delete > add.
+- Item 13 light continuation: added minimal shared `protected Synapse StampCurrent(Synapse s) => s.Stamp(Self, CurrentCause);` in base Neuron.cs (thin, no vacuous docs; uses IChannelNeuron marker spirit + existing Stamp/CorrelationId/CausationId for reply context sharing).
+  - Updated call sites to use it (TelegramChatNeuron viz trigger, ChatNeuron deliver, DataVisualization BroadcastRfwCard + Handle path) demonstrating shared no-dupe stamping for tg->ui flows.
+- Delete: removed dead `using DigitalBrain.Kernel; // for HomeFeedBus` from CompanySkillOrchestratorNeuron (unused after prior cleanups).
+- All changes root-out via I* + synapses; no new direct couplings.
+- After *every* slice: 
+  - dotnet build (relative): 0 errors (lock warnings transient from test hosts, killed via pwsh, re-green).
+  - Targeted dotnet test (high-sev filters: Demo|TelegramChatNeuron|FlutterUi|DataViz|Chat|UiSurface ): 36-80 passed / 0 failed across runs (aspire E2E integration remain green, unit over TestCluster).
+  - aspire__doctor (MCP): 4/4 every time.
+  - Plan updated.
+- Files changed (tiny): DigitalBrain.Kernel/DemoNeuron.cs, Neuron.cs (helper), Ui/ChatNeuron.cs, TelegramChatNeuron.cs, DataVisualizationNeuron.cs, Company/CompanySkillOrchestratorNeuron.cs, plan.md.
+- No large P1; kept focused. More direct emitters remain (SystemNeurons many, UserSession, GatewayService) for follow-up tiny slices; did not touch UiSurfaceRfwBridge/HomeFeedBus impls themselves (channel neuron owns via Handle).
+- 13/14 feel solid (routing prefer + shared context helper in place, cross tg viz context via causation works).
+
+**Next 2-3 specific items recommended:**
+- Item 15/16: enhance DataVisualization to explicitly accept/handle "from telegram" context (use CausationId/Sender to tag or prefer reply channel; already wired via stamped vizReq). Add small ExcelVizPack seed example in MarketplaceSeeds (self-contained pack that Telegram responder can trigger for "excel chart" producing UiSurface).
+- Light continue 14: one more emitter e.g. update a couple direct bus in AspireOrchestratorNeuron (SystemNeurons.cs) startup surfaces to Deliver via flutter (tiny slice, keep Fires + delete bus blocks selectively).
+- Item 17 prep: ensure a Reqnroll slice or unit asserts the tg->chart->flutter with causation (use existing test that fires Signal to tg).
+- Full manual `aspire run` (no flags) + doctor + spot check "hello-world" toast + tg viz before next big.
+- Strictly: Context7 if new Orleans/Aspire touch, aspire MCP, relative only, ritual after each, update plan, commit when user says.
+- Do not jump to P2 deletes or large refactors.
