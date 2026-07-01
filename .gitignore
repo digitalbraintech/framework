@@ -435,3 +435,10 @@ output/
 # stray local build/test output redirects
 build-output.txt
 test-output.txt
+
+# Agent / superpowers / session trash (from cleanup research - keep source trees clean like old IAW/final)
+.superpowers/
+sdd/
+*.sdd/
+aspire_*.log
+*.superpowers*

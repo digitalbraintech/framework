@@ -2,18 +2,6 @@ namespace DigitalBrain.Core;
 
 using System.Text.Json.Nodes;
 
-/// <summary>
-/// The single canonical dynamic UI payload. All UI (shell chrome, navigation, views, widgets, and even the main app layout)
-/// is expressed and streamed as UiSurface instances emitted by neurons (or embodied packs).
-/// Neurons build their own UI dynamically by emitting these.
-/// 
-/// The Flutter client is a thin host/renderer:
-/// - ForUI primitives for quality chrome and common widgets.
-/// - RFW for fully custom subtrees from neurons.
-/// - Composes everything from the streamed UiSurface tree(s).
-///
-/// Use Kind + Props (and the helpers below) or a UiWidgetTree for combined dynamic UI.
-/// </summary>
 [GenerateSerializer]
 public record UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props) : Synapse(nameof(UiSurface), DateTimeOffset.UtcNow)
 {

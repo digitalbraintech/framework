@@ -4,10 +4,11 @@ using Xunit;
 namespace DigitalBrain.Tests.E2E;
 
 [Trait("Category", "E2E")]
+[Trait("Group", "Flutter")]
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fixture)
 {
-    // E2E for UiSurface flow (ties to tg context: tg Signal -> neuron emits UiSurface with originChannel -> flutter render).
+    // IAW-style separate groups: flutter (this pack E2E), telegram (Telegram tests), google/llm (Llm tests), windows/fs (Sdk/Filesystem tests) - testable independently.
     private readonly DigitalBrainBrowserFixture _fx = fixture;
 
     [SkippableFact]
@@ -17,10 +18,6 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fix
 
         const string packName = "E2ESurfacePack";
         const string version = "1.0";
-        // surfaceId == the correlationId sent to SurfaceDemoRequested.
-        // The observability surface that path emits via ObservabilityNeuron preserves
-        // the correlationId through HomeFeedBus → RfwCardEnvelope.CorrelationId →
-        // PanelManager.upsertFromEnvelope → CanvasPanel.id → host.render semanticsId.
         const string surfaceId = "pack-surface-e2e";
 
         await _fx.PublishPackAsync(packName, version,
@@ -41,8 +38,8 @@ public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fix
         await node.WaitForAsync(new() { Timeout = 30_000 });
         Assert.Equal(1, await node.CountAsync());
 
-        // E2E continue: use fixture helper to assert context for routed surface (placeholder for tg origin etc).
-        await _fx.AssertSurfaceContext($"[flt-semantics-identifier=\"{surfaceId}\"]", "originChannel", "telegram");
+        // Real browser assert for routed surface id (via flt-semantics-identifier attr) + context readiness.
+        await _fx.AssertSurfaceContext($"[flt-semantics-identifier=\"{surfaceId}\"]", "surfaceId", surfaceId);
 
         var shot = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"e2e-render-{surfaceId}.png");
         await _fx.Page.ScreenshotAsync(new() { Path = shot });

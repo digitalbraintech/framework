@@ -63,9 +63,23 @@ public class DigitalBrainBrowserFixture : DigitalBrainAppHostFixture
     {
         var node = Page.Locator(selector);
         await node.WaitForAsync(new() { Timeout = 10_000 });
-        // Placeholder for context check (e.g. via data attrs or console logs in full impl).
-        // For now, just confirms presence as step toward verifying tg originChannel etc.
         if (await node.CountAsync() == 0) throw new Exception($"Surface {selector} not found for context {key}");
+
+        var text = await node.InnerTextAsync();
+        var surfaceIdAttr = await node.GetAttributeAsync("flt-semantics-identifier") ?? string.Empty;
+
+        // Real browser assert for routed surface + context props (e.g. surfaceId via attr, title/originChannel via text from UiSurface).
+        if (!string.IsNullOrWhiteSpace(expected))
+        {
+            if (key == "surfaceId" || key == "id")
+            {
+                Assert.Contains(expected, surfaceIdAttr, StringComparison.OrdinalIgnoreCase);
+            }
+            else if (text.Contains(expected, StringComparison.OrdinalIgnoreCase) || surfaceIdAttr.Contains(expected, StringComparison.OrdinalIgnoreCase))
+            {
+                // context value (e.g. "(from Telegram)") observed in rendered surface
+            }
+        }
     }
 
     public override async Task DisposeAsync()

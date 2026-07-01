@@ -2,8 +2,6 @@ using System.ComponentModel;
 
 namespace DigitalBrain.Core;
 
-// Typed Windows Package Manager (winget) operations. NET-NEW: no donor tree had a WingetNeuron — built on the
-// shared ProcessRunner shell mechanics (modeled on IAW's ShellAgent). Windows-only; mutating ops run winget directly.
 public interface IWingetNeuron : INeuronAgent
 {
     static string INeuronAgent.AgentDisplayName => "Winget";

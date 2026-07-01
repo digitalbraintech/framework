@@ -68,7 +68,6 @@ public class NeuronTests : IAsyncLifetime
         Assert.True(sim.Success);
         Assert.Contains("different", sim.Details, StringComparison.OrdinalIgnoreCase);
 
-        // Hardened isolated sim: replay proper CreateCheckpoint snapshot into separate TestCluster.
         var simBuilder = new TestClusterBuilder();
         simBuilder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
         var simCluster = simBuilder.Build();
@@ -76,7 +75,6 @@ public class NeuronTests : IAsyncLifetime
         try
         {
             var simStatus = simCluster.GrainFactory.GetGrain<ISystemStatus>("status-isolated-sim");
-            // Seed from checkpoint snapshot (faithful isolated replay)
             foreach (var s in cp.Snapshot.OfType<SystemStatusChanged>())
             {
                 await simStatus.FireAsync(s);

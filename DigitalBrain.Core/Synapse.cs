@@ -13,16 +13,10 @@ public record Synapse(
     [property: Id(5)] string? CorrelationId = null
 )
 {
-    // Stable per-synapse identity. Append-only Id, assigned at construction and preserved through `with`,
-    // so a fired synapse keeps the same id across journaling/replay. Enables causal lineage + robust dedup.
     [Id(6)] public string SynapseId { get; init; } = Guid.NewGuid().ToString("N");
 
-    // The SynapseId of the synapse whose handling caused this one to fire. Null for a root synapse.
     [Id(7)] public string? CausationId { get; init; }
 
-    // Sets sender + timestamp and propagates causal lineage from the synapse currently being handled (cause).
-    // CorrelationId flows down the whole reaction chain (root correlates to itself); CausationId points at
-    // the immediate predecessor. Explicitly-set CorrelationId on the payload always wins.
     public Synapse Stamp(NeuronId sender, Synapse? cause = null) =>
         this with
         {
