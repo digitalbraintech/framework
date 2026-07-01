@@ -790,7 +790,10 @@ public static class UiSurfaceLiveData
                 ["private"] = pack.IsPrivate,
                 ["commissionRate"] = pack.CommissionRate,
                 ["description"] = pack.Description,
-                ["installed"] = installedKeys.Contains(PackKey(pack)) || IsPreinstalledLocalPack(pack)
+                ["installed"] = installedKeys.Contains(PackKey(pack)) || IsPreinstalledLocalPack(pack),
+                ["tier"] = pack.Manifest?.Tier.ToString(),
+                ["channels"] = pack.Manifest?.Channels.Select(c => c.ToString()).ToArray(),
+                ["entryExperienceId"] = pack.Manifest?.EntryExperience?.ExperienceId
             })
             .ToArray();
 

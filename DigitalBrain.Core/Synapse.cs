@@ -235,7 +235,8 @@ public record NeuroPack(
     [property: Id(7)] string AuthorPublicKeyBase64 = "",
     [property: Id(8)] string SignatureBase64 = "",
     // Economics: price in the marketplace currency. 0 = free. Premium (>0) packs require a license at install.
-    [property: Id(9)] decimal Price = 0m
+    [property: Id(9)] decimal Price = 0m,
+    [property: Id(10)] BundleManifest? Manifest = null
 );
 
 // Richer publish/install commands that carry full pack data for real marketplace behavior.
