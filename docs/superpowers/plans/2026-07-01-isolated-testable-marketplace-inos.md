@@ -195,22 +195,33 @@ git commit -m "feat(testkit): add DigitalBrain.TestKit with IDigitalBrain facade
 
 ### Task 2: `DigitalBrain.Windows` ino (FileSystem + Winget + Shell + ProcessRunner)
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`.
+> Original Task 2 (below, superseded) tried to move the concrete grain classes into the ino; they can't
+> compile there because `Neuron` lives in `DigitalBrain.Kernel`. The interfaces + `ProcessRunner` (already
+> Orleans-free) still move to the ino. `FileSystemNeuron.cs`/`WingetNeuron.cs`/`ShellNeuron.cs` **stay in
+> `DigitalBrain.Kernel/Sdk/`** — `WingetNeuron`/`ShellNeuron` are already trivial `ProcessRunner` one-liners
+> with nothing worth extracting; `FileSystemNeuron`'s real file-I/O body is extracted into a new plain class,
+> `FileSystemOperations`, in the ino, which the Kernel-side grain delegates to.
+
 **Files:**
 - Create: `DigitalBrain.Windows/DigitalBrain.Windows.csproj`
 - Move: `DigitalBrain.Core/Sdk/IFileSystemNeuron.cs`, `IWingetNeuron.cs`, `IShellNeuron.cs` → `DigitalBrain.Windows/` (namespace `DigitalBrain.Core` → `DigitalBrain.Windows`)
-- Move: `DigitalBrain.Kernel/Sdk/FileSystemNeuron.cs`, `WingetNeuron.cs`, `ShellNeuron.cs`, `ProcessRunner.cs` → `DigitalBrain.Windows/` (namespace `DigitalBrain.Kernel` → `DigitalBrain.Windows`)
-- Delete: `DigitalBrain.Kernel/Sdk/` (now empty)
+- Move: `DigitalBrain.Kernel/Sdk/ProcessRunner.cs` → `DigitalBrain.Windows/ProcessRunner.cs` (namespace `DigitalBrain.Kernel` → `DigitalBrain.Windows`; content otherwise unchanged — it's already a pure static class with no `Neuron`/Orleans dependency)
+- Create: `DigitalBrain.Windows/FileSystemOperations.cs` (new plain class — the real `System.IO` logic extracted verbatim from `FileSystemNeuron.cs`'s current body)
+- Modify: `DigitalBrain.Kernel/Sdk/FileSystemNeuron.cs` — **stays in Kernel** (does not move); add `using DigitalBrain.Windows;`; body changes from direct `System.IO` calls to delegating to an injected `FileSystemOperations`
+- Modify: `DigitalBrain.Kernel/Sdk/WingetNeuron.cs`, `ShellNeuron.cs` — **stay in Kernel** (do not move); add `using DigitalBrain.Windows;` (for `ProcessRunner`/interfaces); no other change — their bodies are already literal `ProcessRunner` one-liners with nothing to extract
 - Modify: `DigitalBrain.Kernel/Sandbox/OutOfProcessSandbox.cs` — add `using DigitalBrain.Windows;` (line 1 area)
 - Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Windows`
 - Modify: `Brain.slnx` — add `DigitalBrain.Windows/DigitalBrain.Windows.csproj`, `DigitalBrain.Windows.Tests/DigitalBrain.Windows.Tests.csproj`
 - Create: `DigitalBrain.Windows.Tests/DigitalBrain.Windows.Tests.csproj`
-- Create: `DigitalBrain.Windows.Tests/FileSystemNeuronTests.cs`, `WingetNeuronTests.cs`, `ShellNeuronTests.cs`
+- Create: `DigitalBrain.Windows.Tests/FileSystemNeuronTests.cs`, `WingetNeuronTests.cs`, `ShellNeuronTests.cs`, `FileSystemOperationsTests.cs`
 - Modify: `DigitalBrain.Tests/Sdk/SdkNeuronsTests.cs` — delete `Shell_Executes_Echo`, `Shell_Blocks_Dangerous_Command`, `FileSystem_Write_Read_List_Delete_RoundTrip` (moved out; keep `DotNet_Reports_Sdk_Version` and `Git_Status_Works_After_ProcessRunner_Refactor` for now — those move in Task 3)
 - Modify: `DigitalBrain.Tests/Sdk/SdkContractsMetadataTests.cs` — add `using DigitalBrain.Windows;` for `IWingetNeuron`/`IFileSystemNeuron`/`IShellNeuron` (types moved, test stays central since it spans all Sdk contracts)
 
 **Interfaces:**
 - Consumes: nothing new (existing `IFileSystemNeuron`/`IWingetNeuron`/`IShellNeuron`/`ProcessRunner` signatures are unchanged, only namespace moves).
-- Produces: `DigitalBrain.Windows.ProcessRunner.RunAsync/ShellAsync/PowerShellAsync` (unchanged signatures) — Task 3's Developer ino references this.
+- Produces: `DigitalBrain.Windows.ProcessRunner.RunAsync/ShellAsync/PowerShellAsync` (unchanged signatures) — Task 3's Developer ino references this indirectly through Kernel (see amendment: `GitNeuron`/`DotNetNeuron`/`NuGetNeuron` stay in Kernel too and already reference `DigitalBrain.Windows` directly, no change needed there).
+- Produces: `DigitalBrain.Windows.FileSystemOperations` — plain class with the same 8 methods as `IFileSystemNeuron` (`ReadFileAsync`, `WriteFileAsync`, `ListFilesAsync`, `ExistsAsync`, `CopyAsync`, `MoveAsync`, `DeleteAsync`, `GetInfoAsync`), each identical in behavior to `FileSystemNeuron`'s current body. `DigitalBrain.Kernel.FileSystemNeuron` constructs one directly (`new FileSystemOperations()`) or takes it via constructor DI — no external state, so either works; use constructor DI to match the Google ino's established pattern (Task 8) and keep the grain trivially testable in isolation later if needed.
 
 - [ ] **Step 1: Create the project**
 
@@ -235,24 +246,133 @@ git commit -m "feat(testkit): add DigitalBrain.TestKit with IDigitalBrain facade
 
 For each of `IFileSystemNeuron.cs`, `IWingetNeuron.cs`, `IShellNeuron.cs` in `DigitalBrain.Core/Sdk/`: move to `DigitalBrain.Windows/`, change `namespace DigitalBrain.Core;` to `namespace DigitalBrain.Windows;`. Content otherwise unchanged (they already only reference `INeuronAgent`/`CommandResult`, both staying in Core, reached via an added `using DigitalBrain.Core;` at the top of each moved file).
 
-- [ ] **Step 3: Move the 4 Kernel implementation files**
+- [ ] **Step 3: Move `ProcessRunner`, extract `FileSystemOperations`**
 
-For each of `FileSystemNeuron.cs`, `WingetNeuron.cs`, `ShellNeuron.cs`, `ProcessRunner.cs` in `DigitalBrain.Kernel/Sdk/`: move to `DigitalBrain.Windows/`, change `namespace DigitalBrain.Kernel;` to `namespace DigitalBrain.Windows;`. Content otherwise unchanged.
+Move `DigitalBrain.Kernel/Sdk/ProcessRunner.cs` to `DigitalBrain.Windows/ProcessRunner.cs`, change `namespace DigitalBrain.Kernel;` to `namespace DigitalBrain.Windows;`. Content otherwise unchanged — it's already a pure static class (no `Neuron`/Orleans reference).
 
-Delete the now-empty `DigitalBrain.Kernel/Sdk/` directory.
+Create `DigitalBrain.Windows/FileSystemOperations.cs` — the real file-I/O logic, extracted verbatim from `FileSystemNeuron.cs`'s current body (read the real file first to confirm nothing has drifted from this plan's snapshot):
 
-- [ ] **Step 4: Fix the one cross-reference**
+```csharp
+// DigitalBrain.Windows/FileSystemOperations.cs
+namespace DigitalBrain.Windows;
+
+public sealed class FileSystemOperations
+{
+    private const int MaxReadChars = 50 * 1024;
+
+    public async Task<string> ReadFileAsync(string path, CancellationToken ct = default)
+    {
+        var text = await File.ReadAllTextAsync(path, ct);
+        return text.Length > MaxReadChars ? text[..MaxReadChars] + "\n... [truncated]" : text;
+    }
+
+    public async Task WriteFileAsync(string path, string content, CancellationToken ct = default)
+    {
+        var directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+        await File.WriteAllTextAsync(path, content, ct);
+    }
+
+    public Task<string[]> ListFilesAsync(string directory, string pattern = "*", CancellationToken ct = default)
+        => Task.FromResult(Directory.GetFiles(directory, pattern, SearchOption.TopDirectoryOnly));
+
+    public Task<bool> ExistsAsync(string path, CancellationToken ct = default)
+        => Task.FromResult(File.Exists(path) || Directory.Exists(path));
+
+    public Task<string> CopyAsync(string source, string destination, CancellationToken ct = default)
+    {
+        var directory = Path.GetDirectoryName(destination);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+        File.Copy(source, destination, overwrite: true);
+        return Task.FromResult($"Copied '{source}' -> '{destination}'.");
+    }
+
+    public Task<string> MoveAsync(string source, string destination, CancellationToken ct = default)
+    {
+        File.Move(source, destination, overwrite: true);
+        return Task.FromResult($"Moved '{source}' -> '{destination}'.");
+    }
+
+    public Task<string> DeleteAsync(string path, CancellationToken ct = default)
+    {
+        if (Directory.Exists(path))
+            return Task.FromResult($"Refused: '{path}' is a directory.");
+        File.Delete(path);
+        return Task.FromResult($"Deleted '{path}'.");
+    }
+
+    public Task<string> GetInfoAsync(string path, CancellationToken ct = default)
+    {
+        if (File.Exists(path))
+        {
+            var info = new FileInfo(path);
+            return Task.FromResult($"File '{path}': {info.Length} bytes, modified {info.LastWriteTimeUtc:u}.");
+        }
+        if (Directory.Exists(path))
+        {
+            var info = new DirectoryInfo(path);
+            return Task.FromResult($"Directory '{path}': created {info.CreationTimeUtc:u}.");
+        }
+        return Task.FromResult($"Path '{path}' does not exist.");
+    }
+}
+```
+
+`DigitalBrain.Kernel/Sdk/` is **not** deleted — `FileSystemNeuron.cs`, `WingetNeuron.cs`, `ShellNeuron.cs` stay there (and `GitNeuron.cs`/`DotNetNeuron.cs`/`NuGetNeuron.cs`/`RoslynNeuron.cs` stay there too per Task 3's amendment).
+
+- [ ] **Step 4: Update the 3 grain classes left in Kernel**
+
+`DigitalBrain.Kernel/Sdk/FileSystemNeuron.cs` — add `using DigitalBrain.Windows;`, change the class to hold and delegate to a `FileSystemOperations`:
+
+```csharp
+// DigitalBrain.Kernel/Sdk/FileSystemNeuron.cs
+using DigitalBrain.Core;
+using DigitalBrain.Windows;
+
+namespace DigitalBrain.Kernel;
+
+[GrainType("digitalbrain.sdk.filesystem.v1")]
+public class FileSystemNeuron(ILogger<FileSystemNeuron> logger, NeuronJournals journals, FileSystemOperations ops)
+    : Neuron(logger, journals), IFileSystemNeuron
+{
+    public Task<string> ReadFileAsync(string path, CancellationToken ct = default) => ops.ReadFileAsync(path, ct);
+    public Task WriteFileAsync(string path, string content, CancellationToken ct = default) => ops.WriteFileAsync(path, content, ct);
+    public Task<string[]> ListFilesAsync(string directory, string pattern = "*", CancellationToken ct = default) => ops.ListFilesAsync(directory, pattern, ct);
+    public Task<bool> ExistsAsync(string path, CancellationToken ct = default) => ops.ExistsAsync(path, ct);
+    public Task<string> CopyAsync(string source, string destination, CancellationToken ct = default) => ops.CopyAsync(source, destination, ct);
+    public Task<string> MoveAsync(string source, string destination, CancellationToken ct = default) => ops.MoveAsync(source, destination, ct);
+    public Task<string> DeleteAsync(string path, CancellationToken ct = default) => ops.DeleteAsync(path, ct);
+    public Task<string> GetInfoAsync(string path, CancellationToken ct = default) => ops.GetInfoAsync(path, ct);
+}
+```
+
+`FileSystemOperations` has no dependencies of its own, so Orleans DI resolves `new FileSystemOperations()` automatically as long as it's registered — add `services.AddSingleton<FileSystemOperations>();` in `DigitalBrain.Kernel/Program.cs` near the other SDK neuron/service registrations (read that file first to match the existing registration style).
+
+`DigitalBrain.Kernel/Sdk/WingetNeuron.cs` and `ShellNeuron.cs` — add `using DigitalBrain.Windows;` only. No other change; their bodies are already pure `ProcessRunner` one-liners with nothing to extract:
+
+```csharp
+// DigitalBrain.Kernel/Sdk/WingetNeuron.cs — only the using changes
+using DigitalBrain.Core;
+using DigitalBrain.Windows;
+
+namespace DigitalBrain.Kernel;
+// ... rest of the class body unchanged (still `: Neuron, IWingetNeuron`, still calls ProcessRunner.RunAsync directly)
+```
+
+- [ ] **Step 5: Fix the one cross-reference**
 
 In `DigitalBrain.Kernel/Sandbox/OutOfProcessSandbox.cs`, add `using DigitalBrain.Windows;` alongside the existing `using DigitalBrain.Kernel.Foundry;` (line 1).
 
-- [ ] **Step 5: Wire Kernel → Windows**
+- [ ] **Step 6: Wire Kernel → Windows**
 
 Add to `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj`:
 ```xml
 <ProjectReference Include="..\DigitalBrain.Windows\DigitalBrain.Windows.csproj" />
 ```
 
-- [ ] **Step 6: Build Kernel, fix any remaining errors**
+- [ ] **Step 6a: Build Kernel, fix any remaining errors**
 
 ```
 dotnet build DigitalBrain.Kernel/DigitalBrain.Kernel.csproj --nologo -clp:NoSummary
@@ -395,6 +515,42 @@ public class WingetNeuronTests : IAsyncLifetime
 }
 ```
 
+Also add a zero-infra unit test directly against the extracted `FileSystemOperations` — no Orleans/TestKit needed, since it's now a plain class (this is the concrete isolation win the amendment describes):
+
+```csharp
+// DigitalBrain.Windows.Tests/FileSystemOperationsTests.cs
+using DigitalBrain.Windows;
+using Xunit;
+
+namespace DigitalBrain.Windows.Tests;
+
+public class FileSystemOperationsTests
+{
+    [Fact]
+    public async Task Write_Read_List_Delete_RoundTrip()
+    {
+        var fs = new FileSystemOperations();
+        var dir = Path.Combine(Path.GetTempPath(), "dbfsops-" + Guid.NewGuid().ToString("N"));
+        var file = Path.Combine(dir, "note.txt");
+        try
+        {
+            await fs.WriteFileAsync(file, "hello fs");
+            Assert.True(await fs.ExistsAsync(file));
+            Assert.Equal("hello fs", await fs.ReadFileAsync(file));
+            Assert.Contains(file, await fs.ListFilesAsync(dir, "*.txt"));
+            await fs.DeleteAsync(file);
+            Assert.False(await fs.ExistsAsync(file));
+        }
+        finally
+        {
+            try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+    }
+}
+```
+
 - [ ] **Step 9: Delete the moved tests from central `DigitalBrain.Tests`**
 
 In `DigitalBrain.Tests/Sdk/SdkNeuronsTests.cs`, delete the `Shell_Executes_Echo`, `Shell_Blocks_Dangerous_Command`, and `FileSystem_Write_Read_List_Delete_RoundTrip` methods (now duplicated in `DigitalBrain.Windows.Tests`). Leave `DotNet_Reports_Sdk_Version` and `Git_Status_Works_After_ProcessRunner_Refactor` in place — they move in Task 3.
@@ -408,33 +564,46 @@ dotnet build Brain.slnx --nologo -clp:NoSummary
 dotnet test DigitalBrain.Windows.Tests --nologo
 dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~Sdk" --nologo
 ```
-Expected: 0 build errors, `DigitalBrain.Windows.Tests` 5/5 passed, `DigitalBrain.Tests` Sdk filter passes with the 3 moved tests gone and the remaining 2 (DotNet/Git) + metadata test still green.
+Expected: 0 build errors, `DigitalBrain.Windows.Tests` 6/6 passed (5 grain-level TestKit tests + the new zero-infra `FileSystemOperationsTests`), `DigitalBrain.Tests` Sdk filter passes with the 3 moved tests gone and the remaining 2 (DotNet/Git) + metadata test still green.
 
 - [ ] **Step 11: Commit**
 
 ```bash
 git add DigitalBrain.Windows DigitalBrain.Windows.Tests DigitalBrain.Kernel DigitalBrain.Core DigitalBrain.Tests Brain.slnx
-git commit -m "feat(windows-ino): extract FileSystem/Winget/Shell into isolated DigitalBrain.Windows project with co-located tests"
+git commit -m "feat(windows-ino): extract FileSystem/Winget/Shell interfaces + ProcessRunner/FileSystemOperations into isolated DigitalBrain.Windows project; grain classes stay in Kernel per neuron-placement amendment"
 ```
 
 ---
 
 ### Task 3: `DigitalBrain.Developer` ino (Git + DotNet + NuGet + Roslyn)
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`.
+> `GitNeuron`/`DotNetNeuron`/`NuGetNeuron` are already pure `ProcessRunner` wrappers (`GitNeuron.GetMetricsAsync`
+> additionally reads the grain's own `OutgoingJournal`, `CommitAsync`/`RevertAsync` call `FireAsync` —
+> inherently grain-coupled, nothing to extract) — they **stay in `DigitalBrain.Kernel/Sdk/`** unchanged except
+> a `using DigitalBrain.Developer;` addition. `RoslynNeuron`'s `MSBuildWorkspace` analysis body has zero
+> grain coupling beyond its final `FireAsync` call — that part extracts cleanly into a new plain
+> `RoslynAnalysisService` in the ino; `RoslynNeuron` itself stays in Kernel as a thin wrapper. Because none of
+> the 4 grain classes move, `DigitalBrain.Developer` no longer needs a `ProjectReference` to
+> `DigitalBrain.Windows` — it only needs `DigitalBrain.Core`.
+
 **Files:**
-- Create: `DigitalBrain.Developer/DigitalBrain.Developer.csproj`
+- Create: `DigitalBrain.Developer/DigitalBrain.Developer.csproj` (`ProjectReference`: `DigitalBrain.Core` only)
 - Move: `DigitalBrain.Core/Sdk/IGitNeuron.cs`, `IDotNetNeuron.cs`, `INuGetNeuron.cs`, `IRoslynNeuron.cs` → `DigitalBrain.Developer/` (namespace → `DigitalBrain.Developer`)
-- Move: `DigitalBrain.Kernel/Sdk/GitNeuron.cs`, `DotNetNeuron.cs`, `NuGetNeuron.cs`, `RoslynNeuron.cs` → `DigitalBrain.Developer/` (namespace → `DigitalBrain.Developer`; note `DigitalBrain.Kernel/Sdk/` no longer exists after Task 2 — these files currently live there before this task moves them, i.e. this task's "move" source is the Task-2-emptied directory's siblings; in practice do Task 2 and Task 3 file moves in the same pass if easier, but keep them as separate commits per this plan's task boundaries)
-- Modify: `DigitalBrain.Developer/DigitalBrain.Developer.csproj` — `ProjectReference` to `DigitalBrain.Core` and `DigitalBrain.Windows` (for `ProcessRunner`); `RoslynNeuron.cs` needs `Microsoft.CodeAnalysis`/`Microsoft.CodeAnalysis.MSBuild` `PackageReference`s (copy exact versions from `DigitalBrain.Kernel.csproj`'s current references to `Directory.Packages.props`)
-- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Developer`
+- Create: `DigitalBrain.Developer/RoslynAnalysisService.cs` (new plain class — the `MSBuildWorkspace` analysis logic extracted verbatim from `RoslynNeuron.cs`'s current body, minus the `FireAsync` call)
+- Modify: `DigitalBrain.Kernel/Sdk/GitNeuron.cs`, `DotNetNeuron.cs`, `NuGetNeuron.cs` — **stay in Kernel** (do not move); add `using DigitalBrain.Developer;` (for the interfaces); no other change — their bodies are unchanged
+- Modify: `DigitalBrain.Kernel/Sdk/RoslynNeuron.cs` — **stays in Kernel** (does not move); drop the `Microsoft.CodeAnalysis`/`Microsoft.CodeAnalysis.MSBuild` `using`s, add `using DigitalBrain.Developer;`, delegate to an injected `RoslynAnalysisService`
+- Modify: `DigitalBrain.Developer/DigitalBrain.Developer.csproj` — `Microsoft.CodeAnalysis.CSharp.Workspaces`/`Microsoft.CodeAnalysis.Workspaces.MSBuild` `PackageReference`s move here (copy exact versions from `DigitalBrain.Kernel.csproj`'s current references into `Directory.Packages.props` if not already centrally pinned)
+- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Developer` (still needed: Kernel's `GitNeuron`/`DotNetNeuron`/`NuGetNeuron`/`RoslynNeuron` reference the ino's interfaces + `RoslynAnalysisService`)
 - Modify: `Brain.slnx` — add `DigitalBrain.Developer`, `DigitalBrain.Developer.Tests`
 - Create: `DigitalBrain.Developer.Tests/DigitalBrain.Developer.Tests.csproj`
-- Create: `DigitalBrain.Developer.Tests/GitNeuronTests.cs`, `DotNetNeuronTests.cs`, `NuGetNeuronTests.cs`, `RoslynNeuronTests.cs`
+- Create: `DigitalBrain.Developer.Tests/GitNeuronTests.cs`, `DotNetNeuronTests.cs`, `NuGetNeuronTests.cs`, `RoslynNeuronTests.cs`, `RoslynAnalysisServiceTests.cs`
 - Modify: `DigitalBrain.Tests/Sdk/SdkNeuronsTests.cs` — delete `DotNet_Reports_Sdk_Version`, `Git_Status_Works_After_ProcessRunner_Refactor` (moved out); file is now empty of test methods — delete the file entirely and remove it from the project if no methods remain
 - Modify: `DigitalBrain.Tests/Sdk/SdkContractsMetadataTests.cs` — add `using DigitalBrain.Developer;`
 
 **Interfaces:**
-- Consumes: `DigitalBrain.Windows.ProcessRunner.RunAsync(fileName, arguments, workingDirectory?, timeoutMs?, ct?)` (from Task 2, unchanged signature).
+- Consumes: nothing new from Task 2 — `GitNeuron`/`DotNetNeuron`/`NuGetNeuron` already reference `DigitalBrain.Windows.ProcessRunner` directly from within Kernel (unchanged from before this task).
+- Produces: `DigitalBrain.Developer.RoslynAnalysisService.AnalyzeSolutionAsync(solutionPath, ct)` — returns the same report string `RoslynNeuron.AnalyzeSolutionAsync` used to build directly.
 
 - [ ] **Step 1: Create the project**
 
@@ -450,7 +619,6 @@ git commit -m "feat(windows-ino): extract FileSystem/Winget/Shell into isolated 
 
   <ItemGroup>
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Windows\DigitalBrain.Windows.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -461,11 +629,69 @@ git commit -m "feat(windows-ino): extract FileSystem/Winget/Shell into isolated 
 </Project>
 ```
 
-Before finalizing, run `grep -n "Microsoft.CodeAnalysis" DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` to get the exact `PackageReference` Include names currently used for Roslyn in Kernel, and match them exactly (do not guess package names).
+Before finalizing, run `grep -n "Microsoft.CodeAnalysis" DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` to get the exact `PackageReference` Include names currently used for Roslyn in Kernel, and match them exactly (do not guess package names). No `DigitalBrain.Windows` reference is needed — the 4 grain classes that need `ProcessRunner` stay in Kernel, which already references `DigitalBrain.Windows` from Task 2.
 
-- [ ] **Step 2: Move the 4 Core interfaces and 4 Kernel implementations**
+- [ ] **Step 2: Move the 4 Core interfaces; extract `RoslynAnalysisService`; update the 4 Kernel grain classes**
 
-Same mechanical move as Task 2 Steps 2-3: `IGitNeuron.cs`/`IDotNetNeuron.cs`/`INuGetNeuron.cs`/`IRoslynNeuron.cs` from `DigitalBrain.Core/Sdk/` and `GitNeuron.cs`/`DotNetNeuron.cs`/`NuGetNeuron.cs`/`RoslynNeuron.cs` from wherever Task 2 left them, all into `DigitalBrain.Developer/`, namespace changed to `DigitalBrain.Developer`. Add `using DigitalBrain.Windows;` to `GitNeuron.cs`/`DotNetNeuron.cs`/`NuGetNeuron.cs` (they call `ProcessRunner.RunAsync`/`ShellAsync`).
+Move `IGitNeuron.cs`/`IDotNetNeuron.cs`/`INuGetNeuron.cs`/`IRoslynNeuron.cs` from `DigitalBrain.Core/Sdk/` into `DigitalBrain.Developer/`, namespace changed to `DigitalBrain.Developer`. Content otherwise unchanged.
+
+Read `DigitalBrain.Kernel/Sdk/RoslynNeuron.cs`'s real current body first to confirm it matches this plan's snapshot, then create `DigitalBrain.Developer/RoslynAnalysisService.cs` with its `MSBuildWorkspace` logic, minus the `FireAsync` call:
+
+```csharp
+// DigitalBrain.Developer/RoslynAnalysisService.cs
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.MSBuild;
+
+namespace DigitalBrain.Developer;
+
+public sealed class RoslynAnalysisService
+{
+    public async Task<string> AnalyzeSolutionAsync(string solutionPath, CancellationToken ct = default)
+    {
+        using var workspace = MSBuildWorkspace.Create();
+        var solution = await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+        var projectCount = solution.Projects.Count();
+
+        var diagnostics = new List<string>();
+        foreach (var project in solution.Projects.Take(5))
+        {
+            var compilation = await project.GetCompilationAsync(ct);
+            var errors = compilation!.GetDiagnostics(ct)
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Take(3);
+            diagnostics.AddRange(errors.Select(e => $"{project.Name}:{e.Location} {e.GetMessage()}"));
+        }
+
+        return $"Solution {solutionPath}: {projectCount} projects. Sample issues: {string.Join("; ", diagnostics)}";
+    }
+}
+```
+
+Update `DigitalBrain.Kernel/Sdk/RoslynNeuron.cs` to delegate to it (drop the `Microsoft.CodeAnalysis`/`Microsoft.CodeAnalysis.MSBuild` `using`s, add `using DigitalBrain.Developer;`):
+
+```csharp
+// DigitalBrain.Kernel/Sdk/RoslynNeuron.cs
+using DigitalBrain.Core;
+using DigitalBrain.Developer;
+
+namespace DigitalBrain.Kernel;
+
+[GrainType("digitalbrain.sdk.roslyn.v1")]
+public class RoslynNeuron(ILogger<RoslynNeuron> logger, NeuronJournals journals, RoslynAnalysisService analysis)
+    : Neuron(logger, journals), IRoslynNeuron
+{
+    public async Task<string> AnalyzeSolutionAsync(string solutionPath, CancellationToken ct = default)
+    {
+        var report = await analysis.AnalyzeSolutionAsync(solutionPath, ct);
+        await FireAsync(new ArchitectReport(solutionPath, report));
+        return report;
+    }
+}
+```
+
+Add `using DigitalBrain.Developer;` to `DigitalBrain.Kernel/Sdk/GitNeuron.cs`, `DotNetNeuron.cs`, `NuGetNeuron.cs` (for their `IGitNeuron`/`IDotNetNeuron`/`INuGetNeuron` interfaces). No other changes — these 3 classes stay exactly as they are today, calling `ProcessRunner`/`OutgoingJournal`/`FireAsync` directly; none of that is separable from `Neuron` (`GitNeuron.CommitAsync`/`RevertAsync` call `FireAsync`, `GetMetricsAsync` reads `OutgoingJournal` — genuinely grain-coupled, not worth an artificial split).
+
+In `DigitalBrain.Kernel/Program.cs`, register `services.AddSingleton<RoslynAnalysisService>();` near the other SDK neuron/service registrations (read the file first to match the existing registration style).
 
 - [ ] **Step 3: Wire Kernel → Developer**
 
@@ -603,7 +829,29 @@ public class RoslynNeuronTests : IAsyncLifetime
 }
 ```
 
-Before writing the `RoslynNeuronTests` assertion body precisely, re-read `DigitalBrain.Developer/RoslynNeuron.cs` (moved in Step 2) to confirm `AnalyzeSolutionAsync`'s actual return shape/content beyond line 20 (only the first 20 lines were read during planning) and adjust the assertion to match what it actually returns.
+`AnalyzeSolutionAsync`'s return shape is confirmed by this amendment's research pass (the full original body is quoted in Step 2 above) — the assertion above (`Assert.False(string.IsNullOrWhiteSpace(result))`) matches its `"Solution {path}: {N} projects. Sample issues: ..."` return format.
+
+Also add a zero-infra unit test directly against the extracted `RoslynAnalysisService` — no Orleans/TestKit needed:
+
+```csharp
+// DigitalBrain.Developer.Tests/RoslynAnalysisServiceTests.cs
+using DigitalBrain.Developer;
+using Xunit;
+
+namespace DigitalBrain.Developer.Tests;
+
+public class RoslynAnalysisServiceTests
+{
+    [Fact]
+    public async Task AnalyzeSolutionAsync_Analyzes_Real_Solution()
+    {
+        var service = new RoslynAnalysisService();
+        var solutionPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "Brain.slnx"));
+        var result = await service.AnalyzeSolutionAsync(solutionPath);
+        Assert.False(string.IsNullOrWhiteSpace(result));
+    }
+}
+```
 
 - [ ] **Step 7: Delete the now-empty central Sdk test file**
 
@@ -618,33 +866,43 @@ dotnet build Brain.slnx --nologo -clp:NoSummary
 dotnet test DigitalBrain.Developer.Tests --nologo
 dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~Sdk" --nologo
 ```
-Expected: 0 build errors, `DigitalBrain.Developer.Tests` 4/4 passed, `DigitalBrain.Tests` Sdk filter only runs `SdkContractsMetadataTests` now and passes.
+Expected: 0 build errors, `DigitalBrain.Developer.Tests` 5/5 passed (4 grain-level TestKit tests + the new zero-infra `RoslynAnalysisServiceTests`), `DigitalBrain.Tests` Sdk filter only runs `SdkContractsMetadataTests` now and passes.
 
 - [ ] **Step 9: Commit**
 
 ```bash
 git add DigitalBrain.Developer DigitalBrain.Developer.Tests DigitalBrain.Kernel DigitalBrain.Core DigitalBrain.Tests Brain.slnx Directory.Packages.props
-git commit -m "feat(developer-ino): extract Git/DotNet/NuGet/Roslyn into isolated DigitalBrain.Developer project, close zero-coverage gap"
+git commit -m "feat(developer-ino): extract Git/DotNet/NuGet/Roslyn interfaces + RoslynAnalysisService into isolated DigitalBrain.Developer project; grain classes stay in Kernel per neuron-placement amendment, close zero-coverage gap"
 ```
 
 ---
 
 ### Task 4: `DigitalBrain.Context` ino
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`.
+> `ContextNeuron.cs`'s real body (verified) is entirely grain/journal-coupled — `RememberAsync`/`RecallAsync`
+> store and scan `MemoryStored` synapses via the grain's own `OutgoingJournal`/`IncomingJournal` and
+> `FireAsync`, not via `QdrantVectorStore`/`DocumentIngestor` (those are a separate, already Orleans-free
+> subsystem `ContextNeuron` doesn't currently call into). So `ContextNeuron.cs` **stays in
+> `DigitalBrain.Kernel`** (does not move); everything else in the original Task 4 Files list is unchanged —
+> `ContextServices`/`DocumentIngestor`/`HybridScorer`/`QdrantVectorStore`/`VectorStore` were never
+> grain-coupled and move to the ino exactly as originally planned, and so does the `IContextNeuron` interface.
+
 **Files:**
 - Create: `DigitalBrain.Context/DigitalBrain.Context.csproj`
-- Move: `DigitalBrain.Kernel/ContextNeuron.cs`, `Context/ContextServices.cs`, `Context/DocumentIngestor.cs`, `Context/HybridScorer.cs`, `Context/QdrantVectorStore.cs`, `Context/VectorStore.cs` → `DigitalBrain.Context/` (namespace → `DigitalBrain.Context`)
+- Move: `Context/ContextServices.cs`, `Context/DocumentIngestor.cs`, `Context/HybridScorer.cs`, `Context/QdrantVectorStore.cs`, `Context/VectorStore.cs` → `DigitalBrain.Context/` (namespace → `DigitalBrain.Context`) — **`DigitalBrain.Kernel/ContextNeuron.cs` does NOT move**, it stays where it is
 - Move (from `DigitalBrain.Core/Synapse.cs:402`): `IContextNeuron` interface → `DigitalBrain.Context/IContextNeuron.cs` (namespace `DigitalBrain.Context`; keep `ContextUpdate`/`MemoryStored` records in `DigitalBrain.Core/Synapse.cs` unchanged — they're already-journaled generic Synapse payloads, see Global Constraints)
-- Delete: `DigitalBrain.Kernel/Context/` (now empty)
-- Modify: `DigitalBrain.Context/ContextNeuron.cs` — delete the dead `using DigitalBrain.Kernel.Foundry;` (line 2) and any other unused usings surfaced by the build (`ModelContextProtocol.Client`/`ModelContextProtocol.Protocol`/`Orleans.Runtime`/`System.Reflection`/`System.Diagnostics`/`Microsoft.CodeAnalysis*` were present in the original file but not visibly used in its body — verify each against the actual body before deleting; keep only what the compiler requires)
+- Delete: `DigitalBrain.Kernel/Context/` (now empty — it only ever held the 5 moved files, not `ContextNeuron.cs`, which lives directly under `DigitalBrain.Kernel/`)
+- Modify: `DigitalBrain.Kernel/ContextNeuron.cs` — add `using DigitalBrain.Context;` (for `IContextNeuron` and `HybridScorer`, which `RecallAsync` calls); delete the dead `using DigitalBrain.Kernel.Foundry;` (line 2) and other unused usings confirmed dead against the real body: `Microsoft.Extensions.Configuration`, `ModelContextProtocol.Client`, `ModelContextProtocol.Protocol`, `Orleans.Journaling`, `Orleans.Runtime`, `System.Reflection`, `System.Diagnostics`, `Microsoft.CodeAnalysis`, `Microsoft.CodeAnalysis.MSBuild`, `Microsoft.CodeAnalysis.CSharp` — none of these are referenced in the method bodies (`Logger`/`FireAsync`/`OutgoingJournal`/`IncomingJournal`/`ServiceProvider` all come from the base `Neuron` class already in scope). Keep `Microsoft.Extensions.AI` — the body directly uses `IEmbeddingGenerator<string, Embedding<float>>`.
 - Modify: `DigitalBrain.Kernel/Company/CompanySkillOrchestratorNeuron.cs`, `DigitalBrain.Kernel/Gateway/NeuronResolver.cs`, `DigitalBrain.Kernel/Program.cs` — add `using DigitalBrain.Context;`
 - Modify: `DigitalBrain.Kernel/JournalJsonContext.cs` — no change needed (`ContextUpdate`/`MemoryStored` stay in Core, already resolvable)
-- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Context`; move the `Microsoft.Extensions.AI`/Qdrant/`ModelContextProtocol` package references that `ContextNeuron` needs from Kernel's csproj into `DigitalBrain.Context.csproj` (check `DigitalBrain.Kernel.csproj` for their exact current `PackageReference` names first)
+- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Context`; move the Qdrant/`ModelContextProtocol` package references that only `ContextServices`/`QdrantVectorStore`/`DocumentIngestor` need into `DigitalBrain.Context.csproj` — **keep `Microsoft.Extensions.AI` in Kernel too** (`DigitalBrain.Kernel/ContextNeuron.cs` still references `IEmbeddingGenerator`/`Embedding<float>` directly; check `DigitalBrain.Kernel.csproj` for the exact current `PackageReference` names before moving anything)
 - Modify: `Brain.slnx` — add `DigitalBrain.Context`, `DigitalBrain.Context.Tests`
 - Create: `DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj`, `ContextNeuronTests.cs`
 
 **Interfaces:**
-- Produces: `DigitalBrain.Context.IContextNeuron` — `Task<string> GetContextAsync(string contextName)`, `Task RememberAsync(string text)`, `Task<string[]> RecallAsync(string query, int top = 5)` (unchanged signatures, moved namespace only).
+- Produces: `DigitalBrain.Context.IContextNeuron` — `Task<string> GetContextAsync(string contextName)`, `Task RememberAsync(string text)`, `Task<string[]> RecallAsync(string query, int top = 5)` (unchanged signatures, moved namespace only). The concrete implementation (`DigitalBrain.Kernel.ContextNeuron`) stays in Kernel.
+- Produces: `DigitalBrain.Context.HybridScorer.Score(...)` (unchanged signature) — `DigitalBrain.Kernel.ContextNeuron.RecallAsync` calls this directly.
 
 - [ ] **Step 1: Create the project**
 
@@ -667,9 +925,9 @@ git commit -m "feat(developer-ino): extract Git/DotNet/NuGet/Roslyn into isolate
 
 Before adding `PackageReference`s, run `grep -n "Microsoft.Extensions.AI\|Qdrant\|ModelContextProtocol" DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` to find the exact package names currently pulling in the types `ContextNeuron.cs`/`QdrantVectorStore.cs` use, and add those exact `PackageReference` entries here (do not guess versions — they're centrally managed in `Directory.Packages.props` already).
 
-- [ ] **Step 2: Move the 6 files**
+- [ ] **Step 2: Move the 5 Context files (not `ContextNeuron.cs`)**
 
-Move `ContextNeuron.cs` (from `DigitalBrain.Kernel/`) and `ContextServices.cs`/`DocumentIngestor.cs`/`HybridScorer.cs`/`QdrantVectorStore.cs`/`VectorStore.cs` (from `DigitalBrain.Kernel/Context/`) into `DigitalBrain.Context/`, namespace `DigitalBrain.Kernel` → `DigitalBrain.Context` in each. Delete the now-empty `DigitalBrain.Kernel/Context/` directory.
+Move `ContextServices.cs`/`DocumentIngestor.cs`/`HybridScorer.cs`/`QdrantVectorStore.cs`/`VectorStore.cs` (from `DigitalBrain.Kernel/Context/`) into `DigitalBrain.Context/`, namespace `DigitalBrain.Kernel` → `DigitalBrain.Context` in each. Content otherwise unchanged — verified none of these 5 files reference `Neuron`/Orleans grain types. Delete the now-empty `DigitalBrain.Kernel/Context/` directory. **`DigitalBrain.Kernel/ContextNeuron.cs` stays exactly where it is** — it is not part of this move.
 
 - [ ] **Step 3: Move `IContextNeuron` out of Core**
 
@@ -691,9 +949,31 @@ public interface IContextNeuron : INeuron, IHandle<ContextUpdate>
 
 Read the actual current `IContextNeuron` declaration at `DigitalBrain.Core/Synapse.cs:402` before writing this file — copy its real member list verbatim rather than trusting this reconstruction, since the plan author only confirmed the interface's existence and line number, not its full body.
 
-- [ ] **Step 4: Clean up `ContextNeuron.cs`'s usings**
+- [ ] **Step 4: Clean up `DigitalBrain.Kernel/ContextNeuron.cs`'s usings, add the `DigitalBrain.Context` reference**
 
-After moving, run `dotnet build DigitalBrain.Context` and delete every `using` that produces an "unused using" hint or isn't needed to compile (expected removals: `DigitalBrain.Kernel.Foundry`, and verify `ModelContextProtocol.Client`/`ModelContextProtocol.Protocol`/`Orleans.Runtime`/`System.Reflection`/`System.Diagnostics`/`Microsoft.CodeAnalysis`/`Microsoft.CodeAnalysis.MSBuild`/`Microsoft.CodeAnalysis.CSharp` similarly — keep only `DigitalBrain.Core`, `Microsoft.Extensions.Configuration`, `Microsoft.Extensions.AI`, `Orleans.Journaling` if the compiler still needs them).
+`ContextNeuron.cs` stays in `DigitalBrain.Kernel` (Step 2), so this cleanup happens in place, not as part of a move. Its current top-of-file usings are:
+```csharp
+using DigitalBrain.Core;
+using DigitalBrain.Kernel.Foundry;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.AI;
+using ModelContextProtocol.Client;
+using ModelContextProtocol.Protocol;
+using Orleans.Journaling;
+using Orleans.Runtime;
+using System.Reflection;
+using System.Diagnostics;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.CodeAnalysis.CSharp;
+```
+Replace with:
+```csharp
+using DigitalBrain.Core;
+using DigitalBrain.Context;
+using Microsoft.Extensions.AI;
+```
+`DigitalBrain.Context` is new (for `IContextNeuron` and `HybridScorer.Score`, which `RecallAsync` calls). `Microsoft.Extensions.AI` is kept (`EmbedAsync` uses `IEmbeddingGenerator<string, Embedding<float>>` directly). Every other using was confirmed unused in the method bodies — `Logger`/`FireAsync`/`OutgoingJournal`/`IncomingJournal`/`ServiceProvider` are inherited from the base `Neuron` class already in scope via the `DigitalBrain.Kernel` namespace, needing no explicit using. Run `dotnet build DigitalBrain.Kernel` after this change and delete any further usings the compiler flags as unused.
 
 - [ ] **Step 5: Fix the 3 cross-references**
 
@@ -756,26 +1036,40 @@ Expected: 0 build errors, Context.Tests 1/1 passed, Company/Gateway filtered tes
 
 ```bash
 git add DigitalBrain.Context DigitalBrain.Context.Tests DigitalBrain.Kernel DigitalBrain.Core Brain.slnx Directory.Packages.props
-git commit -m "feat(context-ino): extract ContextNeuron + Qdrant memory subsystem into isolated DigitalBrain.Context project"
+git commit -m "feat(context-ino): extract IContextNeuron + Qdrant memory subsystem into isolated DigitalBrain.Context project; ContextNeuron grain stays in Kernel per neuron-placement amendment"
 ```
 
 ---
 
 ### Task 5: `DigitalBrain.UiKit` ino
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`,
+> **plus a second, independent correction**: the original Task 5 Files list below contradicted the base
+> design spec's own "Project inventory" table, which explicitly scopes `DigitalBrain.UiKit` to
+> `IFlutterUiNeuron`/`FlutterUiNeuron` **only** — "not `HomeFeedBus`/`ChatNeuron`/`SignalEgressBus`/stream
+> subscribers/`UiSurfaceRfwBridge`, which stay in Kernel as cross-cutting broadcast infra used by many
+> neurons beyond this one channel." Per this plan's Global Constraints ("if a task and the spec conflict,
+> the spec governs"), the spec wins: those 5 files were never supposed to move, and this revision fixes that
+> in addition to applying the Neuron-placement amendment. `FlutterUiNeuron.cs`'s real body (verified) calls
+> `ServiceProvider.GetService<HomeFeedBus>()` and `UiSurfaceRfwBridge.FromUiSurface(...)` directly — both
+> staying in Kernel confirms it belongs there too, consistent with the Neuron-placement amendment
+> independently reaching the same conclusion (its body is 100% grain/Kernel-coupled, nothing to extract).
+> Net effect: **only the `IFlutterUiNeuron` interface moves.** Everything else in `DigitalBrain.Kernel/Ui/`
+> stays exactly where it is.
+
 **Files:**
-- Create: `DigitalBrain.UiKit/DigitalBrain.UiKit.csproj`
-- Move: `DigitalBrain.Kernel/Ui/FlutterUiNeuron.cs`, `HomeFeedBus.cs`, `HomeFeedStreamSubscriber.cs`, `SignalEgressBus.cs`, `SignalEgressStreamSubscriber.cs`, `UiSurfaceRfwBridge.cs` → `DigitalBrain.UiKit/` (namespace → `DigitalBrain.UiKit`). `ChatNeuron.cs` stays in `DigitalBrain.Kernel/Ui/` — it's a consumer of the UiKit bus, not part of the delivery mechanism itself.
+- Create: `DigitalBrain.UiKit/DigitalBrain.UiKit.csproj` (`ProjectReference`: `DigitalBrain.Core` only — no `Microsoft.Orleans.Streaming` package needed, since no stream-subscriber code moves here)
 - Move (from `DigitalBrain.Core/Synapse.cs:77`): `IFlutterUiNeuron` interface → `DigitalBrain.UiKit/IFlutterUiNeuron.cs` (namespace `DigitalBrain.UiKit`)
 - Modify: `DigitalBrain.Core/Synapse.cs` — delete the `IFlutterUiNeuron` interface (line ~77); `IChannelNeuron` (line ~84) stays (generic marker)
-- Modify: `DigitalBrain.Kernel/Auth/UserSessionNeuron.cs`, `DataVisualizationNeuron.cs`, `DemoNeuron.cs`, `Gateway/GatewayService.cs`, `Gateway/KernelSurfaceDemo.cs`, `GeneratedNeuron.cs`, `KernelTaskNeuron.cs`, `MarketplaceNeuron.cs`, `Program.cs`, `SystemNeurons.cs`, `Ui/ChatNeuron.cs` — add `using DigitalBrain.UiKit;` to each
+- Modify: `DigitalBrain.Kernel/Ui/FlutterUiNeuron.cs` — **stays in Kernel** (does not move); add `using DigitalBrain.UiKit;` (for the interface); no other change — `HomeFeedBus`/`UiSurfaceRfwBridge` it calls are already in scope via the shared `DigitalBrain.Kernel` namespace
+- `DigitalBrain.Kernel/Ui/HomeFeedBus.cs`, `HomeFeedStreamSubscriber.cs`, `SignalEgressBus.cs`, `SignalEgressStreamSubscriber.cs`, `UiSurfaceRfwBridge.cs`, `ChatNeuron.cs` — **all stay in `DigitalBrain.Kernel/Ui/` unchanged**, per both the design spec and the Neuron-placement amendment
+- Modify: `DigitalBrain.Kernel/Auth/UserSessionNeuron.cs`, `DataVisualizationNeuron.cs`, `DemoNeuron.cs`, `Gateway/GatewayService.cs`, `Gateway/KernelSurfaceDemo.cs`, `GeneratedNeuron.cs`, `KernelTaskNeuron.cs`, `MarketplaceNeuron.cs`, `Program.cs`, `SystemNeurons.cs`, `Ui/ChatNeuron.cs` — add `using DigitalBrain.UiKit;` to each (for the interface)
 - Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.UiKit`
 - Modify: `Brain.slnx` — add `DigitalBrain.UiKit`, `DigitalBrain.UiKit.Tests`
 - Create: `DigitalBrain.UiKit.Tests/DigitalBrain.UiKit.Tests.csproj`, `FlutterUiNeuronTests.cs`
 
 **Interfaces:**
-- Produces: `DigitalBrain.UiKit.IFlutterUiNeuron : INeuron, IHandle<UiSurface>` (unchanged signature, moved namespace).
-- Produces: `DigitalBrain.UiKit.HomeFeedBus` — same public surface as today (`Broadcast(...)`, DI-registered as singleton).
+- Produces: `DigitalBrain.UiKit.IFlutterUiNeuron : INeuron, IHandle<UiSurface>` (unchanged signature, moved namespace). The concrete implementation (`DigitalBrain.Kernel.FlutterUiNeuron`) stays in Kernel, as does `HomeFeedBus`.
 
 - [ ] **Step 1: Create the project**
 
@@ -793,18 +1087,14 @@ git commit -m "feat(context-ino): extract ContextNeuron + Qdrant memory subsyste
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Streaming" />
-  </ItemGroup>
-
 </Project>
 ```
 
-Check `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` for the exact package reference providing `Orleans.Streams` (used by `HomeFeedStreamSubscriber.cs`/`SignalEgressStreamSubscriber.cs`) and match the exact `Include` name.
+No `Microsoft.Orleans.Streaming` package reference is needed — `HomeFeedStreamSubscriber.cs`/`SignalEgressStreamSubscriber.cs` (the files that use `Orleans.Streams`) stay in Kernel, not this project (see amendment note above).
 
-- [ ] **Step 2: Move the 6 files**
+- [ ] **Step 2: Move only the `IFlutterUiNeuron` interface — no `.cs` files move**
 
-Move `FlutterUiNeuron.cs`, `HomeFeedBus.cs`, `HomeFeedStreamSubscriber.cs`, `SignalEgressBus.cs`, `SignalEgressStreamSubscriber.cs`, `UiSurfaceRfwBridge.cs` from `DigitalBrain.Kernel/Ui/` to `DigitalBrain.UiKit/`, namespace `DigitalBrain.Kernel` → `DigitalBrain.UiKit` in each. `ChatNeuron.cs` stays where it is, untouched.
+Nothing moves out of `DigitalBrain.Kernel/Ui/` in this step. `FlutterUiNeuron.cs`, `HomeFeedBus.cs`, `HomeFeedStreamSubscriber.cs`, `SignalEgressBus.cs`, `SignalEgressStreamSubscriber.cs`, `UiSurfaceRfwBridge.cs`, `ChatNeuron.cs` all stay exactly where they are, byte-for-byte unchanged except `FlutterUiNeuron.cs` gaining one `using` (Step 3). The only file movement in this task is the `IFlutterUiNeuron` interface, handled in Step 3 below.
 
 - [ ] **Step 3: Move `IFlutterUiNeuron` out of Core**
 
@@ -822,6 +1112,8 @@ public interface IFlutterUiNeuron : IChannelNeuron, IHandle<UiSurface>
 ```
 
 (Copy the exact base-list/body from the real file read in this step rather than this reconstruction — the plan author saw this at `Synapse.cs:77` during research but is reconstructing the exact declaration here from memory of the surrounding grep context.)
+
+Add `using DigitalBrain.UiKit;` to the top of `DigitalBrain.Kernel/Ui/FlutterUiNeuron.cs` (its only change this task — the class itself, and its calls to `HomeFeedBus`/`UiSurfaceRfwBridge`, are unaffected since those stay in the same `DigitalBrain.Kernel` namespace).
 
 - [ ] **Step 4: Fix the 11 cross-references**
 
@@ -865,16 +1157,22 @@ public class FlutterUiNeuronTests : IAsyncLifetime
     public Task DisposeAsync() => _brain.DisposeAsync();
 
     [Fact]
-    public async Task HandleAsync_Accepts_UiSurface_Without_Throwing()
+    public async Task HandleAsync_Records_The_Delivered_UiSurface_In_The_Incoming_Journal()
     {
         var flutter = _brain.Grain<IFlutterUiNeuron>("flutter-ui");
         var surface = new UiSurface("test-kind", new Dictionary<string, object?> { ["title"] = "smoke" });
+
         await flutter.HandleAsync(surface);
+
+        var incoming = await flutter.GetIncomingTimelineAsync();
+        Assert.Contains(incoming, s => s is UiSurface delivered && delivered.Kind == "test-kind");
     }
 }
 ```
 
-Read the real `UiSurface` record definition in `DigitalBrain.Core/Synapse.cs` or `UiSurfaces.cs` before finalizing this constructor call — the plan author has not confirmed `UiSurface`'s exact constructor parameter list/order; match it exactly (likely `UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props, ...)` based on `FlutterUiNeuron.HandleAsync`'s use of `surface.Kind`/`surface.Props`, but verify before writing the test).
+`UiSurface`'s real constructor is confirmed: `UiSurface(string Kind, IReadOnlyDictionary<string, object?> Props)` (`DigitalBrain.Core/UiSurfaces.cs:6`) — the call above matches it exactly, no adjustment needed.
+
+This asserts on observable grain state (the delivered synapse landing in `IncomingTimelineAsync`) rather than merely "didn't throw," per the plan's pre-flight review decision. `FlutterUiNeuron.HandleAsync`'s real body doesn't call `FireAsync` (so `GetTimelineAsync`/outgoing journal won't show anything from this call) — `DeliverAsync` itself is what records the incoming synapse, which is what this assertion checks. Verifying the deeper `HomeFeedBus.Broadcast` fan-out itself would need a test double wired through `TestDigitalBrain`'s `extend` hook and is out of scope for this smoke test.
 
 - [ ] **Step 8: Build and test everything**
 
@@ -888,26 +1186,33 @@ Expected: 0 build errors, UiKit.Tests 1/1 passed, the filtered central tests (wh
 - [ ] **Step 9: Commit**
 
 ```bash
-git add DigitalBrain.UiKit DigitalBrain.UiKit.Tests DigitalBrain.Kernel DigitalBrain.Core Brain.slnx Directory.Packages.props
-git commit -m "feat(uikit-ino): extract FlutterUiNeuron + HomeFeed/SignalEgress delivery pipe into isolated DigitalBrain.UiKit project, add first direct test"
+git add DigitalBrain.UiKit DigitalBrain.UiKit.Tests DigitalBrain.Kernel DigitalBrain.Core Brain.slnx
+git commit -m "feat(uikit-ino): extract IFlutterUiNeuron into isolated DigitalBrain.UiKit project, add first direct test; FlutterUiNeuron/HomeFeed/SignalEgress stay in Kernel per spec + neuron-placement amendment"
 ```
 
 ---
 
 ### Task 6: `DigitalBrain.Telegram.Channel` ino
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`.
+> `TelegramChatNeuron.cs`'s real body (verified, 102 lines) is entirely grain/journal-coupled — reads
+> `IncomingJournal`, calls `Broadcast`/`FireAsync`-derived helpers, `GrainFactory.GetGrain<>`,
+> `StampCurrent`/`Self`/`CurrentCause` — every method except the trivial static `TryParseStart` string
+> parser needs `Neuron`. It **stays in `DigitalBrain.Kernel`** (does not move); only the `ITelegramChatNeuron`
+> interface moves to the ino.
+
 **Files:**
 - Create: `DigitalBrain.Telegram.Channel/DigitalBrain.Telegram.Channel.csproj`
-- Move: `DigitalBrain.Kernel/TelegramChatNeuron.cs` → `DigitalBrain.Telegram.Channel/TelegramChatNeuron.cs` (namespace `DigitalBrain.Kernel` → `DigitalBrain.Telegram.Channel`)
 - Move (from `DigitalBrain.Core/Synapse.cs:72`): `ITelegramChatNeuron` interface → `DigitalBrain.Telegram.Channel/ITelegramChatNeuron.cs` (namespace `DigitalBrain.Telegram.Channel`)
+- Modify: `DigitalBrain.Kernel/TelegramChatNeuron.cs` — **stays in Kernel** (does not move); add `using DigitalBrain.Telegram.Channel;` (for the interface); no other change
 - Modify: `DigitalBrain.Kernel/Gateway/GatewayService.cs` — add `using DigitalBrain.Telegram.Channel;`
 - Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Telegram.Channel`
 - Modify: `Brain.slnx` — add `DigitalBrain.Telegram.Channel`, `DigitalBrain.Telegram.Channel.Tests`
 - Create: `DigitalBrain.Telegram.Channel.Tests/DigitalBrain.Telegram.Channel.Tests.csproj`
-- Move: `DigitalBrain.Tests/Telegram/TelegramChatNeuronTests.cs` → `DigitalBrain.Telegram.Channel.Tests/TelegramChatNeuronTests.cs` (update `using`s: `DigitalBrain.Tests.TestSupport` → `DigitalBrain.TestKit`, add `DigitalBrain.Telegram.Channel`); `TelegramDeepLinkRoutingTests.cs` stays central (it likely also touches gateway/routing concerns beyond the grain itself — read it first to confirm before deciding whether it moves too)
+- Move: `DigitalBrain.Tests/Telegram/TelegramChatNeuronTests.cs` → `DigitalBrain.Telegram.Channel.Tests/TelegramChatNeuronTests.cs` (update `using`s: `DigitalBrain.Tests.TestSupport` → `DigitalBrain.TestKit`, add `DigitalBrain.Telegram.Channel`) — this move is unaffected by the amendment: the test only ever referenced the `ITelegramChatNeuron` interface + `TestDigitalBrain`, and `TestDigitalBrain` already resolves `DigitalBrain.Kernel`'s concrete `TelegramChatNeuron` transitively (confirmed in Task 1); `TelegramDeepLinkRoutingTests.cs` stays central (it likely also touches gateway/routing concerns beyond the grain itself — read it first to confirm before deciding whether it moves too)
 
 **Interfaces:**
-- Produces: `DigitalBrain.Telegram.Channel.ITelegramChatNeuron` (unchanged signature, moved namespace).
+- Produces: `DigitalBrain.Telegram.Channel.ITelegramChatNeuron` (unchanged signature, moved namespace). The concrete implementation (`DigitalBrain.Kernel.TelegramChatNeuron`) stays in Kernel.
 
 - [ ] **Step 1: Create the project**
 
@@ -928,9 +1233,9 @@ git commit -m "feat(uikit-ino): extract FlutterUiNeuron + HomeFeed/SignalEgress 
 </Project>
 ```
 
-- [ ] **Step 2: Move `TelegramChatNeuron.cs`**
+- [ ] **Step 2: `TelegramChatNeuron.cs` stays in Kernel — no file move this step**
 
-Move verbatim from `DigitalBrain.Kernel/TelegramChatNeuron.cs` to `DigitalBrain.Telegram.Channel/TelegramChatNeuron.cs`, namespace `DigitalBrain.Kernel` → `DigitalBrain.Telegram.Channel`. No other changes — confirmed during research that its only real-type references (`IDataVisualizationNeuron`, `IGeneratedNeuron`, `VisualizeDataRequest`) already live in `DigitalBrain.Core`, reachable via the existing `using DigitalBrain.Core;`.
+`DigitalBrain.Kernel/TelegramChatNeuron.cs` is not moved. Its `using DigitalBrain.Telegram.Channel;` addition (for the interface) happens in Step 3 below, alongside the interface's own move.
 
 - [ ] **Step 3: Move `ITelegramChatNeuron` out of Core**
 
@@ -949,6 +1254,8 @@ public interface ITelegramChatNeuron : IChannelNeuron
 ```
 
 Copy the exact real body from the file read in this step rather than this reconstruction.
+
+Add `using DigitalBrain.Telegram.Channel;` to the top of `DigitalBrain.Kernel/TelegramChatNeuron.cs`.
 
 - [ ] **Step 4: Fix the 1 cross-reference**
 
@@ -988,7 +1295,7 @@ Expected: 0 build errors, the moved test(s) pass in the new project, remaining c
 
 ```bash
 git add DigitalBrain.Telegram.Channel DigitalBrain.Telegram.Channel.Tests DigitalBrain.Kernel DigitalBrain.Core DigitalBrain.Tests Brain.slnx
-git commit -m "feat(telegram-channel-ino): extract TelegramChatNeuron into isolated DigitalBrain.Telegram.Channel project"
+git commit -m "feat(telegram-channel-ino): extract ITelegramChatNeuron into isolated DigitalBrain.Telegram.Channel project; TelegramChatNeuron grain stays in Kernel per neuron-placement amendment"
 ```
 
 ---
@@ -1061,23 +1368,32 @@ git commit -m "feat(telegram-pack): co-locate TelegramResponderNeuron's test in 
 
 ### Task 8: `DigitalBrain.Google` ino
 
+> **AMENDED 2026-07-01:** revised per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`.
+> `GmailNeuron`/`GoogleDriveNeuron`/`GoogleCalendarNeuron`/`GoogleAuthNeuron` all derive from `Neuron`
+> (`: Neuron(logger, journals), IGmailNeuron`, etc. — see Step 7/7b below), so they cannot live in the
+> Core-only `DigitalBrain.Google` project as originally written. This is net-new code (not an extraction from
+> an existing file), so the fix is simple: **the 4 grain classes are created directly in
+> `DigitalBrain.Kernel/Google/` instead of `DigitalBrain.Google/`.** Everything else — the 3 public
+> interfaces, the 3 API client interfaces + real implementations, `GoogleCredentialFactory` — stays in
+> `DigitalBrain.Google` exactly as originally written; none of those ever referenced `Neuron`.
+
 **Files:**
 - Create: `DigitalBrain.Google/DigitalBrain.Google.csproj`
 - Create: `DigitalBrain.Google/IGmailNeuron.cs`, `IGoogleDriveNeuron.cs`, `IGoogleCalendarNeuron.cs`
 - Create: `DigitalBrain.Google/IGmailApiClient.cs`, `IGoogleDriveApiClient.cs`, `IGoogleCalendarApiClient.cs`
 - Create: `DigitalBrain.Google/GoogleGmailApiClient.cs`, `GoogleDriveApiClient.cs`, `GoogleCalendarApiClient.cs`
 - Create: `DigitalBrain.Google/GoogleCredentialFactory.cs`
-- Create: `DigitalBrain.Google/GmailNeuron.cs`, `GoogleDriveNeuron.cs`, `GoogleCalendarNeuron.cs`
+- Create: `DigitalBrain.Kernel/Google/GmailNeuron.cs`, `GoogleDriveNeuron.cs`, `GoogleCalendarNeuron.cs`, `GoogleAuthNeuron.cs` (namespace `DigitalBrain.Kernel` — **not** `DigitalBrain.Google`; new subfolder under Kernel, following the existing `DigitalBrain.Kernel/Ui/`, `DigitalBrain.Kernel/Auth/`, `DigitalBrain.Kernel/Gateway/` convention of grouping related grains in a subfolder)
 - Modify: `DigitalBrain.Core/Signals.cs` — add `GoogleSignals` string-constant class
 - Modify: `Directory.Packages.props` — add `Google.Apis.Gmail.v1`, `Google.Apis.Drive.v3`, `Google.Apis.Calendar.v3`, `Google.Apis.Auth`
-- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Google`
+- Modify: `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj` — add `ProjectReference` to `DigitalBrain.Google` (still needed: Kernel's `Google/*.cs` grain classes reference the ino's interfaces + API client types)
 - Modify: `Brain.slnx` — add `DigitalBrain.Google`, `DigitalBrain.Google.Tests`
 - Create: `DigitalBrain.Google.Tests/DigitalBrain.Google.Tests.csproj`, `FakeGoogleApiClients.cs`, `GmailNeuronTests.cs`, `GoogleDriveNeuronTests.cs`, `GoogleCalendarNeuronTests.cs`
 
 **Interfaces:**
-- Produces: `IGmailNeuron.ListMessagesAsync(string query, int maxResults)`, `.ReadMessageAsync(string messageId)`, `.SendMessageAsync(string to, string subject, string body)`.
-- Produces: `IGoogleDriveNeuron.ListFilesAsync(string query)`, `.UploadFileAsync(string name, string content, string mimeType)`, `.DownloadFileAsync(string fileId)`, `.DeleteFileAsync(string fileId)`.
-- Produces: `IGoogleCalendarNeuron.ListEventsAsync(string timeMinIso, string timeMaxIso)`, `.CreateEventAsync(string summary, string startIso, string endIso, string description)`, `.DeleteEventAsync(string eventId)`.
+- Produces: `IGmailNeuron.ListMessagesAsync(string query, int maxResults)`, `.ReadMessageAsync(string messageId)`, `.SendMessageAsync(string to, string subject, string body)`. Concrete implementation lives in `DigitalBrain.Kernel.GmailNeuron`.
+- Produces: `IGoogleDriveNeuron.ListFilesAsync(string query)`, `.UploadFileAsync(string name, string content, string mimeType)`, `.DownloadFileAsync(string fileId)`, `.DeleteFileAsync(string fileId)`. Concrete implementation lives in `DigitalBrain.Kernel.GoogleDriveNeuron`.
+- Produces: `IGoogleCalendarNeuron.ListEventsAsync(string timeMinIso, string timeMaxIso)`, `.CreateEventAsync(string summary, string startIso, string endIso, string description)`, `.DeleteEventAsync(string eventId)`. Concrete implementation lives in `DigitalBrain.Kernel.GoogleCalendarNeuron`.
 
 - [ ] **Step 1: Context7 check before any Google API code**
 
@@ -1424,13 +1740,14 @@ public sealed class GoogleCalendarApiClient(UserCredential credential) : IGoogle
 
 This matches the Context7-confirmed `Events.List`/`TimeMinDateTimeOffset`/`SingleEvents`/`OrderBy` shape from the initial spec research (already verified). Confirm `Event.Start`/`Event.End` as `EventDateTime` with a `DateTimeDateTimeOffset` property specifically (not just `DateTime`) via one more Context7 query before finalizing, since the initial research only confirmed the read path, not event creation.
 
-- [ ] **Step 7: Write the three real grains**
+- [ ] **Step 7: Write the three real grains — in `DigitalBrain.Kernel/Google/`, not `DigitalBrain.Google/`**
 
 ```csharp
-// DigitalBrain.Google/GmailNeuron.cs
+// DigitalBrain.Kernel/Google/GmailNeuron.cs
 using DigitalBrain.Core;
+using DigitalBrain.Google;
 
-namespace DigitalBrain.Google;
+namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.google.gmail.v1")]
 public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, IGmailApiClient client)
@@ -1447,9 +1764,11 @@ public class GmailNeuron(ILogger<GmailNeuron> logger, NeuronJournals journals, I
 }
 ```
 
-Before finalizing this constructor, read `DigitalBrain.Windows/WingetNeuron.cs`'s real constructor signature (`WingetNeuron(ILogger<WingetNeuron> logger, NeuronJournals journals) : base(logger, journals) { }`) and confirm whether `Neuron`'s base constructor accepts additional DI-resolved parameters cleanly via Orleans activation (it should — Orleans resolves grain constructor parameters from the DI container automatically) — if `IGmailApiClient` isn't registered in DI, grain activation will throw at runtime; Step 9 registers it.
+Note the namespace is `DigitalBrain.Kernel` (matching its physical location, same convention as every other grain in this codebase) with `using DigitalBrain.Google;` for `IGmailNeuron`/`IGmailApiClient`. `NeuronJournals`/`Neuron` are already in scope via the shared `DigitalBrain.Kernel` namespace — no extra using needed for those, unlike the real-grain inos in Tasks 2-6 where the grain and its interface are split across two projects.
 
-Write `GoogleDriveNeuron.cs` and `GoogleCalendarNeuron.cs` following the identical pattern (constructor takes the matching `I*ApiClient`, each interface method is a one-line delegation).
+Before finalizing this constructor, read `DigitalBrain.Kernel/Sdk/WingetNeuron.cs`'s real constructor signature (`WingetNeuron(ILogger<WingetNeuron> logger, NeuronJournals journals) : base(logger, journals) { }`) and confirm whether `Neuron`'s base constructor accepts additional DI-resolved parameters cleanly via Orleans activation (it should — Orleans resolves grain constructor parameters from the DI container automatically) — if `IGmailApiClient` isn't registered in DI, grain activation will throw at runtime; Step 8 registers it.
+
+Write `DigitalBrain.Kernel/Google/GoogleDriveNeuron.cs` and `GoogleCalendarNeuron.cs` following the identical pattern (namespace `DigitalBrain.Kernel`, `using DigitalBrain.Google;`, constructor takes the matching `I*ApiClient`, each interface method is a one-line delegation).
 
 - [ ] **Step 7a: Add `GoogleSignals` to Core**
 
@@ -1470,10 +1789,11 @@ public static class GoogleSignals
 This is the piece of the spec ("The 'Sign in with Google' experience is a `UiSurface`... whose `onClick` fires `Signal("GoogleAuthRequested", ...)`") that Steps 1-7 don't cover yet — without it, nothing in the system can actually trigger Google auth.
 
 ```csharp
-// DigitalBrain.Google/GoogleAuthNeuron.cs
+// DigitalBrain.Kernel/Google/GoogleAuthNeuron.cs
 using DigitalBrain.Core;
+using DigitalBrain.Google;
 
-namespace DigitalBrain.Google;
+namespace DigitalBrain.Kernel;
 
 [GrainType("digitalbrain.google.auth.v1")]
 public class GoogleAuthNeuron(ILogger<GoogleAuthNeuron> logger, NeuronJournals journals)
@@ -1539,6 +1859,7 @@ Add to `DigitalBrain.Kernel/DigitalBrain.Kernel.csproj`:
 ```xml
 <ProjectReference Include="..\DigitalBrain.Google\DigitalBrain.Google.csproj" />
 ```
+(This reference is for the interfaces/API client types Kernel's `Google/*.cs` grain classes consume — it's the same `ProjectReference` the original plan already specified, still needed under the amendment even though the grain classes themselves now live in Kernel rather than `DigitalBrain.Google`.)
 
 In `DigitalBrain.Kernel/Program.cs`, find where other per-request DI services are registered (e.g. near `IScopedChatClientFactory`/`IEmbeddingGenerator` registrations) and add real registrations for `IGmailApiClient`/`IGoogleDriveApiClient`/`IGoogleCalendarApiClient`, each constructed via `GoogleCredentialFactory.FromRefreshToken(...)` reading `client_id`/`client_secret`/`refresh_token` from `IPackConfigStore` under a well-known scope (e.g. `"google"`/`"default"`) — mirror exactly how `LlmResponderNeuron` currently resolves per-scope config via `IPackConfigStore` in `Program.cs`/`LlmResponderNeuron.cs` (read that resolution code first and match its shape, including how it handles the config-not-yet-provided case).
 
@@ -1679,7 +2000,7 @@ public class GmailNeuronTests : IAsyncLifetime
 }
 ```
 
-This is the first real exercise of Step 1's `TestDigitalBrain(Action<ISiloBuilder>? extend)` extension point — if it doesn't work as designed, fix `TestDigitalBrain` in `DigitalBrain.TestKit` now rather than working around it here (the whole point of that constructor parameter was exactly this use case).
+This is the first real exercise of Step 1's `TestDigitalBrain(Action<ISiloBuilder>? extend)` extension point — if it doesn't work as designed, fix `TestDigitalBrain` in `DigitalBrain.TestKit` now rather than working around it here (the whole point of that constructor parameter was exactly this use case). This test code is unaffected by the amendment's grain relocation: `_brain.Grain<IGmailNeuron>(...)` resolves to `DigitalBrain.Kernel.GmailNeuron` transitively through `DigitalBrain.TestKit`'s existing reference to `DigitalBrain.Kernel` (confirmed in Task 1), exactly as it would have resolved to a `DigitalBrain.Google`-hosted grain under the original (uncompilable) plan.
 
 Write `GoogleDriveNeuronTests.cs` and `GoogleCalendarNeuronTests.cs` following the identical shape (construct `TestDigitalBrain` with the matching fake registered, assert against the fake's recorded state).
 
@@ -1695,18 +2016,24 @@ Expected: 0 build errors, all Google tests pass using the fakes — confirm via 
 
 ```bash
 git add DigitalBrain.Google DigitalBrain.Google.Tests DigitalBrain.Core DigitalBrain.Kernel Brain.slnx Directory.Packages.props
-git commit -m "feat(google-ino): add Gmail/Drive/Calendar as isolated DigitalBrain.Google project with mockable API clients"
+git commit -m "feat(google-ino): add Gmail/Drive/Calendar interfaces + mockable API clients as isolated DigitalBrain.Google project; grain classes live in Kernel/Google per neuron-placement amendment"
 ```
 
 ---
 
 ### Task 9: `DigitalBrain.Experience.PersonalAssistant` ino
 
+> **AMENDED 2026-07-01:** per `docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`
+> and Task 4's revision, `ContextNeuron` (the concrete grain) lives in `DigitalBrain.Kernel`, not
+> `DigitalBrain.Context`. This task's `IHandle<Signal>` addition below goes into
+> `DigitalBrain.Kernel/ContextNeuron.cs`. `PersonalAssistantNeuron` itself is unaffected — it's a pure-pack
+> `IPackBehavior`, never derives from `Neuron`, and was never blocked by the Neuron-placement issue.
+
 **Files:**
 - Create: `DigitalBrain.Experience.PersonalAssistant/DigitalBrain.Experience.PersonalAssistant.csproj`
 - Create: `DigitalBrain.Experience.PersonalAssistant/PersonalAssistantNeuron.cs`
 - Modify: `DigitalBrain.Core/Signals.cs` — add `ContextSignals` string-constant class
-- Modify: `DigitalBrain.Context/ContextNeuron.cs` — add `IHandle<Signal>` handling `ContextSignals.RecallRequested`
+- Modify: `DigitalBrain.Kernel/ContextNeuron.cs` — add `IHandle<Signal>` handling `ContextSignals.RecallRequested` (**not** `DigitalBrain.Context/ContextNeuron.cs` — the concrete grain stays in Kernel per Task 4's amendment)
 - Modify: `Brain.slnx` — add `DigitalBrain.Experience.PersonalAssistant`, `DigitalBrain.Experience.PersonalAssistant.Tests`
 - Create: `DigitalBrain.Experience.PersonalAssistant.Tests/DigitalBrain.Experience.PersonalAssistant.Tests.csproj`, `PersonalAssistantNeuronTests.cs`
 
@@ -1762,7 +2089,7 @@ Expected: FAIL (no such handling exists yet).
 
 - [ ] **Step 4: Implement `IHandle<Signal>` on `ContextNeuron`**
 
-Add to `DigitalBrain.Context/ContextNeuron.cs` (class declaration becomes `public class ContextNeuron : Neuron, IContextNeuron, IHandle<Signal>`):
+Add to `DigitalBrain.Kernel/ContextNeuron.cs` (class declaration becomes `public class ContextNeuron : Neuron, IContextNeuron, IHandle<Signal>`):
 
 ```csharp
 public async Task HandleAsync(Signal signal)
@@ -1784,8 +2111,8 @@ Expected: PASS.
 - [ ] **Step 6: Commit the Context addition**
 
 ```bash
-git add DigitalBrain.Context DigitalBrain.Context.Tests DigitalBrain.Core
-git commit -m "feat(context-ino): handle ContextRecallRequested signal, reusing the AskLlm reply-by-name pattern"
+git add DigitalBrain.Kernel DigitalBrain.Context.Tests DigitalBrain.Core
+git commit -m "feat(context): handle ContextRecallRequested signal on the Kernel-hosted ContextNeuron grain, reusing the AskLlm reply-by-name pattern"
 ```
 
 - [ ] **Step 7: Create the PersonalAssistant project**
@@ -2008,16 +2335,53 @@ git commit -m "feat(personal-assistant-ino): add PersonalAssistantNeuron pack co
 
 ### Task 10: Marketplace seed entry + `Brain.slnx` consolidation pass
 
+> **AMENDED 2026-07-01 (pre-flight decision, independent of the Neuron-placement amendment):** the original
+> Step 1 below hand-copied `PersonalAssistantNeuron.cs`'s source into a `const string` in `MarketplaceSeeds.cs`
+> — a second, manually-maintained copy that drifts the moment the real file changes. Reviewed before
+> execution began and revised: instead of a hand-copied duplicate, `DigitalBrain.Core` embeds
+> `PersonalAssistantNeuron.cs` itself as a build-time `EmbeddedResource`, read back at runtime. The file's
+> content is the single source of truth — no copy-paste, no drift. This does not create a project reference
+> from Core to `DigitalBrain.Experience.PersonalAssistant` (it's a file-system-path resource include, not an
+> assembly reference) and does not change Core's "zero vendor/integration type references" property verified
+> in Task 11 — it's data (a resource), not a compiled type dependency, same category as the existing
+> `TelegramResponderPackCode` pattern this replaces the naive form of.
+
 **Files:**
+- Modify: `DigitalBrain.Core/DigitalBrain.Core.csproj` — add an `EmbeddedResource` include for `PersonalAssistantNeuron.cs`
 - Modify: `DigitalBrain.Core/MarketplaceSeeds.cs`
 - Modify: `Brain.slnx`
 
 **Interfaces:**
-- Consumes: `DigitalBrain.Experience.PersonalAssistant.PersonalAssistantNeuron`'s real source (Task 9) — this task embeds it as a string constant in `MarketplaceSeeds.cs`, the same accepted-duplication pattern `TelegramResponderPackCode` already uses (see spec's "Explicitly out of scope" section).
+- Consumes: `DigitalBrain.Experience.PersonalAssistant.PersonalAssistantNeuron`'s real source (Task 9), embedded as a resource and read back at runtime — never hand-copied.
 
-- [ ] **Step 1: Add the embedded pack source constant**
+- [ ] **Step 1: Embed `PersonalAssistantNeuron.cs` as a resource, expose its content via a property**
 
-In `DigitalBrain.Core/MarketplaceSeeds.cs`, near `TelegramResponderPackCode`, add a new `public const string PersonalAssistantPackCode = """..."""` containing the exact same C# source written in Task 9 Step 8 (copy verbatim from `DigitalBrain.Experience.PersonalAssistant/PersonalAssistantNeuron.cs`, since packs seeded here must be self-contained compilable source — this is the accepted duplication, not a bug).
+Add to `DigitalBrain.Core/DigitalBrain.Core.csproj`:
+```xml
+<ItemGroup>
+  <EmbeddedResource Include="..\DigitalBrain.Experience.PersonalAssistant\PersonalAssistantNeuron.cs">
+    <LogicalName>PersonalAssistantNeuron.cs</LogicalName>
+  </EmbeddedResource>
+</ItemGroup>
+```
+
+In `DigitalBrain.Core/MarketplaceSeeds.cs`, near `TelegramResponderPackCode`, add:
+
+```csharp
+public static string PersonalAssistantPackCode => _personalAssistantPackCode.Value;
+
+private static readonly Lazy<string> _personalAssistantPackCode = new(() => ReadEmbeddedSource("PersonalAssistantNeuron.cs"));
+
+private static string ReadEmbeddedSource(string logicalName)
+{
+    using var stream = typeof(MarketplaceSeeds).Assembly.GetManifestResourceStream(logicalName)
+        ?? throw new InvalidOperationException($"Embedded resource '{logicalName}' not found.");
+    using var reader = new StreamReader(stream);
+    return reader.ReadToEnd();
+}
+```
+
+`PersonalAssistantPackCode` is a property (not `const`), since its value is read from the embedded resource at first access rather than known at compile time — every call site in `LocalUiPacks` (Step 2 below) works identically either way.
 
 - [ ] **Step 2: Add the `NeuroPack` seed entry**
 
@@ -2110,7 +2474,7 @@ Use the aspire MCP tool `mcp__aspire__doctor` (per project convention — always
 
 - [ ] **Step 5: Update `SYSTEM_DESIGN.md`**
 
-In `brain/docs/SYSTEM_DESIGN.md` §1.3 ("Project graph"), add rows for the 8 new real-grain/pure-pack projects and `DigitalBrain.TestKit`, following the existing table's exact format (Project | Purpose columns). Note the new "every integration is a peer ino" architecture in a short new subsection, referencing the design spec.
+In `brain/docs/SYSTEM_DESIGN.md` §1.3 ("Project graph"), add rows for the 8 new real-grain/pure-pack projects and `DigitalBrain.TestKit`, following the existing table's exact format (Project | Purpose columns). Note the new "every integration's contract is a peer ino" architecture in a short new subsection, referencing both the design spec and the neuron-placement amendment (`docs/superpowers/specs/2026-07-01-real-grain-ino-neuron-placement-amendment.md`) — be precise that the concrete `Neuron`-derived grain classes for Windows/Developer/Context/UiKit/Telegram.Channel/Google stay in (or moved into) `DigitalBrain.Kernel`, while the isolated inos hold the public interfaces plus whatever real capability logic is genuinely Orleans-independent (full for Windows/Developer/Context/Google, interface-only for UiKit/Telegram.Channel). Don't describe every real-grain ino as "hosting its own grain" — only the pure-pack inos (Telegram, Experience.PersonalAssistant) are fully self-contained.
 
 - [ ] **Step 6: Final commit**
 
