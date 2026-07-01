@@ -1,0 +1,102 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using DigitalBrain.Core;
+using DigitalBrain.Kernel;
+using DigitalBrain.Tests.TestSupport;
+using Orleans.TestingHost;
+using Xunit;
+
+namespace DigitalBrain.Tests.Telegram;
+
+public class TelegramChatNeuronTests
+{
+    private static TestCluster Cluster()
+    {
+        var builder = new TestClusterBuilder();
+        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
+        return builder.Build();
+    }
+
+    private static Signal Inbound(long chatId, string text) =>
+        new("TelegramMessageReceived", new Dictionary<string, object?>
+        {
+            ["chatId"] = chatId, ["fromUserId"] = 1L, ["text"] = text, ["updateId"] = 1L
+        });
+
+    [Fact]
+    public async Task Start_command_binds_the_chat_and_confirms()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-100");
+            await chat.DeliverAsync(Inbound(100, "/start hello-world"));
+
+            Assert.Equal("hello-world", await chat.GetBoundBundleAsync());
+
+            var reply = (await chat.GetOutgoingTimelineAsync())
+                .OfType<Signal>().Single(s => s.Name == "TelegramReplyRequested");
+            Assert.Equal(100L, System.Convert.ToInt64(reply.Props["chatId"]));
+            Assert.Contains("hello-world", reply.Props["text"]?.ToString());
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
+
+    [Fact]
+    public async Task Latest_start_wins_as_the_binding()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-101");
+            await chat.DeliverAsync(Inbound(101, "/start alpha"));
+            await chat.DeliverAsync(Inbound(101, "/start beta"));
+
+            Assert.Equal("beta", await chat.GetBoundBundleAsync());
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
+
+    [Fact]
+    public async Task Bound_chat_routes_a_normal_message_to_the_bound_bundle()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-102");
+            await chat.DeliverAsync(Inbound(102, "/start hello-world"));
+            await chat.DeliverAsync(Inbound(102, "hi there"));
+
+            var forwarded = (await chat.GetOutgoingTimelineAsync())
+                .OfType<Signal>()
+                .Where(s => s.Name == "TelegramMessageReceived" && s.Receiver is not null)
+                .ToList();
+            Assert.Contains(forwarded, s =>
+                s.Receiver!.Value == "generated-hello-world" && s.Props["text"]?.ToString() == "hi there");
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
+
+    [Fact]
+    public async Task Unbound_chat_broadcasts_so_the_default_responder_handles_it()
+    {
+        var cluster = Cluster();
+        await cluster.DeployAsync();
+        try
+        {
+            var chat = cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-103");
+            await chat.DeliverAsync(Inbound(103, "just a question"));
+
+            var broadcast = (await chat.GetOutgoingTimelineAsync())
+                .OfType<Signal>()
+                .Where(s => s.Name == "TelegramMessageReceived" && s.IsBroadcast)
+                .ToList();
+            Assert.Contains(broadcast, s => s.Props["text"]?.ToString() == "just a question");
+        }
+        finally { await cluster.StopAllSilosAsync(); }
+    }
+}

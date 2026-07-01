@@ -69,6 +69,11 @@ public interface IAspireNeuron : IAspire { }
 
 public interface IMarketplaceNeuron : IMarketplace { }
 
+public interface ITelegramChatNeuron : INeuron
+{
+    Task<string?> GetBoundBundleAsync();
+}
+
 // IUser contract lives in Core so kernel can run standalone for security/air-gapped scenarios.
 // Full user accounts, auth, billing live in the private marketplace service.
 [GenerateSerializer]
