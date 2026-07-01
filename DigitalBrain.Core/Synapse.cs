@@ -399,16 +399,6 @@ public interface IInoCodeEditor : INeuron, IHandle<InoCodeEdit>, IHandle<InoCode
 [GenerateSerializer]
 public record ContextUpdate(string ContextName, string Key, string Value) : Synapse(nameof(ContextUpdate), DateTimeOffset.UtcNow);
 
-public interface IContextNeuron : INeuron, IHandle<ContextUpdate>
-{
-    Task<string> GetContextAsync(string contextName);
-
-    // Semantic memory: store a memory (embedded) and recall the most relevant ones for a query.
-    // Recall uses an in-grain hybrid (cosine + keyword) scorer; with a NoOp embedder it degrades to keyword.
-    Task RememberAsync(string text);
-    Task<string[]> RecallAsync(string query, int top = 5);
-}
-
 // A stored semantic memory: the text plus its embedding (empty when no real embedder is configured).
 [GenerateSerializer]
 public record MemoryStored(string Text, float[] Embedding) : Synapse(nameof(MemoryStored), DateTimeOffset.UtcNow);

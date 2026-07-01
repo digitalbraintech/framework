@@ -33,7 +33,6 @@
     <PackageReference Include="ModelContextProtocol" />
     <PackageReference Include="ModelContextProtocol.AspNetCore" />
     <PackageReference Include="Stripe.net" />
-    <PackageReference Include="Qdrant.Client" />
     <PackageReference Include="Microsoft.Orleans.Clustering.AzureStorage" />
     <PackageReference Include="Microsoft.Orleans.Core" />
     <PackageReference Include="Microsoft.Orleans.Journaling" />
@@ -43,6 +42,7 @@
     <PackageReference Include="Microsoft.Orleans.Server" />
     <PackageReference Include="Microsoft.Orleans.Streaming" />
     <!-- Microsoft.Orleans.Dashboard added for .WithOrleansDashboard() - run 'dotnet add package Microsoft.Orleans.Dashboard' if needed for full UI -->
+    <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Developer\DigitalBrain.Developer.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Tools\DigitalBrain.Mcp.Tools.csproj" />

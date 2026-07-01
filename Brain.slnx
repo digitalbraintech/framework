@@ -9,6 +9,8 @@
   <Project Path="DigitalBrain.Aspire/DigitalBrain.Aspire.csproj" />
   <Project Path="DigitalBrain.Gateway/DigitalBrain.Gateway.csproj" />
   <Project Path="DigitalBrain.Cli/DigitalBrain.Cli.csproj" />
+  <Project Path="DigitalBrain.Context/DigitalBrain.Context.csproj" />
+  <Project Path="DigitalBrain.Context.Tests/DigitalBrain.Context.Tests.csproj" />
   <Project Path="DigitalBrain.Core/DigitalBrain.Core.csproj" />
   <Project Path="DigitalBrain.Developer/DigitalBrain.Developer.csproj" />
   <Project Path="DigitalBrain.Developer.Tests/DigitalBrain.Developer.Tests.csproj" />

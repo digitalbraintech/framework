@@ -7,11 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- MCP tool attributes ([McpServerToolType]/[McpServerTool]); transport packages live in the host projects. -->
-    <PackageReference Include="ModelContextProtocol" />
     <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
-    <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
+    <ProjectReference Include="..\DigitalBrain.TestKit\DigitalBrain.TestKit.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
 
 </Project>
-

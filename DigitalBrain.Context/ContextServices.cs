@@ -2,7 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Qdrant.Client;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Context;
 
 public static class ContextServices
 {

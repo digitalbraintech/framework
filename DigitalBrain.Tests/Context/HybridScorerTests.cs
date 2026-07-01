@@ -1,4 +1,4 @@
-using DigitalBrain.Kernel;
+using DigitalBrain.Context;
 using Xunit;
 
 namespace DigitalBrain.Tests.Context;

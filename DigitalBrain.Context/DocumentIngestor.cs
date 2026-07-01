@@ -1,6 +1,6 @@
 using Microsoft.Extensions.AI;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Context;
 
 // Paragraph-aware text chunking (~targetWords, hard cap maxWords). Harvested from IAW's PdfIngestionSource chunker.
 public static class TextChunker
