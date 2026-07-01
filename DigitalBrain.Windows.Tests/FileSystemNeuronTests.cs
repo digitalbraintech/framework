@@ -3,16 +3,12 @@ using Xunit;
 
 namespace DigitalBrain.Windows.Tests;
 
-public class FileSystemNeuronTests : IAsyncLifetime
+public class FileSystemNeuronTests : NeuronTestBase
 {
-    private readonly TestDigitalBrain _brain = new();
-    public Task InitializeAsync() => _brain.InitializeAsync();
-    public Task DisposeAsync() => _brain.DisposeAsync();
-
     [Fact]
     public async Task Write_Read_List_Delete_RoundTrip()
     {
-        var fs = _brain.Grain<IFileSystemNeuron>("fs-test");
+        var fs = Grain<IFileSystemNeuron>("fs-test");
         var dir = Path.Combine(Path.GetTempPath(), "dbfs-" + Guid.NewGuid().ToString("N"));
         var file = Path.Combine(dir, "note.txt");
         try
