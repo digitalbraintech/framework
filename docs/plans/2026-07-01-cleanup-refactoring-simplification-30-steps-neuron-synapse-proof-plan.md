@@ -206,3 +206,4 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Additional commit 33a1817.
 - Ritual passed each time (build 0e, key tests incl. viz chain + Gateway green, doctor 4/4 via MCP, list_apphosts etc.).
 - More literal cleanup + UiSignals usage + full item 9/10/11 in subsequent slices (delete string trash aggressively).
+- Additional commit ca6c4e8 for test const usage. The WatchSynapses "flaky" failure in broad run was environmental (Orleans TestCluster grain placement noise on shutdown); passes cleanly when targeted.
