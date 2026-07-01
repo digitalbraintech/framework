@@ -14,9 +14,6 @@ public static class KernelPack
     public const string Description = "Core kernel substrate. Pre-installed; updatable via marketplace with rolling replica support.";
 }
 
-[GenerateSerializer]
-public record PerformKernelSelfUpdate(string Version = "", int FailAtReplica = 0) : Synapse(nameof(PerformKernelSelfUpdate), DateTimeOffset.UtcNow);
-
 [GrainType("digitalbrain.kernel.aspire.v1")]
 public class AspireOrchestratorNeuron(ILogger<AspireOrchestratorNeuron> logger, NeuronJournals journals) : Neuron(logger, journals), IAspireNeuron, IHandle<PerformKernelSelfUpdate>
 {
