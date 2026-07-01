@@ -268,7 +268,7 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Ready for next: start light item 13/14 or remaining 12 polish (e.g. make resolve logic reusable or expose a public TryResolveDevFlutterPath if pack needs it). Will pick 1-2 tiny verifiable slices next. Full manual aspire run + doctor recommended before heavier work.
 - Recommendation reminder: 12 solidify + 13 (IChannel marker + causation sharing) or 14 (stronger FlutterUiNeuron routing). Do not expand until next user "continue" + green checks.
 
-**Item 12 solidify (tiny slice, this continue):**
+**Item 12 solidify (tiny slice):**
 - Context7 (Aspire resolve + query on builder extensions / reusable resource helpers) performed before edit.
 - Changed private ResolveDevFlutterAppPath to public in DigitalBrain.Aspire/DigitalBrainBuilderExtensions.cs + added one-line comment explaining pack reuse.
 - This allows future "DigitalBrain.UI.AspireFlutter" pack or other code to call the resolver directly for overrides without duplication.
@@ -278,3 +278,14 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - aspire list_resources attempted (no running host, as expected).
 - Plan updated. This is the "make resolve logic reusable" step.
 - No behavior change. Tiny visibility + comment only.
+
+**Item 13 start (tiny slices, this continue):**
+- Context7 (Orleans) for grain interface patterns (IGrainWithStringKey, composing IHandle, marker interfaces) done before edits.
+- Added thin marker `public interface IChannelNeuron : INeuron { }` in DigitalBrain.Core/Synapse.cs (with small explanatory comment, no vacuous docs).
+- Updated specific interfaces to inherit it: ITelegramChatNeuron : IChannelNeuron, IFlutterUiNeuron : IChannelNeuron, IChannelNeuron.
+- Updated impls (deleted explicit IChannelNeuron from class decls since transitive via specific interfaces now): TelegramChatNeuron and FlutterUiNeuron now implement the common marker.
+- This establishes the common pattern for channel neurons. Reply/context sharing via existing CorrelationId/CausationId (Stamp(Self, CurrentCause)) and base INeuron causal APIs is the "use existing pattern".
+- Build: succeeded 0 errors.
+- Targeted tests (TelegramChatNeuron|FlutterUiNeuron|Journal...|Marketplace): 0 failed (28 passed, 10 passed on narrow).
+- aspire__doctor: 4/4.
+- Tiny, delete (removed redundant explicit impl), marker only for now. Ready for further sharing or item 14.
