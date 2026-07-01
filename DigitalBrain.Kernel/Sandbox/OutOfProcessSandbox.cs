@@ -1,4 +1,5 @@
 using DigitalBrain.Kernel.Foundry;
+using DigitalBrain.Windows;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;

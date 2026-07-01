@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.Text;
 using DigitalBrain.Core;
 
-namespace DigitalBrain.Kernel;
+namespace DigitalBrain.Windows;
 
 // Shared process-exec core for the SDK integration neurons (Shell/Git/DotNet/NuGet/Winget). Harvests IAW
 // ShellAgent's mechanics: timeout + kill-tree, command block-list, base64 PowerShell, output truncation.

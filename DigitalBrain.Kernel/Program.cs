@@ -77,6 +77,9 @@ builder.Services.AddSingleton<HomeFeedBus>();
 // subscriber receives every Signal regardless of which replica it was broadcast on.
 builder.Services.AddSingleton<SignalEgressBus>();
 
+// FileSystemNeuron delegates its System.IO logic to this ino-hosted, Orleans-free plain class.
+builder.Services.AddSingleton<DigitalBrain.Windows.FileSystemOperations>();
+
 // Co-host the MCP tool surface in-process. Only read-only tools are exposed over HTTP (remotely reachable);
 // mutation tools are stdio-only (local/trusted) pending a remote auth decision.
 builder.Services

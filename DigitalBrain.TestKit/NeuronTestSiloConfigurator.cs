@@ -5,6 +5,7 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.Kernel.Ui;
+using DigitalBrain.Windows;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -46,6 +47,7 @@ public sealed class NeuronTestSiloConfigurator : ISiloConfigurator
                 services.AddSingleton<DocumentIngestor>();
                 services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
                 services.AddSingleton<SkillPackSynthesizer>();
+                services.AddSingleton<FileSystemOperations>();
                 services.AddSingleton<HomeFeedBus>();
                 services.AddHomeFeedStreamSubscriber();
                 services.AddSingleton<SignalEgressBus>();

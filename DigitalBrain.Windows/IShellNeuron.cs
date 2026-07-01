@@ -1,6 +1,7 @@
 using System.ComponentModel;
+using DigitalBrain.Core;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Windows;
 
 // Typed shell/PowerShell execution. Re-homed from IAW's IShell/ShellAgent onto Neuron; the process mechanics
 // (timeout, kill-tree, block-list, base64 pwsh, output truncation) live in the shared ProcessRunner.

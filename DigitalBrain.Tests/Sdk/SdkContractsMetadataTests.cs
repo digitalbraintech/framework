@@ -1,4 +1,5 @@
 using DigitalBrain.Core;
+using DigitalBrain.Windows;
 using Xunit;
 
 namespace DigitalBrain.Tests.Sdk;

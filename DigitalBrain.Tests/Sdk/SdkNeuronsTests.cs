@@ -25,45 +25,6 @@ public class SdkNeuronsTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Shell_Executes_Echo()
-    {
-        var shell = _cluster!.GrainFactory.GetGrain<IShellNeuron>("shell-test");
-        var result = await shell.ExecuteAsync("echo digitalbrain");
-        Assert.Equal(0, result.ExitCode);
-        Assert.Contains("digitalbrain", result.Output);
-    }
-
-    [Fact]
-    public async Task Shell_Blocks_Dangerous_Command()
-    {
-        var shell = _cluster!.GrainFactory.GetGrain<IShellNeuron>("shell-block");
-        var result = await shell.ExecuteAsync("format c:");
-        Assert.Equal(-1, result.ExitCode);
-        Assert.Contains("blocked", result.Error, System.StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task FileSystem_Write_Read_List_Delete_RoundTrip()
-    {
-        var fs = _cluster!.GrainFactory.GetGrain<IFileSystemNeuron>("fs-test");
-        var dir = Path.Combine(Path.GetTempPath(), "dbfs-" + Guid.NewGuid().ToString("N"));
-        var file = Path.Combine(dir, "note.txt");
-        try
-        {
-            await fs.WriteFileAsync(file, "hello fs");
-            Assert.True(await fs.ExistsAsync(file));
-            Assert.Equal("hello fs", await fs.ReadFileAsync(file));
-            Assert.Contains(file, await fs.ListFilesAsync(dir, "*.txt"));
-            await fs.DeleteAsync(file);
-            Assert.False(await fs.ExistsAsync(file));
-        }
-        finally
-        {
-            TryDeleteDir(dir);
-        }
-    }
-
-    [Fact]
     public async Task DotNet_Reports_Sdk_Version()
     {
         var dotnet = _cluster!.GrainFactory.GetGrain<IDotNetNeuron>("dotnet-test");

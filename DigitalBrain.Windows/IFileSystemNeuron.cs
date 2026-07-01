@@ -1,6 +1,7 @@
 using System.ComponentModel;
+using DigitalBrain.Core;
 
-namespace DigitalBrain.Core;
+namespace DigitalBrain.Windows;
 
 // Typed filesystem operations. Re-homed from IAW's IFileSystem/FileSystemAgent onto Neuron (core ops subset).
 public interface IFileSystemNeuron : INeuronAgent
