@@ -100,10 +100,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
                 ["tasks"] = taskItems
             });
         await FireAsync(taskTreeSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(taskTreeSurface, Self.Value));
-        }
+        // Continue item 14: route task tree surface via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(taskTreeSurface.Stamp(Self, CurrentCause));
 
         // Seed a visible startup task so the manager shows real work item right away.
         var demoId = new TaskId("startup-" + cmd.AppName);
@@ -122,10 +120,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         var publishedForStart = MarketplaceSeeds.LocalUiPacks;
         var marketList = UiSurfaceLiveData.MarketplaceListFromPacks(publishedForStart, Array.Empty<NeuroPack>());
         await FireAsync(marketList);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketList, Self.Value));
-        }
+        // Continue item 14: route marketplace list via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(marketList.Stamp(Self, CurrentCause));
 
         // Emit faceted marketplace tree (unfiltered): facet-filter row (All + per distinct tier/channel buttons) + pack list.
         // Seeds have no materialized BundleManifest, so only the All button appears until packs are published.
@@ -133,10 +129,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             publishedForStart, Array.Empty<NeuroPack>(), tierFilter: null, channelFilter: null,
             emitter: Self.Value, title: "Marketplace");
         await FireAsync(marketTreeSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(marketTreeSurface, Self.Value));
-        }
+        // Continue item 14: route market tree surface via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(marketTreeSurface.Stamp(Self, CurrentCause));
 
         // Main UI is UiSurface based. Emit an app-shell surface that can drive the entire thin host chrome + nav.
         // Neurons (and packs after embodiment) build and own this dynamically.
@@ -192,10 +186,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
         // Also set the canonical kind so hosts can recognize it as the root chrome.
         // (We keep the tree in Props; hosts that understand WidgetTreeKind render the full shell.)
         await FireAsync(appShellSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(appShellSurface, Self.Value));
-        }
+        // Continue item 14: route app shell via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(appShellSurface.Stamp(Self, CurrentCause));
 
         // Legacy shell chrome surface for incremental adoption (still useful for panels).
         var shellSurface = new UiSurface(UiSurfaceKinds.ShellChrome, new Dictionary<string, object?>
@@ -213,14 +205,13 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             ["chrome"] = "forui-sidebar"
         });
         await FireAsync(shellSurface);
-        if (bus != null) bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(shellSurface, Self.Value));
+        // Continue item 14: route shell chrome via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(shellSurface.Stamp(Self, CurrentCause));
 
         var installedStart = UiSurfaceLiveData.InstalledBundlesFromPacks(publishedForStart, Array.Empty<NeuroPack>());
         await FireAsync(installedStart);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(installedStart, Self.Value));
-        }
+        // Continue item 14: route installed bundles via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(installedStart.Stamp(Self, CurrentCause));
 
         // Runtime-only Hello World from Software Engineering team (neuron driven, no Flutter view code).
         // Button click flows as synapse to DemoNeuron which emits "toast" surface -> host shows ForUI notification.
@@ -244,10 +235,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             [UiSurfaceKeys.Emitter] = Self.Value
         });
         await FireAsync(seHelloSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(seHelloSurface, Self.Value));
-        }
+        // Continue item 14: prefer IFlutterUiNeuron routing (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(seHelloSurface.Stamp(Self, CurrentCause));
 
         // Rich UI Kit demo surface (replaces static gallery .dart screen). Neurons emit full forui components via kit.
         var richKitTree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
@@ -267,10 +256,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             [UiSurfaceKeys.Emitter] = Self.Value
         });
         await FireAsync(richKitSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(richKitSurface, Self.Value));
-        }
+        // Continue item 14: route rich kit demo via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(richKitSurface.Stamp(Self, CurrentCause));
 
         // Kit-driven INO Chat surface (replaces ino_chat_screen.dart). Messages list + input using forui kit.
         var chatTree = new UiWidgetTree("column", new Dictionary<string, object?>(), new List<UiWidgetTree>
@@ -290,10 +277,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             [UiSurfaceKeys.Emitter] = Self.Value
         });
         await FireAsync(chatSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(chatSurface, Self.Value));
-        }
+        // Continue item 14: route INO chat surface via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(chatSurface.Stamp(Self, CurrentCause));
 
         // Seed a first-class live chart surface (uses GraphicSpec for rich interactive rendering via graphic package).
         var demoChartData = new[]
@@ -315,10 +300,8 @@ public class AspireOrchestratorNeuron : Neuron, IAspireNeuron, IHandle<PerformKe
             Summary: "4 months. Click points or use commands to filter/transform.");
         var chartSurface = UiSurfaceSamples.Chart("surface.chart.demo", Self.Value, gspec);
         await FireAsync(chartSurface);
-        if (bus != null)
-        {
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(chartSurface, Self.Value));
-        }
+        // Continue item 14: route demo chart surface via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(chartSurface.Stamp(Self, CurrentCause));
     }
 
     public async Task HandleAsync(RestartResource cmd)
@@ -672,9 +655,8 @@ public class MarketplaceNeuron : Neuron, IMarketplaceNeuron
             published, Array.Empty<NeuroPack>(), cmd.Tier, cmd.Channel, Self.Value);
         await FireAsync(surface);
 
-        var bus = ServiceProvider.GetService<HomeFeedBus>();
-        if (bus is not null)
-            bus.Broadcast(UiSurfaceRfwBridge.FromUiSurface(surface, Self.Value));
+        // Continue item 14: route filtered market tree via IFlutterUiNeuron (delete direct bus).
+        await GrainFactory.GetGrain<IFlutterUiNeuron>("flutter-ui").DeliverAsync(surface.Stamp(Self, CurrentCause));
     }
 
     private IReadOnlyList<NeuroPack> GetPublishedPacks()

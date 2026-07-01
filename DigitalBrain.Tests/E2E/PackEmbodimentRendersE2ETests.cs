@@ -7,6 +7,7 @@ namespace DigitalBrain.Tests.E2E;
 [Collection(nameof(DigitalBrainE2ECollection))]
 public sealed class PackEmbodimentRendersE2ETests(DigitalBrainBrowserFixture fixture)
 {
+    // E2E for UiSurface flow (ties to tg context: tg Signal -> neuron emits UiSurface with originChannel -> flutter render).
     private readonly DigitalBrainBrowserFixture _fx = fixture;
 
     [SkippableFact]

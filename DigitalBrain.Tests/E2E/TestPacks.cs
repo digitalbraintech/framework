@@ -14,6 +14,7 @@ public static class TestPacks
     // observability-surface path via ObservabilityNeuron → HomeFeedBus).
     // The trigger correlationId is set to surfaceId so panel.id == surfaceId
     // and flt-semantics-identifier == surfaceId.
+    // Ties to tg context flow (tg Signal -> viz/chart with originChannel -> flutter).
     public static string RenderableSurfacePack(string surfaceId) => $$"""
         public sealed class RenderableSurfacePack : DigitalBrain.Core.IPackBehavior
         {

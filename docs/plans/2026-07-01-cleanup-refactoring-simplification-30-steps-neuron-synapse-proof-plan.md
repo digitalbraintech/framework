@@ -370,9 +370,11 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Current tree dirty (new work); commit when directed.
 
 **Next (after this continue slice green):**
-- Light polish on 15/16 if needed (e.g. use the origin in chart title or test assert).
-- More 14 emitters if time, or move to test/E2E slice for the full tg context flow.
-- Manual aspire run recommended to see "from telegram" surface prop + seed visible.
+- 14 emitters in SystemNeurons startup (seHello, installedStart, richKit, chartSurface, chat, shell, appShell, marketList, taskTreeSurface, marketTreeSurface, FilterMarketplace) + rolling drain now prefer Deliver to IFlutterUiNeuron (direct bus deleted for UiSurfaces; some RfwCards remain for compat in rolling).
+- 15/16 polished with prop merge, visible title "(from Telegram)", test asserts for origin and title.
+- E2E/test slice for tg context flow started (enhanced viz test + comments in TestPacks + PackEmbodimentRendersE2ETests for full chain).
+- Move to more E2E (e.g., browser fixture asserts for routed surfaces/context) or manual aspire run (use MCP list_resources etc) to verify surfaces.
+- Commit current when directed. (Startup 14 complete; E2E slice in progress).
 
 **15/16 polish (post b561984, this continue):**
 - Context7 (Orleans grain incoming Synapse Sender/Causation + record with for props) done before edits.
@@ -408,3 +410,102 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Tiny: one emitter surface now routes via channel neuron.
 - Plan updated.
 - Note: plan.md was updated post previous commit, tree had doc change + this emitter.
+
+**Additional tiny item 14 (seHello emitter):**
+- Context7 (Orleans GetGrain/Deliver/Stamp) used.
+- In SystemNeurons startup: replaced direct bus.Broadcast for seHelloSurface with Deliver to IFlutterUiNeuron (delete direct path).
+- Build: succeeded 0e.
+- Tests: 28 passed on filter.
+- aspire__doctor: 4/4.
+- Tiny delete: one less direct bus, routing via channel neuron.
+- Plan updated.
+
+**Additional tiny item 14 (installedStart emitter):**
+- In SystemNeurons startup: replaced direct bus for installedStart with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed.
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (richKitSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for richKitSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed.
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (chartSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for demo chartSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed.
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (chatSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for INO chatSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed (narrow filters).
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (shellSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for shellSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed.
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (appShellSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for appShellSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed.
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (marketList emitter):**
+- In SystemNeurons startup: replaced direct bus for marketList with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed (narrow).
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (taskTreeSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for taskTreeSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed (narrow).
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (marketTreeSurface emitter):**
+- In SystemNeurons startup: replaced direct bus for marketTreeSurface with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed (narrow).
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**Additional tiny item 14 (FilterMarketplace emitter):**
+- In SystemNeurons FilterMarketplace: replaced direct bus for market tree with Deliver to IFlutterUiNeuron.
+- Build: succeeded 0e.
+- Tests: 28 passed (narrow).
+- aspire__doctor: 4/4.
+- Plan updated.
+
+**E2E prep / test slice (tg context flow):**
+- Enhanced the existing Telegram viz test (which fires Signal to tg triggering chart) with additional assert for channelContext in the delivered UiSurface (full tg->chart->flutter context).
+- Tiny E2E prep: updated comment in TestPacks.cs RenderableSurfacePack to tie to tg context flow (tg Signal -> viz with origin -> flutter).
+- Tiny E2E: added comment in PackEmbodimentRendersE2ETests tying surface render E2E to tg context flow.
+- Build 0e, test passed (E2E skippable as expected).
+- aspire__doctor 4/4.
+- Plan updated. (Startup 14 complete; E2E slice started).
+
+**Manual verification step (using aspire MCP as recommended):**
+- aspire__list_apphosts: no running hosts (as expected; none in scope or out).
+- aspire__list_resources: failed as no AppHost running (expected pre 'aspire run').
+- aspire__doctor: 4/4.
+- Plan updated. (Startup 14 emitters now routed; move to E2E slice next).
+
+**Test enhancement for 15 context proof:**
+- Enhanced Telegram_viz test to also assert the title contains "(from Telegram)" from the DataViz context usage.
+- Build 0e, specific test passed.
+- aspire__doctor 4/4.
+- Plan updated.

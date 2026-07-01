@@ -182,6 +182,10 @@ public class TelegramChatNeuronTests
             Assert.Contains(flIncoming, s => s is UiSurface u && (u.Kind == UiSurfaceKinds.DataChart || u.Props.ContainsKey("chartSpec") || u.Props.ContainsKey("tree")));
             // Item 15 polish: assert "from telegram" context arrived via stamped causation on the UiSurface.
             Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("originChannel", out var oc) && oc?.ToString() == "telegram");
+            // Additional: context used in title for visibility in rendered surface.
+            Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("title", out var t) && (t?.ToString()?.Contains("(from Telegram)") ?? false));
+            // E2E prep: full context flow includes channelContext from tg viz path.
+            Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("channelContext", out var cc) && (cc?.ToString()?.Contains("tg") ?? false));
         }
         finally { await cluster.StopAllSilosAsync(); }
     }
