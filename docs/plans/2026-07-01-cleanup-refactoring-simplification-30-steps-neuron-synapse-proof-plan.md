@@ -240,3 +240,19 @@ This is the root-out, delete-heavy, Musk-ordered path to the exact desired syste
 - Item 13/14: Create thin IChannelNeuron marker (or reuse); make TelegramChatNeuron + FlutterUiNeuron share reply/context via Correlation/CausationId. Or item 14: prefer routing UiSurfaceRfwBridge / HomeFeed via FlutterUiNeuron.
 - After: item 15/16 for more cross viz proof + pack seeds if needed. Full manual `aspire run` + doctor + targeted E2E before bigger slices.
 - Update plan + commit after next slice.
+
+**Commit + continue (70ba57d):**
+- Committed as 70ba57d: "chore(items 10-12): complete signals centralization ... extract dev default Flutter helper (delete dupes)"
+- Post-commit verification ritual:
+  - git status clean.
+  - dotnet build: 0 errors.
+  - Targeted tests (Telegram|...|UiSurface|KernelUi etc.): 81 passed / 0 failed (narrow filters also 24-32 passed green).
+  - aspire__doctor (MCP): 4/4 pass.
+- Small continue polish on 12 (before/during commit flow): cleaned outdated "--flutter" arg comments in brain.cs; added explicit "pack can provide/override" inline note in the AddDefaultDevFlutterClient helper (per plan item 12 doc req).
+- All per strict rules (Context7 pre, relative, delete, rituals after edits, no large P1, aspire MCP).
+- Tree now at 70ba57d (ahead of origin still).
+
+**Continuing (post 70ba57d):**
+- Signals + early hosting unification now solid (items 10 complete, 11 core done, 12 helper extracted + documented + dupes deleted + comments cleaned).
+- Ready for next: start light item 13/14 or remaining 12 polish (e.g. make resolve logic reusable or expose a public TryResolveDevFlutterPath if pack needs it). Will pick 1-2 tiny verifiable slices next. Full manual aspire run + doctor recommended before heavier work.
+- Recommendation reminder: 12 solidify + 13 (IChannel marker + causation sharing) or 14 (stronger FlutterUiNeuron routing). Do not expand until next user "continue" + green checks.

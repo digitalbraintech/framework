@@ -203,7 +203,8 @@ public static class DigitalBrainBuilderExtensions
         return transport;
     }
 
-    // Dev default helper (item 12). Path resolve + AddFlutterClient + kernel ref. Returns null if no Flutter app found.
+    // Dev default helper (item 12). Path resolve + AddFlutterClient + kernel ref.
+    // The DigitalBrain.UI.AspireFlutter (or equivalent) pack can later provide/override these resource bits.
     public static IResourceBuilder<ExecutableResource>? AddDefaultDevFlutterClient(this DigitalBrainContext ctx, IResourceBuilder<ProjectResource> kernel)
     {
         var flutterPath = ResolveDevFlutterAppPath(ctx.Resource.ApplicationBuilder);
