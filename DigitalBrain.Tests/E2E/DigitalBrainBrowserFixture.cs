@@ -31,7 +31,7 @@ public class DigitalBrainBrowserFixture : DigitalBrainAppHostFixture
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        if (App is null) return;
+        if (!Ready) return;
 
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
 

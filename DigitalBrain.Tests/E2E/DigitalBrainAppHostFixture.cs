@@ -25,6 +25,11 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
     // The native-gRPC helpers dial here: the kernel "grpc" endpoint (Http2-only).
     public string GrpcUrl { get; private set; } = null!;
 
+    // True once prerequisites are met and GatewayHttpsUrl/GrpcUrl are valid navigation/dial
+    // targets -- either from a freshly booted AppHost or an attached warm cluster. Distinct from
+    // `App is null`, which is also true after a successful warm-cluster attach.
+    public bool Ready { get; private set; }
+
     // The bare-Kernel non-Aspire-hosted fast path (Program.cs's isAspireHosted=false branch): fixed
     // Kestrel ports, in-memory Orleans clustering. A developer runs
     // `dotnet run --project DigitalBrain.Kernel` (DIGITALBRAIN_WEBROOT set) and leaves it running;
@@ -65,6 +70,7 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
             GatewayHttpsUrl = WarmClusterWebUrl;
             GrpcUrl = WarmClusterGrpcUrl;
+            Ready = true;
             return; // App stays null: attached to a warm cluster we don't own, nothing to boot or dispose.
         }
 
@@ -112,6 +118,7 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
         string grpcUrl = webUrl;
         try { grpcUrl = App.GetEndpoint("kernel", "grpc").ToString(); } catch { }
         GrpcUrl = grpcUrl;
+        Ready = true;
     }
 
     public virtual async Task DisposeAsync()
