@@ -5,6 +5,7 @@ using DigitalBrain.Core;
 using DigitalBrain.Runtime.Grpc;
 using Google.Protobuf;
 using Grpc.Net.Client;
+using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
 using System.Threading;
@@ -24,6 +25,27 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
     // The native-gRPC helpers dial here: the kernel "grpc" endpoint (Http2-only).
     public string GrpcUrl { get; private set; } = null!;
 
+    // The bare-Kernel non-Aspire-hosted fast path (Program.cs's isAspireHosted=false branch): fixed
+    // Kestrel ports, in-memory Orleans clustering. A developer runs
+    // `dotnet run --project DigitalBrain.Kernel` (DIGITALBRAIN_WEBROOT set) and leaves it running;
+    // InitializeAsync attaches to it instead of booting a fresh ~30-120s Aspire stack.
+    internal const string WarmClusterWebUrl = "http://localhost:8081";
+    internal const string WarmClusterGrpcUrl = "http://localhost:8080";
+
+    internal static async Task<bool> ProbeAsync(string url, TimeSpan timeout)
+    {
+        using var client = new HttpClient { Timeout = timeout };
+        try
+        {
+            using var response = await client.GetAsync(url);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public virtual async Task InitializeAsync()
     {
         if (!E2EPrerequisites.OptedIn)
@@ -33,6 +55,18 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
         if (!E2EPrerequisites.WebBundlePresent)
             return; // Still absent after the best-effort auto-build (e.g. Flutter not installed); the [SkippableFact] will skip.
+
+        if (await ProbeAsync(WarmClusterWebUrl, TimeSpan.FromSeconds(2)))
+        {
+            // Port 8080 is HTTP/2-only cleartext (h2c) -- the .NET gRPC client needs this switch to call
+            // it without TLS. This is a process-wide AppContext switch (there is no per-handler
+            // equivalent); it only permits cleartext HTTP/2 for channels that explicitly target an
+            // http:// address, so it does not affect this process's other (HTTPS) gRPC channels.
+            AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+            GatewayHttpsUrl = WarmClusterWebUrl;
+            GrpcUrl = WarmClusterGrpcUrl;
+            return; // App stays null: attached to a warm cluster we don't own, nothing to boot or dispose.
+        }
 
         var testId = Guid.NewGuid().ToString("N")[..8];
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
