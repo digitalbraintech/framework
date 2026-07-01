@@ -50,12 +50,21 @@ cd ../brain
 RUN_FLUTTER_E2E=true dotnet test DigitalBrain.Tests --filter "FullyQualifiedName~MyBundleRendersE2ETests"
 ```
 
-Useful env flags:
+**One-time Visual Studio setup (recommended):** Test > Configure Run Settings > Select Solution
+Wide runsettings File > `e2e.runsettings`. After this, running any `E2E`-tagged test from Test
+Explorer already has `RUN_FLUTTER_E2E=true` and `FAST_UI_E2E=1` set — no terminal needed.
 
-- `RUN_FLUTTER_E2E=true` — opt in to the render E2E (otherwise skipped).
-- `DIGITALBRAIN_E2E_HEADED=true` — watch the browser render live as the test runs.
+**CLI equivalent**, if you'd rather not touch VS settings:
+
+```sh
+cd brain
+dotnet test DigitalBrain.Tests --settings e2e.runsettings --filter "FullyQualifiedName~MyBundleRendersE2ETests"
+```
+
+Other useful env flags (set manually, either way, when you want them):
+
+- `DIGITALBRAIN_E2E_HEADED=true` — force a visible browser (already the default outside CI).
 - `DIGITALBRAIN_E2E_SLOWMO=500` — slow Playwright actions (ms) so you can see each step.
-- `FAST_UI_E2E=1` — shorter assertion timeouts for a quicker render pass.
 - `DIGITALBRAIN_E2E_REPLICAS=1` — kernel replicas for the test stack (default 1).
 
 While iterating visually you can also attach the dart MCP tools (`get_widget_tree`,
