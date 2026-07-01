@@ -5,12 +5,8 @@ using Xunit;
 
 namespace DigitalBrain.Telegram.Channel.Tests;
 
-public class TelegramChatNeuronTests : IAsyncLifetime
+public class TelegramChatNeuronTests : NeuronTestBase
 {
-    private readonly TestDigitalBrain _brain = new();
-    public Task InitializeAsync() => _brain.InitializeAsync();
-    public Task DisposeAsync() => _brain.DisposeAsync();
-
     private static Signal Inbound(long chatId, string text) =>
         new("TelegramMessageReceived", new Dictionary<string, object?>
         {
@@ -20,7 +16,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Start_command_binds_the_chat_and_confirms()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-100");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-100");
         await chat.DeliverAsync(Inbound(100, "/start hello-world"));
 
         Assert.Equal("hello-world", await chat.GetBoundBundleAsync());
@@ -34,7 +30,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Latest_start_wins_as_the_binding()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-101");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-101");
         await chat.DeliverAsync(Inbound(101, "/start alpha"));
         await chat.DeliverAsync(Inbound(101, "/start beta"));
 
@@ -44,7 +40,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Bound_chat_routes_a_normal_message_to_the_bound_bundle()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-102");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-102");
         await chat.DeliverAsync(Inbound(102, "/start hello-world"));
         await chat.DeliverAsync(Inbound(102, "hi there"));
 
@@ -59,7 +55,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Unbound_chat_broadcasts_so_the_default_responder_handles_it()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-103");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-103");
         await chat.DeliverAsync(Inbound(103, "just a question"));
 
         var broadcast = (await chat.GetOutgoingTimelineAsync())
@@ -72,7 +68,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Start_without_space_does_not_bind_and_broadcasts()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-104");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-104");
         await chat.DeliverAsync(Inbound(104, "/startfoo"));
 
         Assert.Null(await chat.GetBoundBundleAsync());
@@ -87,7 +83,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Forwarded_message_preserves_causation_from_the_inbound()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-105");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-105");
         await chat.DeliverAsync(Inbound(105, "/start hello-world"));
         await chat.DeliverAsync(Inbound(105, "hi there"));
 
@@ -102,8 +98,7 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Ignores_broadcast_echoes_to_avoid_self_loop()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-106");
-        // A timeline echo arrives as a broadcast-flagged signal; the neuron must not act on it.
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-106");
         await chat.DeliverAsync(Inbound(106, "hello") with { IsBroadcast = true });
 
         var reactions = (await chat.GetOutgoingTimelineAsync())
@@ -116,22 +111,18 @@ public class TelegramChatNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Telegram_viz_signal_produces_UiSurface_handled_by_FlutterUiNeuron()
     {
-        var chat = _brain.Grain<ITelegramChatNeuron>("tg-chat-viz1");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-viz1");
         await chat.DeliverAsync(Inbound(300, "chart my excel sales data"));
 
-        // Chain: tg inbound -> p2p viz to chart -> chart emits surface p2p delivered to flutter (owns handle)
-        var chart = _brain.Grain<IDataVisualizationNeuron>("viz-default");
+        var chart = Grain<IDataVisualizationNeuron>("viz-default");
         var chartOut = await chart.GetOutgoingTimelineAsync();
         Assert.Contains(chartOut, s => s is DataChartGenerated || s is UiSurface);
 
-        var flutter = _brain.Grain<IFlutterUiNeuron>("flutter-ui");
+        var flutter = Grain<IFlutterUiNeuron>("flutter-ui");
         var flIncoming = await flutter.GetIncomingTimelineAsync();
         Assert.Contains(flIncoming, s => s is UiSurface u && (u.Kind == UiSurfaceKinds.DataChart || u.Props.ContainsKey("chartSpec") || u.Props.ContainsKey("tree")));
-        // Item 15 polish: assert "from telegram" context arrived via stamped causation on the UiSurface.
         Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("originChannel", out var oc) && oc?.ToString() == "telegram");
-        // Additional: context used in title for visibility in rendered surface.
         Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("title", out var t) && (t?.ToString()?.Contains("(from Telegram)") ?? false));
-        // E2E prep: full context flow includes channelContext from tg viz path.
         Assert.Contains(flIncoming, s => s is UiSurface u && u.Props.TryGetValue("channelContext", out var cc) && (cc?.ToString()?.Contains("tg") ?? false));
     }
 }
