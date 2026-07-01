@@ -147,7 +147,7 @@ public class ConfigFormSteps : IAsyncDisposable
         await gateway.Send(new SynapseEnvelope
         {
             TypeName = nameof(ConfigurationProvided),
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
     }
 

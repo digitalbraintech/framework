@@ -227,7 +227,7 @@ public sealed class GatewayService(
             {
                 TypeName = signal.Name,
                 CorrelationId = signal.CorrelationId ?? string.Empty,
-                Payload = Google.Protobuf.ByteString.CopyFrom(
+                Payload = global::Google.Protobuf.ByteString.CopyFrom(
                     System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(signal.Props))
             });
         }

@@ -18,6 +18,14 @@ public static class UiSignals
     public const string WidgetTreeUpdated = "UiWidgetTreeUpdated";
 }
 
+public static class GoogleSignals
+{
+    public const string AuthRequested = "GoogleAuthRequested";
+    public const string AuthCompleted = "GoogleAuthCompleted";
+    public const string GmailFetchRequested = "GmailFetchRequested";
+    public const string GmailMessagesReady = "GmailMessagesReady";
+}
+
 [GenerateSerializer]
 public record Signal(string Name, IReadOnlyDictionary<string, object?> Props)
     : Synapse(Name, DateTimeOffset.UtcNow);

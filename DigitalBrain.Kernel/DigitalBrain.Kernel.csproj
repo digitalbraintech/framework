@@ -45,6 +45,7 @@
     <ProjectReference Include="..\DigitalBrain.Context\DigitalBrain.Context.csproj" />
     <ProjectReference Include="..\DigitalBrain.Core\DigitalBrain.Core.csproj" />
     <ProjectReference Include="..\DigitalBrain.Developer\DigitalBrain.Developer.csproj" />
+    <ProjectReference Include="..\DigitalBrain.Google\DigitalBrain.Google.csproj" />
     <ProjectReference Include="..\DigitalBrain.Mcp.Tools\DigitalBrain.Mcp.Tools.csproj" />
     <ProjectReference Include="..\DigitalBrain.Telegram.Channel\DigitalBrain.Telegram.Channel.csproj" />
     <ProjectReference Include="..\DigitalBrain.UiKit\DigitalBrain.UiKit.csproj" />

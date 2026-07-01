@@ -50,7 +50,7 @@ public class GenericSendTests : IAsyncLifetime
         {
             TypeName = TelegramSignals.MessageReceived,
             CorrelationId = "test-generic-1",
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
         // Poll until the sink receives the signal (broadcast is async)
@@ -85,7 +85,7 @@ public class GenericSendTests : IAsyncLifetime
             _homeFeedBus, new SignalEgressBus(), new FakeHostEnvironment("Production"),
             NullLogger<GatewayService>.Instance);
 
-        var payload = Google.Protobuf.ByteString.CopyFrom(System.Text.Encoding.UTF8.GetBytes("{\"chatId\":7,\"text\":\"hi\"}"));
+        var payload = global::Google.Protobuf.ByteString.CopyFrom(System.Text.Encoding.UTF8.GetBytes("{\"chatId\":7,\"text\":\"hi\"}"));
 
         // No x-internal-key header → forged egress injection rejected.
         var ex = await Assert.ThrowsAsync<RpcException>(() => prodService.Send(new SynapseEnvelope

@@ -118,7 +118,7 @@ public sealed class TelegramReactiveLoopSteps : IAsyncDisposable
         await gateway.Send(new SynapseEnvelope
         {
             TypeName = nameof(ConfigurationProvided),
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
         var stored = await SharedConfigStore.GetAsync(Scope, PackName);
@@ -307,7 +307,7 @@ public sealed class TelegramN1ReactivitySteps : IAsyncDisposable
         await gateway.Send(new SynapseEnvelope
         {
             TypeName = nameof(ConfigurationProvided),
-            Payload  = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload  = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
     }
 

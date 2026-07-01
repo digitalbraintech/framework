@@ -48,7 +48,7 @@ public class TelegramDeepLinkRoutingTests : IAsyncLifetime
         {
             TypeName = "TelegramMessageReceived",
             CorrelationId = "tg-routing-1",
-            Payload = Google.Protobuf.ByteString.CopyFrom(Json(200, "/start hello-world"))
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(Json(200, "/start hello-world"))
         }, TestServerCallContext.Create());
 
         var chat = _cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-200");
@@ -62,7 +62,7 @@ public class TelegramDeepLinkRoutingTests : IAsyncLifetime
         {
             TypeName = "TelegramMessageReceived",
             CorrelationId = "tg-routing-2",
-            Payload = Google.Protobuf.ByteString.CopyFrom(Json(201, "/start hello-world"))
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(Json(201, "/start hello-world"))
         };
 
         var result = await NewService().Send(envelope, TestServerCallContext.Create());

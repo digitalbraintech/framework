@@ -127,6 +127,20 @@ builder.Services.AddPackConfigStore(packConfigBlobs);
 builder.Services.AddSingleton<ProcessCrystallizer>(sp => new ProcessCrystallizer(sp.GetService<IChatClient>()));
 builder.Services.AddSingleton<SkillPackSynthesizer>();
 
+// Google Gmail/Drive/Calendar API clients: one UserCredential per grain activation, built from the "google"/
+// "default" pack config scope (client_id/client_secret/refresh_token), mirroring LlmResponderNeuron's per-scope
+// IPackConfigStore resolution. Scoped (not singleton) because Orleans creates one DI scope per grain activation,
+// so each GmailNeuron/GoogleDriveNeuron/GoogleCalendarNeuron activation resolves its own credential/service.
+// GetAwaiter().GetResult() is safe here: grain activation runs on thread-pool threads with no captured
+// SynchronizationContext, so there is no deadlock risk (the same reasoning ASP.NET Core middleware relies on).
+builder.Services.AddScoped(sp => BuildGoogleCredential(sp, "google", "default"));
+builder.Services.AddScoped<DigitalBrain.Google.IGmailApiClient>(sp =>
+    new DigitalBrain.Google.GoogleGmailApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
+builder.Services.AddScoped<DigitalBrain.Google.IGoogleDriveApiClient>(sp =>
+    new DigitalBrain.Google.GoogleDriveApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
+builder.Services.AddScoped<DigitalBrain.Google.IGoogleCalendarApiClient>(sp =>
+    new DigitalBrain.Google.GoogleCalendarApiClient(sp.GetRequiredService<Google.Apis.Auth.OAuth2.UserCredential>()));
+
 // Proxy to private marketplace (new separate repo) when enabled.
 // Register the stub here; real impl uses HttpClient to the marketplace service.
 var useRemote = builder.Configuration.GetValue("DigitalBrain:Marketplace:UseRemote", false);
@@ -243,6 +257,31 @@ if (grainFactory != null)
 }
 
 app.Run();
+
+// Reads client_id/client_secret/refresh_token from the given pack-config scope/pack and builds a UserCredential.
+// Config not yet provided (first run, before "Sign in with Google" completes) throws so grain activation fails
+// fast and loudly rather than silently constructing a service that will 401 on first real call — mirrors
+// LlmResponderNeuron's fallback-to-null shape being unavailable here since UserCredential is non-nullable.
+static Google.Apis.Auth.OAuth2.UserCredential BuildGoogleCredential(IServiceProvider sp, string pack, string scope)
+{
+    var store = sp.GetRequiredService<DigitalBrain.Core.Config.IPackConfigStore>();
+    var values = store.GetAsync(scope, pack).GetAwaiter().GetResult();
+
+    if (!values.TryGetValue("client_id", out var clientId) ||
+        !values.TryGetValue("client_secret", out var clientSecret) ||
+        !values.TryGetValue("refresh_token", out var refreshToken))
+    {
+        throw new InvalidOperationException(
+            $"Google pack config (scope '{scope}', pack '{pack}') is missing client_id/client_secret/refresh_token. " +
+            "Complete \"Sign in with Google\" before using Gmail/Drive/Calendar neurons.");
+    }
+
+    return DigitalBrain.Google.GoogleCredentialFactory.FromRefreshToken(
+        clientId, clientSecret, refreshToken,
+        Google.Apis.Gmail.v1.GmailService.ScopeConstants.MailGoogleCom,
+        Google.Apis.Drive.v3.DriveService.ScopeConstants.Drive,
+        Google.Apis.Calendar.v3.CalendarService.ScopeConstants.Calendar);
+}
 
 public partial class Program;
 

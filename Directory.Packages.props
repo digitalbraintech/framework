@@ -89,5 +89,10 @@
     <PackageVersion Include="Google.Protobuf" Version="3.31.0" />
     <!-- Roslyn for runtime compilation and execution of generated software/automations inside the brain for self-improvement and install -->
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="4.8.0" />
+    <!-- Google Workspace ino (Gmail/Drive/Calendar) — versions verified via nuget.org 2026-07-01 -->
+    <PackageVersion Include="Google.Apis.Gmail.v1" Version="1.74.0.4162" />
+    <PackageVersion Include="Google.Apis.Drive.v3" Version="1.75.0.4192" />
+    <PackageVersion Include="Google.Apis.Calendar.v3" Version="1.75.0.4182" />
+    <PackageVersion Include="Google.Apis.Auth" Version="1.75.0" />
   </ItemGroup>
 </Project>

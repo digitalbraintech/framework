@@ -69,7 +69,7 @@ public class PackConfigPullTests : IAsyncLifetime
         {
             TypeName = nameof(ConfigurationProvided),
             CorrelationId = "cfg-auth",
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
     }
 
@@ -83,7 +83,7 @@ public class PackConfigPullTests : IAsyncLifetime
         {
             TypeName = nameof(ConfigurationProvided),
             CorrelationId = "cfg-1",
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
         var reply = await svc.GetPackConfig(
@@ -107,7 +107,7 @@ public class PackConfigPullTests : IAsyncLifetime
         {
             TypeName = nameof(ConfigurationProvided),
             CorrelationId = "cfg-session",
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
         var reply = await svc.GetPackConfig(
@@ -130,7 +130,7 @@ public class PackConfigPullTests : IAsyncLifetime
         {
             TypeName = nameof(ConfigurationProvided),
             CorrelationId = "cfg-2",
-            Payload = Google.Protobuf.ByteString.CopyFrom(payload)
+            Payload = global::Google.Protobuf.ByteString.CopyFrom(payload)
         }, TestServerCallContext.Create());
 
         Signal? received = null;
