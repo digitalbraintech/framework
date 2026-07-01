@@ -77,6 +77,7 @@ While iterating visually you can also attach the dart MCP tools (`get_widget_tre
 2. Copy `DigitalBrain.Tests/Authoring/StarterBundleTests.cs`; write the failing fast test
    for your entry hop.
 3. Edit your bundle source until the fast test is green.
-4. Copy `DigitalBrain.Tests/E2E/StarterBundleRendersE2ETests.cs`; run it with
-   `RUN_FLUTTER_E2E=true` (and `DIGITALBRAIN_E2E_HEADED=true`) to watch it render.
+4. Copy `DigitalBrain.Tests/E2E/StarterBundleRendersE2ETests.cs`; run it from Test Explorer
+   (with `e2e.runsettings` wired up, per the Render loop section above) or with
+   `dotnet test --settings e2e.runsettings ...` to watch it render.
 5. When both are green, the bundle is publishable.
