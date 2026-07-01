@@ -26,8 +26,13 @@ public class DigitalBrainAppHostFixture : IAsyncLifetime
 
     public virtual async Task InitializeAsync()
     {
-        if (!(E2EPrerequisites.OptedIn && E2EPrerequisites.WebBundlePresent))
-            return; // Prereqs absent: the [SkippableFact] will skip; don't boot the AppHost.
+        if (!E2EPrerequisites.OptedIn)
+            return; // Not opted into the render E2E; the [SkippableFact] will skip.
+
+        E2EPrerequisites.EnsureWebBundleFresh();
+
+        if (!E2EPrerequisites.WebBundlePresent)
+            return; // Still absent after the best-effort auto-build (e.g. Flutter not installed); the [SkippableFact] will skip.
 
         var testId = Guid.NewGuid().ToString("N")[..8];
         Environment.SetEnvironmentVariable("DIGITALBRAIN_TEST_MODE", "true");
