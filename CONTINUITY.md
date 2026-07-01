@@ -393,3 +393,5 @@ the Slice 0 pattern — the `ui:*` renderer branch was never touched.
   (not axis-aware); `ui_bottom_nav` placeholder uses Material `Icons.circle_outlined` (→ `FIcons.circle`);
   `ui:Sheet` title is a plain Text (no ForUI header slot); gallery `Pagination` targets non-existent `page-N` hops
   (cosmetic dead-end); live `aspire run` + gallery/HelloWorld browser E2E not yet run this session (gated).
+
+- 2026-07-02 spec/system-neurons-bloat-delete: startup bloat (hardcoded shells, seeds direct, SE/kit/chart demos) deleted from AspireOrchestratorNeuron.Handle(Start); ownership to MarketplaceNeuron/UserSession/DataViz via existing FireAsync+HomeFeedBus. kernel-dashboard + core started/status kept. Affected tests green.
