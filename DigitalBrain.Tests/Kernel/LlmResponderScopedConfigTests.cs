@@ -55,7 +55,9 @@ public interface IScopedAskLlmEmitter : INeuron
 
     // Stores config through the silo's IPackConfigStore. The fast-path store keeps config in a per-silo
     // in-memory backing dictionary encrypted with that silo's ephemeral DataProtection keys, so the emitter
-    // and responder must share a silo to read the same plaintext — the tests pin a single-silo cluster.
+    // and responder must share a silo to read the same plaintext — the tests rely on NeuronTestBase's
+    // single-silo default (a 2-silo cluster placed them nondeterministically, which made these tests flaky
+    // before this was pinned).
     Task StoreConfigAsync(string scope, string pack, Dictionary<string, string> values);
 }
 
@@ -112,57 +114,45 @@ public sealed class NullScopedLlmResponderSiloConfigurator : ISiloConfigurator
         });
 }
 
-public class LlmResponderScopedConfigTests
+public class LlmResponderScopedConfigTests : NeuronTestBase
 {
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        new ScopedLlmResponderSiloConfigurator().Configure(builder);
+
     [Fact]
     public async Task AskLlm_with_ConfigPack_uses_scoped_client_from_stored_provider_and_key()
     {
         ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
 
-        // Single silo: the in-memory PackConfigStore lives per silo, so emitter and responder must co-locate
-        // to share the stored config (and its silo-local DataProtection keys). The default 2-silo cluster
-        // places them nondeterministically, which made this test flaky (responder read an empty store → global).
-        var builder = new TestClusterBuilder(initialSilosCount: 1);
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<ScopedLlmResponderSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
-        try
+        const string pack = "DigitalBrain.Telegram.Responder";
+        const string scope = "default";
+
+        var responder = Grain<ILlmResponderNeuron>("responder-scoped-1");
+        await responder.GetTimelineAsync();
+
+        var emitter = Grain<IScopedAskLlmEmitter>("emitter-scoped-1");
+        await emitter.StoreConfigAsync(scope, pack, new Dictionary<string, string>
         {
-            const string pack = "DigitalBrain.Telegram.Responder";
-            const string scope = "default";
+            ["llm_provider"] = "openai",
+            ["llm_key"] = "sk-test",
+        });
+        var replyProps = new Dictionary<string, object?> { ["chatId"] = 7 };
+        await emitter.BroadcastScopedAskAsync("hi", "TelegramReplyRequested", replyProps, pack, scope);
 
-            var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-scoped-1");
-            await responder.GetTimelineAsync();
-
-            var emitter = cluster.GrainFactory.GetGrain<IScopedAskLlmEmitter>("emitter-scoped-1");
-            await emitter.StoreConfigAsync(scope, pack, new Dictionary<string, string>
-            {
-                ["llm_provider"] = "openai",
-                ["llm_key"] = "sk-test",
-            });
-            var replyProps = new Dictionary<string, object?> { ["chatId"] = 7 };
-            await emitter.BroadcastScopedAskAsync("hi", "TelegramReplyRequested", replyProps, pack, scope);
-
-            Signal? signal = null;
-            for (var attempt = 0; attempt < 20 && signal is null; attempt++)
-            {
-                await Task.Delay(50);
-                var timeline = await responder.GetTimelineAsync();
-                signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "TelegramReplyRequested");
-            }
-
-            Assert.NotNull(signal);
-            Assert.Equal("SCOPED:hi", signal.Props["text"]);
-
-            var request = Assert.Single(ScopedLlmResponderSiloConfigurator.Factory.Requests);
-            Assert.Equal("openai", request.Provider);
-            Assert.Equal("sk-test", request.ApiKey);
-        }
-        finally
+        Signal? signal = null;
+        for (var attempt = 0; attempt < 20 && signal is null; attempt++)
         {
-            await cluster.StopAllSilosAsync();
+            await Task.Delay(50);
+            var timeline = await responder.GetTimelineAsync();
+            signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "TelegramReplyRequested");
         }
+
+        Assert.NotNull(signal);
+        Assert.Equal("SCOPED:hi", signal.Props["text"]);
+
+        var request = Assert.Single(ScopedLlmResponderSiloConfigurator.Factory.Requests);
+        Assert.Equal("openai", request.Provider);
+        Assert.Equal("sk-test", request.ApiKey);
     }
 
     [Fact]
@@ -170,59 +160,46 @@ public class LlmResponderScopedConfigTests
     {
         ScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
 
-        // Single silo keeps the responder co-located with the emitter (see the scoped test for why).
-        var builder = new TestClusterBuilder(initialSilosCount: 1);
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<ScopedLlmResponderSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
-        try
+        var responder = Grain<ILlmResponderNeuron>("responder-global-1");
+        await responder.GetTimelineAsync();
+
+        var emitter = Grain<IScopedAskLlmEmitter>("emitter-global-1");
+        var replyProps = new Dictionary<string, object?> { ["chatId"] = 9 };
+        await emitter.BroadcastScopedAskAsync("hi", "ReplyGlobal", replyProps, configPack: null, configScope: null);
+
+        Signal? signal = null;
+        for (var attempt = 0; attempt < 20 && signal is null; attempt++)
         {
-            var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-global-1");
-            await responder.GetTimelineAsync();
-
-            var emitter = cluster.GrainFactory.GetGrain<IScopedAskLlmEmitter>("emitter-global-1");
-            var replyProps = new Dictionary<string, object?> { ["chatId"] = 9 };
-            await emitter.BroadcastScopedAskAsync("hi", "ReplyGlobal", replyProps, configPack: null, configScope: null);
-
-            Signal? signal = null;
-            for (var attempt = 0; attempt < 20 && signal is null; attempt++)
-            {
-                await Task.Delay(50);
-                var timeline = await responder.GetTimelineAsync();
-                signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "ReplyGlobal");
-            }
-
-            Assert.NotNull(signal);
-            Assert.Equal("ANSWER:hi", signal.Props["text"]);
-            Assert.Empty(ScopedLlmResponderSiloConfigurator.Factory.Requests);
+            await Task.Delay(50);
+            var timeline = await responder.GetTimelineAsync();
+            signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "ReplyGlobal");
         }
-        finally
-        {
-            await cluster.StopAllSilosAsync();
-        }
+
+        Assert.NotNull(signal);
+        Assert.Equal("ANSWER:hi", signal.Props["text"]);
+        Assert.Empty(ScopedLlmResponderSiloConfigurator.Factory.Requests);
     }
 
-    [Fact]
-    public async Task AskLlm_scoped_factory_returns_null_falls_back_to_global_client()
+    // NullScopedLlmResponderSiloConfigurator is mutually exclusive with ScopedLlmResponderSiloConfigurator
+    // (the outer class's ConfigureSilo) — this nested class extends NeuronTestBase directly so it applies
+    // its own ConfigureSilo instead of inheriting the outer one.
+    public sealed class NullScopedFactoryFallbackTests : NeuronTestBase
     {
-        NullScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
+        protected override void ConfigureSilo(ISiloBuilder builder) =>
+            new NullScopedLlmResponderSiloConfigurator().Configure(builder);
 
-        // Single silo so the responder reads the same in-memory config the emitter stored (see the scoped test).
-        var builder = new TestClusterBuilder(initialSilosCount: 1);
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<NullScopedLlmResponderSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
-        try
+        [Fact]
+        public async Task AskLlm_scoped_factory_returns_null_falls_back_to_global_client()
         {
+            NullScopedLlmResponderSiloConfigurator.Factory.Requests.Clear();
+
             const string pack = "DigitalBrain.Telegram.Responder";
             const string scope = "default";
 
-            var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-nullfactory-1");
+            var responder = Grain<ILlmResponderNeuron>("responder-nullfactory-1");
             await responder.GetTimelineAsync();
 
-            var emitter = cluster.GrainFactory.GetGrain<IScopedAskLlmEmitter>("emitter-nullfactory-1");
+            var emitter = Grain<IScopedAskLlmEmitter>("emitter-nullfactory-1");
             // Store openai config but with no key — factory will be asked and return null.
             await emitter.StoreConfigAsync(scope, pack, new Dictionary<string, string>
             {
@@ -246,10 +223,6 @@ public class LlmResponderScopedConfigTests
             // Factory was called (it attempted to build) but returned null.
             var request = Assert.Single(NullScopedLlmResponderSiloConfigurator.Factory.Requests);
             Assert.Equal("openai", request.Provider);
-        }
-        finally
-        {
-            await cluster.StopAllSilosAsync();
         }
     }
 }
