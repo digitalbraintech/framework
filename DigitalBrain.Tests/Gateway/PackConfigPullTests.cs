@@ -40,7 +40,6 @@ public class PackConfigPullTests : NeuronTestBase
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton(_egressBus);
-            services.AddSignalEgressStreamSubscriber();
         });
 
     private static IPackConfigStore BuildConfigStore()

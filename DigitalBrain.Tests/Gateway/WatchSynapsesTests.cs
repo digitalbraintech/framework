@@ -31,7 +31,6 @@ public class WatchSynapsesTests : NeuronTestBase
             services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
             services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
             services.AddSingleton(_egressBus);
-            services.AddSignalEgressStreamSubscriber();
         });
 
     [Fact]
