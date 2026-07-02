@@ -2,7 +2,6 @@ using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Logging;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Kernel;
 
@@ -45,7 +44,7 @@ public sealed class PingEmitter(ILogger<PingEmitter> logger, NeuronJournals jour
     public Task EmitPingAsync(string note) => Broadcast(new Ping(note));
 }
 
-public class BroadcastReactivityTests
+public class BroadcastReactivityTests : NeuronTestBase
 {
     private static async Task WaitForCountAsync(Func<Task<int>> getCount, int expected)
     {
@@ -60,26 +59,15 @@ public class BroadcastReactivityTests
     [Fact]
     public async Task Broadcast_reaches_every_activated_handler()
     {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
-        try
-        {
-            var a = cluster.GrainFactory.GetGrain<IPingSink>("a");
-            var b = cluster.GrainFactory.GetGrain<IPingSink>("b");
-            await a.EnsureActiveAsync();
-            await b.EnsureActiveAsync();
-            var emitter = cluster.GrainFactory.GetGrain<IPingEmitter>("e");
-            await emitter.EmitPingAsync("hello");
-            await WaitForCountAsync(() => a.ReceivedCountAsync(), 1);
-            await WaitForCountAsync(() => b.ReceivedCountAsync(), 1);
-            Assert.Equal(1, await a.ReceivedCountAsync());
-            Assert.Equal(1, await b.ReceivedCountAsync());
-        }
-        finally
-        {
-            await cluster.StopAllSilosAsync();
-        }
+        var a = Grain<IPingSink>("a");
+        var b = Grain<IPingSink>("b");
+        await a.EnsureActiveAsync();
+        await b.EnsureActiveAsync();
+        var emitter = Grain<IPingEmitter>("e");
+        await emitter.EmitPingAsync("hello");
+        await WaitForCountAsync(() => a.ReceivedCountAsync(), 1);
+        await WaitForCountAsync(() => b.ReceivedCountAsync(), 1);
+        Assert.Equal(1, await a.ReceivedCountAsync());
+        Assert.Equal(1, await b.ReceivedCountAsync());
     }
 }
