@@ -1,29 +1,43 @@
 using DigitalBrain.Core;
+using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
 using Xunit;
 
 namespace DigitalBrain.TestKit;
 
-public sealed class TestDigitalBrain(Action<ISiloBuilder>? extend = null) : IDigitalBrain, IAsyncLifetime
+public sealed class TestDigitalBrain(
+    Action<ISiloBuilder>? extendSilo = null,
+    Action<IClientBuilder>? extendClient = null,
+    short initialSilosCount = 1) : IDigitalBrain, IAsyncLifetime
 {
-    private readonly Action<ISiloBuilder>? _extend = extend;
+    private readonly Action<ISiloBuilder>? _extendSilo = extendSilo;
+    private readonly Action<IClientBuilder>? _extendClient = extendClient;
+    private readonly short _initialSilosCount = initialSilosCount;
     private TestCluster? _cluster;
+
+    public TestCluster Cluster => _cluster!;
 
     public async Task InitializeAsync()
     {
-        var builder = new TestClusterBuilder();
+        var builder = new TestClusterBuilder(initialSilosCount: _initialSilosCount);
         builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
 
-        // AddSiloBuilderConfigurator<T>() requires a parameterless T: Orleans stores T's
-        // AssemblyQualifiedName and reflectively Activator.CreateInstance()s it inside the
-        // test host process, so a closure-capturing ISiloConfigurator instance can't be passed
-        // directly. Bridge the captured `_extend` delegate through an AsyncLocal that
-        // ExtendSiloConfigurator reads when Orleans reflectively constructs it during
-        // builder.Build()/DeployAsync() below, on this same async flow.
-        if (_extend is not null)
+        // AddSiloBuilderConfigurator<T>() / AddClientBuilderConfigurator<T>() require parameterless T:
+        // Orleans stores T's AssemblyQualifiedName and reflectively Activator.CreateInstance()s it inside
+        // the test host process, so a closure-capturing configurator instance can't be passed directly.
+        // Bridge the captured delegates through AsyncLocals that the Extend* configurators read when
+        // Orleans reflectively constructs them during builder.Build()/DeployAsync() below, on this same
+        // async flow.
+        if (_extendSilo is not null)
         {
             builder.AddSiloBuilderConfigurator<ExtendSiloConfigurator>();
-            ExtendSiloConfigurator.Current.Value = _extend;
+            ExtendSiloConfigurator.Current.Value = _extendSilo;
+        }
+
+        if (_extendClient is not null)
+        {
+            builder.AddClientBuilderConfigurator<ExtendClientBuilderConfigurator>();
+            ExtendClientBuilderConfigurator.Current.Value = _extendClient;
         }
 
         _cluster = builder.Build();
@@ -52,5 +66,13 @@ public sealed class TestDigitalBrain(Action<ISiloBuilder>? extend = null) : IDig
         public static readonly AsyncLocal<Action<ISiloBuilder>?> Current = new();
 
         public void Configure(ISiloBuilder siloBuilder) => Current.Value?.Invoke(siloBuilder);
+    }
+
+    private sealed class ExtendClientBuilderConfigurator : IClientBuilderConfigurator
+    {
+        public static readonly AsyncLocal<Action<IClientBuilder>?> Current = new();
+
+        public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) =>
+            Current.Value?.Invoke(clientBuilder);
     }
 }
