@@ -2,32 +2,15 @@ using System.Text.Json;
 using DigitalBrain.Core;
 using DigitalBrain.Kernel;
 using DigitalBrain.TestKit;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Economics;
 
-public class LicenseAndEntitlementTests : IAsyncLifetime
+public class LicenseAndEntitlementTests : NeuronTestBase
 {
-    private TestCluster? _cluster;
-
-    public async Task InitializeAsync()
-    {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_cluster is not null)
-            await _cluster.StopAllSilosAsync();
-    }
-
     [Fact]
     public async Task License_Issues_Verifies_And_Gates_Entitlement()
     {
-        var license = _cluster!.GrainFactory.GetGrain<ILicenseNeuron>("license-main");
+        var license = Grain<ILicenseNeuron>("license-main");
         var token = await license.IssueLicenseAsync("PackA", "buyer1");
 
         Assert.True(await license.HasLicenseAsync("PackA", "buyer1"));
@@ -45,7 +28,7 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
         var premium = PackSignatureVerifier.SignPack(
             new NeuroPack("Premium", "1.0", OwnerId: "dev", Code: "ok", Price: 9.99m), priv, pub);
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-premium");
+        var market = Grain<IMarketplaceNeuron>("market-premium");
         await Publish(market, premium);
 
         // No license -> the premium gate rejects the install.
@@ -53,7 +36,7 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
         Assert.DoesNotContain(await market.GetTimelineAsync(), s => s is NeuroPackInstalled);
 
         // Grant a license -> install succeeds.
-        await _cluster.GrainFactory.GetGrain<ILicenseNeuron>("license-main").IssueLicenseAsync("Premium", "buyer1");
+        await Grain<ILicenseNeuron>("license-main").IssueLicenseAsync("Premium", "buyer1");
         await market.FireAsync(new InstallFromMarketplace("Premium", "1.0", BuyerId: "buyer1"));
         Assert.Contains(await market.GetTimelineAsync(), s => s is NeuroPackInstalled);
     }
@@ -65,7 +48,7 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
         var premium = PackSignatureVerifier.SignPack(
             new NeuroPack("FlowPack", "1.0", OwnerId: "dev", Code: "ok", Price: 5m), priv, pub);
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-flow");
+        var market = Grain<IMarketplaceNeuron>("market-flow");
         await Publish(market, premium);
 
         // Buyer pays via the synthetic gateway.
@@ -76,7 +59,7 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
         Assert.True(confirmation.Completed);
 
         // Payment confirmed -> issue license -> install the premium pack.
-        await _cluster.GrainFactory.GetGrain<ILicenseNeuron>("license-main")
+        await Grain<ILicenseNeuron>("license-main")
             .IssueLicenseAsync(confirmation.BundleId!, confirmation.UserId!);
         await market.FireAsync(new InstallFromMarketplace("FlowPack", "1.0", BuyerId: "buyerX"));
 
@@ -88,4 +71,3 @@ public class LicenseAndEntitlementTests : IAsyncLifetime
             pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
             pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64, pack.Price)).AsTask();
 }
-

@@ -6,31 +6,18 @@ using DigitalBrain.Tests.TestSupport;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Telegram;
 
 // Verifies that GatewayService.Send routes a TelegramMessageReceived envelope
 // to the per-chat TelegramChatNeuron rather than broadcasting via IngressNeuron.
 [Collection("tg-routing-host")]
-public class TelegramDeepLinkRoutingTests : IAsyncLifetime
+public class TelegramDeepLinkRoutingTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-    private HomeFeedBus _homeFeedBus = null!;
-
-    public async Task InitializeAsync()
-    {
-        _homeFeedBus = new HomeFeedBus();
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
+    private readonly HomeFeedBus _homeFeedBus = new();
 
     private GatewayService NewService() =>
-        new(_cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
@@ -49,7 +36,7 @@ public class TelegramDeepLinkRoutingTests : IAsyncLifetime
             Payload = global::Google.Protobuf.ByteString.CopyFrom(Json(200, "/start hello-world"))
         }, TestServerCallContext.Create());
 
-        var chat = _cluster.GrainFactory.GetGrain<ITelegramChatNeuron>("tg-chat-200");
+        var chat = Grain<ITelegramChatNeuron>("tg-chat-200");
         Assert.Equal("hello-world", await chat.GetBoundBundleAsync());
     }
 
