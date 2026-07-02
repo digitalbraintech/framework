@@ -328,6 +328,8 @@ git commit -m "test(cleanup): migrate 4 mechanical Group 4 files to NeuronTestBa
 - Consumes: `NeuronTestBase.ConfigureSilo` override (existing).
 - Produces: nothing new for later tasks.
 
+**Correction (found during Task 2 implementation, verified empirically):** `using Orleans.TestingHost;` IS required here, unlike the mechanical Task 1 files. The rule is precise: `Orleans.TestingHost` is needed only by files that explicitly reference the `ISiloConfigurator` **type name** (e.g. declaring `class X : ISiloConfigurator`) — not merely by overriding `ConfigureSilo(ISiloBuilder builder)`, whose `ISiloBuilder` parameter type resolves via Orleans SDK global usings regardless. `LlmResponderTests.cs` keeps `LlmResponderSiloConfigurator : ISiloConfigurator` as a standalone class (so its static wiring stays reusable/testable on its own), so it needs the import. Confirmed by removing the import and rebuilding: `error CS0246: The type or namespace name 'ISiloConfigurator' could not be found`. (`GatewayServiceTests.cs`/`ExperienceStepDispatchTests.cs` from Group 3 don't need it because they inline their config directly into the `ConfigureSilo` override body and never write `ISiloConfigurator` as a type name.) The target code below already includes the corrected import.
+
 - [ ] **Step 1: Replace `DigitalBrain.Tests/Kernel/LlmResponderTests.cs` in full**
 
 ```csharp
@@ -336,6 +338,7 @@ using DigitalBrain.Kernel;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Kernel;
 
@@ -700,6 +703,8 @@ git commit -m "test(cleanup): migrate TrustedSeedInstallTests/HandlerGrowthTests
 - Consumes: `NeuronTestBase.ConfigureSilo` override (existing); the "nested class extends `NeuronTestBase` directly" pattern from Task 3.
 - Produces: nothing new for later tasks (last file in the migration).
 
+**Note (see Task 2's correction):** this file keeps `ScopedLlmResponderSiloConfigurator : ISiloConfigurator` and `NullScopedLlmResponderSiloConfigurator : ISiloConfigurator` as standalone classes (both hold a static `Factory` field the facts reference directly), so — same as `LlmResponderTests.cs` in Task 2 — it needs `using Orleans.TestingHost;`. Already included in the target code below.
+
 - [ ] **Step 1: Replace `DigitalBrain.Tests/Kernel/LlmResponderScopedConfigTests.cs` in full**
 
 ```csharp
@@ -711,6 +716,7 @@ using DigitalBrain.Kernel.Llm;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Kernel;
 
