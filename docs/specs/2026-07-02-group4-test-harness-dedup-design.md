@@ -1,7 +1,7 @@
 # Group 4 Test Harness Dedup — Design
 
 **Date:** 2026-07-02
-**Status:** Design, pending approval
+**Status:** Approved, implementation in progress (see `docs/plans/2026-07-02-group4-test-harness-dedup-plan.md` for two corrections found empirically during implementation: `Orleans.TestingHost` import requirement, and nested test classes must be `public`)
 **Branch:** `spec/group4-test-harness-dedup`
 **Scope:** `DigitalBrain.Tests/` (9 files) — zero changes to `NeuronTestBase`/`TestDigitalBrain`.
 
@@ -11,7 +11,7 @@ Direct continuation of Group 3 (`docs/specs/2026-07-02-group3-test-harness-dedup
 
 Fresh research (this round) read all 9 files in full and found that judgment was too pessimistic: none of them actually need new `NeuronTestBase`/`TestDigitalBrain` capability. Every file's facts either:
 - share one cluster config → migrate directly to `NeuronTestBase`, mechanical (same as Group 3's "mechanical" tier), or
-- split across two genuinely different configs → resolved by moving the minority-config fact(s) into a **nested class** in the same file, a pattern already established in `UnitTest1.cs` (`IsolatedReplayTest`, `StrictConfigNeuronTest` — both nested `NeuronTestBase` subclasses with their own `ConfigureSilo` override), not by adding new hooks.
+- split across two genuinely different configs → resolved by moving the minority-config fact(s) into a **public nested class** in the same file, not by adding new hooks. (`UnitTest1.cs`'s `IsolatedReplayTest`/`StrictConfigNeuronTest` are a related but distinct pattern: they're `private` nested `NeuronTestBase` subclasses with no `[Fact]`s of their own, manually instantiated inside another fact to get a fresh isolated cluster — not independently-discovered test classes. A nested class that carries its own `[Fact]` is new to this codebase and must be `public`, per xUnit's `xUnit1000` analyzer rule — verified empirically during implementation.)
 
 Two facts (`TrustedSeedInstallTests.Trusted_Publisher_Signs_Seeds_So_They_Verify`, `HandlerGrowthTests.Dev_Can_Package_And_Publish_Dummy_Distributions_Using_Seeds_Helpers`) build no `TestCluster` at all today — pure unit tests co-located with cluster tests in the same file. Forcing these onto `NeuronTestBase` would make them pay for an Orleans silo spin-up they never needed: a real regression, not a style choice. They move to their own nested plain class (no `NeuronTestBase`).
 

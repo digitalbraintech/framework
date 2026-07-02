@@ -450,6 +450,8 @@ git commit -m "test(cleanup): migrate LlmResponderTests to NeuronTestBase"
 - Consumes: `NeuronTestBase.ConfigureSilo` override (existing).
 - Produces: the "nested class extends `NeuronTestBase` directly, not the outer class" pattern that Task 4 and Task 5 reuse for their own mutually-exclusive-config splits.
 
+**Correction (found during Task 3 implementation, verified empirically):** the nested test class MUST be declared `public`, not `private`. The original design reasoning cited `UnitTest1.cs`'s `IsolatedReplayTest`/`StrictConfigNeuronTest` as precedent for "private nested test classes" — that reading was wrong. Those two classes are `private` but have **no `[Fact]` methods of their own**; they're plain `NeuronTestBase` subclasses manually instantiated inside other facts on the outer class (`new IsolatedReplayTest()` at `UnitTest1.cs:54`, `new StrictConfigNeuronTest()` at `UnitTest1.cs:347`) to get a fresh isolated cluster with different config, not independently-discovered test classes. A nested class that itself carries a `[Fact]` is a genuinely new pattern for this codebase and IS subject to xUnit's own analyzer rule: `error xUnit1000: Test classes must be public`. Verified by building with `private` (fails) and `public` (succeeds, and the 3 facts — 2 outer + 1 nested — are correctly discovered and pass via `dotnet test --filter "FullyQualifiedName~PublishGateTests"`). The target code below already uses `public sealed class DefaultUngatedTests`. This same correction applies to Task 4's `SignatureVerificationTests`/`MarketplaceSeedsPackagingTests` and Task 5's `NullScopedFactoryFallbackTests` — all four nested classes below are `public`, not `private`.
+
 - [ ] **Step 1: Replace `DigitalBrain.Tests/Trust/PublishGateTests.cs` in full**
 
 ```csharp
@@ -511,7 +513,7 @@ public class PublishGateTests : NeuronTestBase
     // Gating is opt-in per-cluster (the outer class's ConfigureSilo enables it) — this nested class extends
     // NeuronTestBase directly, not PublishGateTests, so it gets the plain default silo config instead of
     // inheriting the gated one.
-    private sealed class DefaultUngatedTests : NeuronTestBase
+    public sealed class DefaultUngatedTests : NeuronTestBase
     {
         [Fact]
         public async Task Gate_off_by_default_admits_unsigned()
@@ -596,7 +598,7 @@ public class TrustedSeedInstallTests : NeuronTestBase
 
     // Pure unit test — no TestCluster today, and none needed: only exercises MarketplaceSeeds/
     // PackSignatureVerifier statics. A plain nested class (no NeuronTestBase) keeps it at that cost.
-    private sealed class SignatureVerificationTests
+    public sealed class SignatureVerificationTests
     {
         [Fact]
         public void Trusted_Publisher_Signs_Seeds_So_They_Verify()
@@ -656,7 +658,7 @@ public class HandlerGrowthTests : NeuronTestBase
 
     // Pure unit test — no TestCluster today, and none needed: only exercises MarketplaceSeeds statics.
     // A plain nested class (no NeuronTestBase) keeps it at that cost.
-    private sealed class MarketplaceSeedsPackagingTests
+    public sealed class MarketplaceSeedsPackagingTests
     {
         [Fact]
         public void Dev_Can_Package_And_Publish_Dummy_Distributions_Using_Seeds_Helpers()
@@ -893,7 +895,7 @@ public class LlmResponderScopedConfigTests : NeuronTestBase
     // NullScopedLlmResponderSiloConfigurator is mutually exclusive with ScopedLlmResponderSiloConfigurator
     // (the outer class's ConfigureSilo) — this nested class extends NeuronTestBase directly so it applies
     // its own ConfigureSilo instead of inheriting the outer one.
-    private sealed class NullScopedFactoryFallbackTests : NeuronTestBase
+    public sealed class NullScopedFactoryFallbackTests : NeuronTestBase
     {
         protected override void ConfigureSilo(ISiloBuilder builder) =>
             new NullScopedLlmResponderSiloConfigurator().Configure(builder);
