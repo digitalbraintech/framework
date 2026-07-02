@@ -3,7 +3,7 @@
 **Date:** 2026-07-02
 **Status:** Design, approved, implementation starting
 **Branch:** `spec/group3-test-harness-dedup`
-**Scope:** `DigitalBrain.Tests/` (10 files) + `DigitalBrain.TestKit/NeuronTestBase.cs` + `TestDigitalBrain.cs` (2 small additive hooks)
+**Scope:** `DigitalBrain.Tests/` (10 files) + `DigitalBrain.TestKit/NeuronTestBase.cs` + `TestDigitalBrain.cs` (3 small additive hooks: `ConfigureClient`, `InitialSilosCount`, `Cluster`)
 
 ## Context
 
@@ -21,7 +21,7 @@ Fresh research (this round) re-examined the deferred files and found the "not me
 ## Goals
 
 - Migrate the 10 remaining `IAsyncLifetime`/manual-`TestClusterBuilder` test files in `DigitalBrain.Tests/` to inherit `NeuronTestBase`, deleting the duplicated init/dispose ceremony and (where applicable) the static-field bus bridge.
-- Add exactly two small, additive, backward-compatible hooks to `NeuronTestBase`/`TestDigitalBrain` to unblock the two files that need real new capability: a `ConfigureClient(IClientBuilder)` override point, and an `InitialSilosCount` override point (default `1`, preserving all existing behavior).
+- Add exactly three small, additive, backward-compatible members to `NeuronTestBase`/`TestDigitalBrain` to unblock the files that need real new capability: a `ConfigureClient(IClientBuilder)` override point, an `InitialSilosCount` override point (default `1`), and a `Cluster` accessor exposing the underlying `TestCluster` for the handful of tests that need raw `GrainFactory`/`Client`/`Silos` access. All three preserve existing behavior for every currently-migrated subclass.
 - Preserve every xunit `[Collection(...)]` attribute and `DisableParallelization` semantics exactly as-is (these guard against local Orleans TestCluster port/resource contention, not against the state-sharing problem being deleted here — out of scope to relitigate).
 - Net delete boilerplate LOC.
 
@@ -57,7 +57,14 @@ protected virtual int InitialSilosCount => 1;
 
 `InitializeAsync` constructs `TestDigitalBrain` passing all three. Both new members default to no-ops/`1`, so every currently-migrated subclass (Group 1/2) is unaffected.
 
-A fourth gap surfaced while reading the actual files: `GatewayServiceTests.cs`, `GenericSendTests.cs`, `PackConfigPullTests.cs`, and `TelegramDeepLinkRoutingTests.cs` all construct `GatewayService` directly, whose constructor (`DigitalBrain.Kernel/Gateway/GatewayService.cs:9-10`) takes a raw `IGrainFactory` as its first parameter — something `NeuronTestBase` doesn't expose today (only the typed per-key `Grain<TGrain>(key)` helper). Add `protected IGrainFactory GrainFactory => _brain.GrainFactory;` to `NeuronTestBase` and a matching `public IGrainFactory GrainFactory => _cluster!.GrainFactory;` to `TestDigitalBrain` — additive, same shape as the `Silos` accessor above.
+Reading the actual files surfaced two more gaps, both solved by the same fix: `GatewayServiceTests.cs`, `GenericSendTests.cs`, `PackConfigPullTests.cs`, and `TelegramDeepLinkRoutingTests.cs` all construct `GatewayService` directly, whose constructor (`DigitalBrain.Kernel/Gateway/GatewayService.cs:9-10`) takes a raw `IGrainFactory` as its first parameter; and `TimelineStreamTests.cs` calls `_cluster.Client.GetStreamProvider(...)`, needing the raw `IClusterClient`. Rather than add narrow `GrainFactory`/`Client`/`Silos` accessors piecemeal, expose the underlying cluster itself — one addition covers all three (plus `HomeFeedCrossSiloTests.cs`'s `Silos` need below):
+
+```csharp
+protected TestCluster Cluster => _brain.Cluster; // NeuronTestBase
+public TestCluster Cluster => _cluster!;         // TestDigitalBrain
+```
+
+`NeuronTestBase.cs` needs a new `using Orleans.TestingHost;` for the `TestCluster` type (it currently has none, relying entirely on the Orleans-SDK-injected global usings for `ISiloBuilder`/`ISiloConfigurator`; `TestCluster`/`SiloHandle`/`InProcessSiloHandle` are not part of that global set — confirmed by every file that uses them today carrying an explicit `using Orleans.TestingHost;`).
 
 ### Per-file conversion
 
@@ -74,8 +81,9 @@ A fourth gap surfaced while reading the actual files: `GatewayServiceTests.cs`, 
 - `Gateway/PackConfigPullTests.cs` (`SignalEgressBus` via override; its independent `IPackConfigStore` built from a fresh `ServiceCollection` is already test-local and needs no change — keep `[Collection("pack-config-pull-host")]`)
 
 **New hook usage:**
-- `Kernel/TimelineStreamTests.cs` → `ConfigureClient` override registering `builder.AddMemoryStreams(SynapseStream.ProviderName)`.
-- `Ui/HomeFeedCrossSiloTests.cs` → `InitialSilosCount => 2` override; keep its direct `_cluster.Silos[...]` access pattern — this requires `NeuronTestBase` to expose the underlying silo list for this one file, since `Grain<T>()` alone can't target a specific silo. Add `protected IReadOnlyList<SiloHandle> Silos => _brain.Silos;` to `NeuronTestBase` (and a matching `Silos` accessor on `TestDigitalBrain`) — additive, unused by every other subclass.
+- `Kernel/TimelineStreamTests.cs` → `ConfigureClient` override registering `builder.AddMemoryStreams(SynapseStream.ProviderName)`; use `Cluster.Client.GetStreamProvider(...)` in place of `_cluster.Client...`.
+- `Ui/HomeFeedCrossSiloTests.cs` → `InitialSilosCount => 2` override; keep its direct silo-indexing access pattern via `Cluster.Silos[0]` / `Cluster.Silos[1]` in place of `_cluster.Silos[...]`.
+- `Gateway/GatewayServiceTests.cs`, `Gateway/GenericSendTests.cs`, `Gateway/PackConfigPullTests.cs`, `Telegram/TelegramDeepLinkRoutingTests.cs` → construct `GatewayService` with `Cluster.GrainFactory` in place of `_cluster.GrainFactory`.
 
 ### Verification ritual (after every file, and again at the end)
 
@@ -87,7 +95,7 @@ Low-medium. Mechanical per-file conversions carry standard refactor risk (missed
 
 ## Suggested sequencing
 
-1. Extend `NeuronTestBase`/`TestDigitalBrain` with the four additions (`ConfigureClient`, `InitialSilosCount`, `Silos`, `GrainFactory`); verify no regression across the whole suite.
+1. Extend `NeuronTestBase`/`TestDigitalBrain` with the three additions (`ConfigureClient`, `InitialSilosCount`, `Cluster`); verify no regression across the whole suite.
 2. Convert the 3 fully mechanical files.
 3. Convert `HomeFeedCrossSiloTests.cs` (validates the silo-count hook).
 4. Convert `TimelineStreamTests.cs` (validates the client hook).
