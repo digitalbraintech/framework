@@ -57,6 +57,8 @@ protected virtual int InitialSilosCount => 1;
 
 `InitializeAsync` constructs `TestDigitalBrain` passing all three. Both new members default to no-ops/`1`, so every currently-migrated subclass (Group 1/2) is unaffected.
 
+A fourth gap surfaced while reading the actual files: `GatewayServiceTests.cs`, `GenericSendTests.cs`, `PackConfigPullTests.cs`, and `TelegramDeepLinkRoutingTests.cs` all construct `GatewayService` directly, whose constructor (`DigitalBrain.Kernel/Gateway/GatewayService.cs:9-10`) takes a raw `IGrainFactory` as its first parameter — something `NeuronTestBase` doesn't expose today (only the typed per-key `Grain<TGrain>(key)` helper). Add `protected IGrainFactory GrainFactory => _brain.GrainFactory;` to `NeuronTestBase` and a matching `public IGrainFactory GrainFactory => _cluster!.GrainFactory;` to `TestDigitalBrain` — additive, same shape as the `Silos` accessor above.
+
 ### Per-file conversion
 
 **Mechanical, no override needed** — inherit `NeuronTestBase`, delete `_cluster`/`InitializeAsync`/`DisposeAsync`, replace `_cluster.GrainFactory.GetGrain<T>(key)` with the inherited `Grain<T>(key)`:
@@ -85,7 +87,7 @@ Low-medium. Mechanical per-file conversions carry standard refactor risk (missed
 
 ## Suggested sequencing
 
-1. Extend `NeuronTestBase`/`TestDigitalBrain` with the two hooks + `Cluster` accessor; verify no regression across the whole suite.
+1. Extend `NeuronTestBase`/`TestDigitalBrain` with the four additions (`ConfigureClient`, `InitialSilosCount`, `Silos`, `GrainFactory`); verify no regression across the whole suite.
 2. Convert the 3 fully mechanical files.
 3. Convert `HomeFeedCrossSiloTests.cs` (validates the silo-count hook).
 4. Convert `TimelineStreamTests.cs` (validates the client hook).
