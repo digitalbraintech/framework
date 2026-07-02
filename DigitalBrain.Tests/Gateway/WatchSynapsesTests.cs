@@ -6,7 +6,6 @@ using DigitalBrain.Kernel.Ui;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Gateway;
 
@@ -14,29 +13,33 @@ namespace DigitalBrain.Tests.Gateway;
 // the per-silo SignalEgressStreamSubscriber forwards it into SignalEgressBus, and a filtered subscription
 // (the mechanism WatchSynapses streams to external transports) yields only the matching signal.
 [Collection("signal-egress-host")]
-public class WatchSynapsesTests : IAsyncLifetime
+public class WatchSynapsesTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-    private SignalEgressBus _egressBus = null!;
+    private readonly SignalEgressBus _egressBus = new();
 
-    public async Task InitializeAsync()
-    {
-        _egressBus = new SignalEgressBus();
-        SignalEgressSiloConfig.SharedEgressBus = _egressBus;
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<SignalEgressSiloConfig>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .AddMemoryGrainStorageAsDefault()
+        .AddMemoryStreams("Default")
+        .AddMemoryStreams("HomeFeed")
+        .AddMemoryStreams("DigitalBrainTimeline")
+        .AddMemoryGrainStorage("PubSubStore")
+        .ConfigureServices(services =>
+        {
+            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddScoped<NeuronJournals>();
+            services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
+            services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
+            services.AddSingleton(_egressBus);
+            services.AddSignalEgressStreamSubscriber();
+        });
 
     [Fact]
     public async Task BroadcastSignal_ReachesEgressBus_FilteredByTypeName()
     {
         using var subscription = _egressBus.Subscribe(new[] { TelegramSignals.ReplyRequested });
 
-        var emitter = _cluster.GrainFactory.GetGrain<IIngressNeuron>("egress-emitter-1");
+        var emitter = Grain<IIngressNeuron>("egress-emitter-1");
         await emitter.IngestAsync(TelegramSignals.ReplyRequested,
             new Dictionary<string, object?> { ["chatId"] = 7L, ["text"] = "yo" });
         await emitter.IngestAsync("Other", new Dictionary<string, object?>());
@@ -66,28 +69,6 @@ public class WatchSynapsesTests : IAsyncLifetime
             Assert.Equal(TelegramSignals.ReplyRequested, extra.Name);
             Assert.NotEqual("Other", extra.Name);
         }
-    }
-
-    private sealed class SignalEgressSiloConfig : ISiloConfigurator
-    {
-        public static SignalEgressBus SharedEgressBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton(SharedEgressBus);
-                services.AddSignalEgressStreamSubscriber();
-            });
     }
 }
 

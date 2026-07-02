@@ -14,7 +14,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Gateway;
 
@@ -22,38 +21,44 @@ namespace DigitalBrain.Tests.Gateway;
 // values point-to-point, and the broadcast carries only a NON-SECRET PackConfigured notification — the
 // token never reaches the egress timeline. Mirrors WatchSynapsesTests' egress wiring.
 [Collection("pack-config-pull-host")]
-public class PackConfigPullTests : IAsyncLifetime
+public class PackConfigPullTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-    private SignalEgressBus _egressBus = null!;
-    private IPackConfigStore _configStore = null!;
+    private readonly SignalEgressBus _egressBus = new();
+    private readonly IPackConfigStore _configStore = BuildConfigStore();
 
-    public async Task InitializeAsync()
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .AddMemoryGrainStorageAsDefault()
+        .AddMemoryStreams("Default")
+        .AddMemoryStreams("HomeFeed")
+        .AddMemoryStreams("DigitalBrainTimeline")
+        .AddMemoryGrainStorage("PubSubStore")
+        .ConfigureServices(services =>
+        {
+            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddScoped<NeuronJournals>();
+            services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
+            services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
+            services.AddSingleton(_egressBus);
+            services.AddSignalEgressStreamSubscriber();
+        });
+
+    private static IPackConfigStore BuildConfigStore()
     {
-        _egressBus = new SignalEgressBus();
-        PackConfigPullSiloConfig.SharedEgressBus = _egressBus;
-
         var services = new ServiceCollection();
         services.AddDataProtection().UseEphemeralDataProtectionProvider();
         services.AddSingleton<IPackConfigBackingStore, InMemoryPackConfigBackingStore>();
         services.AddSingleton<IPackConfigStore, PackConfigStore>();
-        _configStore = services.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
-
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<PackConfigPullSiloConfig>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
+        return services.BuildServiceProvider().GetRequiredService<IPackConfigStore>();
     }
 
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
-
     private GatewayService NewService() =>
-        new(_cluster.GrainFactory, new ConfigurationBuilder().Build(), new HomeFeedBus(),
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), new HomeFeedBus(),
             _egressBus, new FakeHostEnvironment(), NullLogger<GatewayService>.Instance, _configStore);
 
     // A production-equivalent service whose GetPackConfig gate is armed with a configured InternalServiceKey.
     private GatewayService NewGatedService(string internalKey) =>
-        new(_cluster.GrainFactory,
+        new(Cluster.GrainFactory,
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:InternalServiceKey"] = internalKey })
                 .Build(),
@@ -180,28 +185,6 @@ public class PackConfigPullTests : IAsyncLifetime
             TestServerCallContext.WithHeaders(("x-internal-key", internalKey)));
 
         Assert.Equal("123:ABC", reply.Values["telegram_token"]);
-    }
-
-    private sealed class PackConfigPullSiloConfig : ISiloConfigurator
-    {
-        public static SignalEgressBus SharedEgressBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton(SharedEgressBus);
-                services.AddSignalEgressStreamSubscriber();
-            });
     }
 }
 
