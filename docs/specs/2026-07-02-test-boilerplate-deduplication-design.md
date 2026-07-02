@@ -10,17 +10,24 @@ This continues the cleanup (root 30-step plan, prior specs/plans, Musk 5-step, s
 
 **What's already done (no duplication):**
 - Ino isolation complete.
-- NeuronTestBase + migration of 14 files in dedicated *.Tests projects complete (base in TestKit).
-- Fix pre-existing (duplicate Perform, Software10 demo) complete.
-- SystemNeurons bloat delete complete (fresh implementer subagent followed plan: stripped ~246 lines demo emission; owners emit via buses; rituals green).
-- Core demo bloat advanced (Dummy/excel-viz/HelloWorld/Simple/UiGallery literals + Hops + entries removed from MarketplaceSeeds; hello special cases from UiSurfaces; dead test file + temps + ref cleanups; builds/tests green).
+- NeuronTestBase + migration of 14+ files in dedicated *.Tests projects (Context, Developer, Google, Telegram.Channel, UiKit, Windows) complete (base in TestKit).
+- Fix pre-existing (duplicate PerformKernelSelfUpdate, Software10 demo deletes) complete.
+- SystemNeurons bloat delete complete (implementer subagent: ~251 LOC demo emission stripped from SystemNeurons.cs; ownership moved to neurons via synapses/buses; rituals green).
+- Core demo literal removal advanced (HelloWorld/SimpleColorPicker/UiGallery/ExcelViz/Dummy pack codes + Hops + entries removed from MarketplaceSeeds; hello special cases from UiSurfaces; dead E2E pack sources + AwesomeSoftware10.feature/cs + demo test files + ref cleanups; builds/tests green per merge c079798).
+- Prior: task renaming (no more KernelTask* in Core), signals work, etc.
 
-**Latest research (Tests subagent + Core):**
-- Main `DigitalBrain.Tests/` still has heavy manual boilerplate (IAsyncLifetime + TestClusterBuilder + NeuronTestSiloConfigurator) in UnitTest1.cs (grab-bag ~30 Facts, 600+ LOC, string .Type checks, buried Ino test) and many other files (Company, Context, Auth, Awesome, Mcp, Gateway, Kernel, Ui, Steps, etc.).
+**Musk step 1 (requirements less dumb) incorporated from brainstorm:**
+- Assumption "all remaining IAsyncLifetime+TestClusterBuilder in DigitalBrain.Tests/ is dumb dupe to blindly nuke" is valid here — mechanical, proven by NeuronTestBase on other projects; no new Orleans APIs invented (use existing base wrapper).
+- IDemoNeuron usage in tests is practical fallback (many impls of INeuron; Mcp.Tools refs only Core requires typed markers for resolver). Not "purity violation" to remove in this slice.
+- UnitTest1.cs grab-bag name + mixed concerns is dumb (trace: legacy catch-all before domain folders).
+- No change to Core/Kernel production; delete boiler only. Trace to real: faster iteration, consistency, "independently testable" per SDD.
+
+**Latest research (Tests subagent + Core + current tree on branch):**
+- Main `DigitalBrain.Tests/` still has heavy manual boilerplate (IAsyncLifetime + TestClusterBuilder + NeuronTestSiloConfigurator) in UnitTest1.cs (grab-bag) and files: Auth/UserSessionNeuronTests, Awesome/SoftwareEngineeringReviewerTests, Company/CompanyKnowledgeTests, Context/ContextRecallTests, Gateway/*Tests, Kernel/*Tests (TimelineStream, ExperienceStepDispatch, Rolling...), Mcp/DigitalBrainToolsTests, Telegram/TelegramDeepLinkRoutingTests, Ui/ChatNeuronTests, Economics/License..., Steps/*, plus E2E fixture (may stay).
 - Dedicated projects are clean (inherit base).
 - UnitTest1 is the legacy catch-all.
 - Good assertions but dupe setup hurts maintainability and "independently testable" vision.
-- Thin coverage (Ino, DbSupport orphan).
+- Thin coverage noted (Ino, DbSupport orphan) — not addressed in this mechanical slice.
 
 This is the explicit next phase from the NeuronTestBase design ("grab-bag... split into 9 domain files").
 
@@ -40,14 +47,16 @@ This is the explicit next phase from the NeuronTestBase design ("grab-bag... spl
 
 ## Design
 
-- Inventory remaining manual files (grep for TestClusterBuilder etc. in **/*.cs under tests).
-- For each: change to : NeuronTestBase, replace _cluster.GrainFactory... with Grain<T>, FireAsync calls, remove Initialize/Dispose boilerplate.
-- For UnitTest1: split by concern into e.g. Kernel/NeuronCoreTests.cs, Distribution/MarketplaceTests.cs, Ui/..., etc. (preserve comments where useful, self-explanatory names).
-- Update any strict configurator helpers if needed (move to TestKit if reusable).
-- Remove unused usings after.
-- Verify with targeted tests + build.
+- Inventory remaining manual files (grep for `TestClusterBuilder| : IAsyncLifetime` in DigitalBrain.Tests/**/*.cs + Steps).
+- For each non-grab-bag: read exact, inherit `NeuronTestBase` (from DigitalBrain.TestKit), replace manual `_cluster = new TestClusterBuilder()...; await Deploy...; _cluster.GrainFactory.GetGrain<IFoo>(k)` with `Grain<IFoo>(k)` + `await FireAsync(...)` or `DeliverAsync(...)` (see NeuronTestBase + migrated examples in Context.Tests etc.). Remove InitializeAsync/DisposeAsync boiler. Self-explanatory class names.
+- For UnitTest1.cs (grab-bag ~600 LOC mixing core activation/journal/fire/branch/restore/embody + IDemoNeuron): extract to focused e.g. `Kernel/NeuronCoreTests.cs`, `Distribution/MarketplaceCoreTests.cs`, `Ui/UiSurfaceCoreTests.cs` etc under existing folders (self-explanatory). Delete or empty the UnitTest1.cs file post-extract (misnomer name).
+- No new abstractions. Use existing TestDigitalBrain/NeuronTestSiloConfigurator (AsyncLocal bridge for configurator extensions is established).
+- Context7 used (resolve + query for /dotnet/orleans testing patterns) before migration edits; patterns match repo's proven base (no direct TestClusterBuilder edits in prod paths).
+- Delete bias: remove 100-200+ LOC boiler across files; no net feature add.
 
-Verification: build + targeted filters for affected (Ui|NeuronCore|Marketplace|...); full relevant at end.
+Verification ritual after EVERY edit (and per task/chunk): `dotnet build` (from brain/) → `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "<target e.g. NeuronCore|Marketplace|Ui|Context|Auth>" --no-build -l minimal` (high-severity relevant). aspire doctor ONLY if AppHost/hosting touched (not this slice). Update plan checkboxes + CONTINUITY at end. Final whole-branch review + finishing-a-development-branch.
+
+Risks: Low (mechanical; base proven; all prior migrations green). Some files (E2E fixtures, Reqnroll Steps) may stay manual if they need custom config or collection fixtures — audit per inventory.
 
 ## Risks
 

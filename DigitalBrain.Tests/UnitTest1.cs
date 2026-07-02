@@ -8,30 +8,13 @@ using Orleans.TestingHost;
 namespace DigitalBrain.Tests;
 
 [Trait("Group", "Core")]
-public class NeuronTests : IAsyncLifetime
+public class NeuronTests : NeuronTestBase
 {
-    private TestCluster? _cluster;
-
-    public async Task InitializeAsync()
-    {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_cluster is not null)
-        {
-            await _cluster.StopAllSilosAsync();
-        }
-    }
 
     [Fact]
     public async Task Neuron_Activates_And_Journals_NeuronActivated()
     {
-        var grain = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("demo1");
+        var grain = Grain<IDemoNeuron>("demo1");
         var timeline = await grain.GetTimelineAsync();
 
         Assert.NotEmpty(timeline);
@@ -41,7 +24,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task FireAsync_Persists_And_Replayable()
     {
-        var grain = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("demo2");
+        var grain = Grain<IDemoNeuron>("demo2");
         await grain.FireAsync(new DemoMessageSynapse("hello from test"));
 
         var timeline = await grain.GetTimelineAsync();
@@ -51,7 +34,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task SystemStatus_Launches_And_Records_Status()
     {
-        var status = _cluster!.GrainFactory.GetGrain<ISystemStatus>("status-test");
+        var status = Grain<ISystemStatus>("status-test");
         var timeline = await status.GetTimelineAsync();
         Assert.Contains(timeline, s => s.Type == nameof(SystemLaunched) || s.Type == nameof(SystemStatusChanged));
     }
@@ -59,7 +42,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task SystemStatus_Simulates_Fix_From_Checkpoint()
     {
-        var status = _cluster!.GrainFactory.GetGrain<ISystemStatus>("status-sim");
+        var status = Grain<ISystemStatus>("status-sim");
         var cp = await status.CreateCheckpointAsync();
         await status.FireAsync(new SystemStatusChanged("kernel", "FailedToStart", "test failure"));
         var timeline = await status.GetTimelineAsync();
@@ -96,7 +79,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Marketplace_Publishes_Real_NeuroPack_With_Owner_Private_Commission()
     {
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-test-1");
+        var market = Grain<IMarketplaceNeuron>("market-test-1");
         var pack = new NeuroPack(
             "TestPrivatePack", "1.0", OwnerId: "owner1", IsPrivate: true, CommissionRate: 0.25, Code: "// test code", Description: "private test");
         
@@ -112,7 +95,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Marketplace_Install_Takes_Commission_And_Delivers_Pack()
     {
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-test-2");
+        var market = Grain<IMarketplaceNeuron>("market-test-2");
         await market.FireAsync(new PublishToMarketplace("CommPack", "1.0", Code: "real code here", OwnerId: "seller1", IsPrivate: false, CommissionRate: 0.15));
 
         await market.FireAsync(new InstallFromMarketplace("CommPack", "1.0", BuyerId: "buyer42"));
@@ -135,7 +118,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Synapse_Propagates_Correlation_And_Causation()
     {
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-causation");
+        var market = Grain<IMarketplaceNeuron>("market-causation");
         await market.FireAsync(new PublishToMarketplace("CausPack", "1.0", Code: "x", OwnerId: "owner", IsPrivate: false, CommissionRate: 0.1));
         await market.FireAsync(new InstallFromMarketplace("CausPack", "1.0", BuyerId: "buyer"));
 
@@ -156,7 +139,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Marketplace_Private_Blocks_NonOwner_Install()
     {
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-test-3");
+        var market = Grain<IMarketplaceNeuron>("market-test-3");
         await market.FireAsync(new PublishToMarketplace("SecretPack", "1.0", OwnerId: "ownerOnly", IsPrivate: true, CommissionRate: 0.1));
 
         // Non-owner tries
@@ -171,12 +154,12 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Installed_Pack_Code_Reaches_GeneratedNeuron()
     {
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-test-4");
+        var market = Grain<IMarketplaceNeuron>("market-test-4");
         await market.FireAsync(new PublishToMarketplace("CodePack", "2.0", Code: "public class Test : Neuron { /* code */ }", OwnerId: "dev", IsPrivate: false));
 
         await market.FireAsync(new InstallFromMarketplace("CodePack", "2.0", BuyerId: "userX"));
 
-        var gen = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("generated-codepack");
+        var gen = Grain<IGeneratedNeuron>("generated-codepack");
         var timeline = await gen.GetTimelineAsync();
         // The install flow fires ExperienceUsed which triggers dispatch that now receives the pack
         Assert.Contains(timeline, s => s.Type == nameof(ExperienceUsed) || s is NeuroPackInstalled);
@@ -194,13 +177,13 @@ public class NeuronTests : IAsyncLifetime
             }
             """;
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-e2e-embody");
+        var market = Grain<IMarketplaceNeuron>("market-e2e-embody");
         await market.FireAsync(new PublishToMarketplace("UpperPackE2E", "1.0", Code: packCode, OwnerId: "tester", IsPrivate: false, CommissionRate: 0.0));
 
         await market.FireAsync(new InstallFromMarketplace("UpperPackE2E", "1.0", BuyerId: "e2e-user"));
 
         // Trigger use which should now run the compiled behavior (GeneratedNeuron handles ExperienceUsed -> real Respond).
-        var gen = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("generated-upperpacke2e");
+        var gen = Grain<IGeneratedNeuron>("generated-upperpacke2e");
         await gen.FireAsync(new ExperienceUsed("UpperPackE2E", "hello test"));
 
         var genTl = await gen.GetTimelineAsync();
@@ -214,7 +197,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task KernelTask_Runs_And_Recovers_Status()
     {
-        var task = _cluster!.GrainFactory.GetGrain<DigitalBrain.Kernel.IKernelTask>("task-test-1");
+        var task = Grain<DigitalBrain.Kernel.IKernelTask>("task-test-1");
         await task.FireAsync(new RunTask("task-test-1", "demo work"));
         var info = await task.GetInfoAsync();
         Assert.Equal("completed", info.Status);
@@ -229,14 +212,14 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Branch_Forks_Same_Type_With_Replayed_History_And_Isolation()
     {
-        var src = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("branch-src");
+        var src = Grain<IDemoNeuron>("branch-src");
         await src.FireAsync(new DemoMessageSynapse("original"));
         var cp = await src.CreateCheckpointAsync();
         var bid = await src.BranchAsync(cp);
         Assert.NotEqual(src.GetPrimaryKeyString(), bid.Value);
 
         // The branch is a grain of the SAME type, seeded with the checkpoint history.
-        var branch = _cluster.GrainFactory.GetGrain<IDemoNeuron>(bid.Value);
+        var branch = Grain<IDemoNeuron>(bid.Value);
         var branchIn = await branch.GetIncomingTimelineAsync();
         Assert.Contains(branchIn, s => s is DemoMessageSynapse d && d.Text == "original");
 
@@ -249,11 +232,11 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Restore_Seeds_Journal_From_Checkpoint_Without_Redispatch()
     {
-        var src = _cluster!.GrainFactory.GetGrain<IDemoNeuron>("restore-src");
+        var src = Grain<IDemoNeuron>("restore-src");
         await src.FireAsync(new DemoMessageSynapse("to-restore"));
         var checkpoint = await src.CreateCheckpointAsync();
 
-        var target = _cluster.GrainFactory.GetGrain<IDemoNeuron>("restore-target");
+        var target = Grain<IDemoNeuron>("restore-target");
         await target.RestoreCheckpointAsync(checkpoint);
 
         var restored = await target.GetIncomingTimelineAsync();
@@ -263,7 +246,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task Ino_Uses_DualJournals_And_Creates_Tasks_Context()
     {
-        var ino = _cluster!.GrainFactory.GetGrain<IInoNeuron>("ino-test");
+        var ino = Grain<IInoNeuron>("ino-test");
         // Ask without llm should still process via fallback and journal
         var resp = await ino.AskAsync("remember to backup important files using task");
         Assert.False(string.IsNullOrWhiteSpace(resp));
@@ -275,7 +258,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task DataVisualizationNeuron_Emits_DataChart_Surface()
     {
-        var chart = _cluster!.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-test");
+        var chart = Grain<IDataVisualizationNeuron>("chart-test");
 
         await chart.FireAsync(new VisualizeDataRequest(
             "show sales by month",
@@ -299,7 +282,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task GmailInsights_Experience_Emits_Summary_Surface_And_User_Scoped_Chart()
     {
-        var generated = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("generated-digitalbrain.experience.gmailinsights");
+        var generated = Grain<IGeneratedNeuron>("generated-digitalbrain.experience.gmailinsights");
 
         await generated.FireAsync(new ExperienceUsed(
             "DigitalBrain.Experience.GmailInsights",
@@ -318,7 +301,7 @@ public class NeuronTests : IAsyncLifetime
         Assert.Equal("session-1", surface.Props["sessionId"]);
         Assert.Equal(100, surface.Props["emailCount"]);
 
-        var chart = _cluster.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-gmail-last-100-alice");
+        var chart = Grain<IDataVisualizationNeuron>("chart-gmail-last-100-alice");
         var chartTimeline = await chart.GetTimelineAsync();
         var chartGenerated = chartTimeline.OfType<DataChartGenerated>().LastOrDefault(g => g.RequestId == "gmail-last-100-alice");
         Assert.NotNull(chartGenerated);
@@ -330,7 +313,7 @@ public class NeuronTests : IAsyncLifetime
     [Fact]
     public async Task ChartNeuron_Handles_Visualize_With_GraphicSpec()
     {
-        var chart = _cluster!.GrainFactory.GetGrain<IDataVisualizationNeuron>("chart-cmd-test");
+        var chart = Grain<IDataVisualizationNeuron>("chart-cmd-test");
         // Verify the new graphic path doesn't break firing
         await chart.FireAsync(new VisualizeDataRequest("demo sales csv", "[{\"m\":\"Jan\",\"s\":10},{\"m\":\"Feb\",\"s\":20}]", null, "cmd-1"));
         // Command path exercised in integration; here just ensure no explosion on visualize for new spec
@@ -342,7 +325,7 @@ public class NeuronTests : IAsyncLifetime
         var (priv, pub) = PackSignatureVerifier.GenerateKeyPair();
 
         // A validly-signed pack installs.
-        var marketOk = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-sign-ok");
+        var marketOk = Grain<IMarketplaceNeuron>("market-sign-ok");
         var good = PackSignatureVerifier.SignPack(new NeuroPack("SignOk", "1.0", OwnerId: "dev", Code: "ok"), priv, pub);
         await marketOk.FireAsync(new PublishToMarketplace(
             good.Name, good.Version, good.Code, good.OwnerId, good.IsPrivate, good.CommissionRate,
@@ -351,7 +334,7 @@ public class NeuronTests : IAsyncLifetime
         Assert.Contains(await marketOk.GetTimelineAsync(), s => s is NeuroPackInstalled);
 
         // A pack whose code was tampered AFTER signing is rejected at install (signature no longer matches).
-        var marketBad = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-sign-bad");
+        var marketBad = Grain<IMarketplaceNeuron>("market-sign-bad");
         var signed = PackSignatureVerifier.SignPack(new NeuroPack("SignBad", "1.0", OwnerId: "dev", Code: "original"), priv, pub);
         var tampered = signed with { Code = "tampered" };
         await marketBad.FireAsync(new PublishToMarketplace(
@@ -395,14 +378,14 @@ public class NeuronTests : IAsyncLifetime
         var pack = PackSignatureVerifier.SignPack(
             new NeuroPack("EchoPack", "1.0", OwnerId: "dev", Code: code), priv, pub);
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-embody");
+        var market = Grain<IMarketplaceNeuron>("market-embody");
         await market.FireAsync(new PublishToMarketplace(
             pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
             pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64));
         await market.FireAsync(new InstallFromMarketplace("EchoPack", "1.0", BuyerId: "buyer"));
 
         // The host neuron compiled pack.Code into a collectible ALC and dispatched to it for real.
-        var generated = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("generated-echopack");
+        var generated = Grain<IGeneratedNeuron>("generated-echopack");
         var emission = (await generated.GetTimelineAsync()).OfType<PackEmission>().LastOrDefault();
 
         Assert.NotNull(emission);                         // proof the install->compile->ALC->dispatch chain ran
@@ -432,11 +415,11 @@ public class NeuronTests : IAsyncLifetime
             }
             """;
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-typed-dispatch");
+        var market = Grain<IMarketplaceNeuron>("market-typed-dispatch");
         await market.FireAsync(new PublishToMarketplace("TypedDispatch", "1.0", Code: code, OwnerId: "dev"));
         await market.FireAsync(new InstallFromMarketplace("TypedDispatch", "1.0", BuyerId: "buyer"));
 
-        var generated = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-typeddispatch");
+        var generated = Grain<IGeneratedNeuron>("generated-typeddispatch");
         await generated.FireAsync(new DemoMessageSynapse("typed-input"));
 
         var timeline = await generated.GetOutgoingTimelineAsync();
@@ -492,13 +475,13 @@ public class NeuronTests : IAsyncLifetime
         var pack = PackSignatureVerifier.SignPack(
             new NeuroPack("SurfacePack", "1.0", OwnerId: "dev", Code: code), priv, pub);
 
-        var market = _cluster!.GrainFactory.GetGrain<IMarketplaceNeuron>("market-surface-pack");
+        var market = Grain<IMarketplaceNeuron>("market-surface-pack");
         await market.FireAsync(new PublishToMarketplace(
             pack.Name, pack.Version, pack.Code, pack.OwnerId, pack.IsPrivate, pack.CommissionRate,
             pack.Description, pack.AuthorPublicKeyBase64, pack.SignatureBase64));
         await market.FireAsync(new InstallFromMarketplace("SurfacePack", "1.0", BuyerId: "buyer"));
 
-        var generated = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-surfacepack");
+        var generated = Grain<IGeneratedNeuron>("generated-surfacepack");
         await generated.FireAsync(new DemoMessageSynapse("task-card"));
 
         var timeline = await generated.GetOutgoingTimelineAsync();
@@ -528,7 +511,7 @@ public class NeuronTests : IAsyncLifetime
             RunGit("config commit.gpgsign false", repo);
             await File.WriteAllTextAsync(Path.Combine(repo, "file.txt"), "hello");
 
-            var git = _cluster!.GrainFactory.GetGrain<IGitNeuron>("git-test");
+            var git = Grain<IGitNeuron>("git-test");
 
             var status = await git.StatusAsync(repo);
             Assert.Contains("file.txt", status);
