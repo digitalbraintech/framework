@@ -37,7 +37,7 @@ public class TrustedSeedInstallTests : NeuronTestBase
 
     // Pure unit test — no TestCluster today, and none needed: only exercises MarketplaceSeeds/
     // PackSignatureVerifier statics. A plain nested class (no NeuronTestBase) keeps it at that cost.
-    public sealed class SignatureVerificationTests
+    public sealed class SeedSignatureTests
     {
         [Fact]
         public void Trusted_Publisher_Signs_Seeds_So_They_Verify()

@@ -450,7 +450,7 @@ git commit -m "test(cleanup): migrate LlmResponderTests to NeuronTestBase"
 - Consumes: `NeuronTestBase.ConfigureSilo` override (existing).
 - Produces: the "nested class extends `NeuronTestBase` directly, not the outer class" pattern that Task 4 and Task 5 reuse for their own mutually-exclusive-config splits.
 
-**Correction (found during Task 3 implementation, verified empirically):** the nested test class MUST be declared `public`, not `private`. The original design reasoning cited `UnitTest1.cs`'s `IsolatedReplayTest`/`StrictConfigNeuronTest` as precedent for "private nested test classes" — that reading was wrong. Those two classes are `private` but have **no `[Fact]` methods of their own**; they're plain `NeuronTestBase` subclasses manually instantiated inside other facts on the outer class (`new IsolatedReplayTest()` at `UnitTest1.cs:54`, `new StrictConfigNeuronTest()` at `UnitTest1.cs:347`) to get a fresh isolated cluster with different config, not independently-discovered test classes. A nested class that itself carries a `[Fact]` is a genuinely new pattern for this codebase and IS subject to xUnit's own analyzer rule: `error xUnit1000: Test classes must be public`. Verified by building with `private` (fails) and `public` (succeeds, and the 3 facts — 2 outer + 1 nested — are correctly discovered and pass via `dotnet test --filter "FullyQualifiedName~PublishGateTests"`). The target code below already uses `public sealed class DefaultUngatedTests`. This same correction applies to Task 4's `SignatureVerificationTests`/`MarketplaceSeedsPackagingTests` and Task 5's `NullScopedFactoryFallbackTests` — all four nested classes below are `public`, not `private`.
+**Correction (found during Task 3 implementation, verified empirically):** the nested test class MUST be declared `public`, not `private`. The original design reasoning cited `UnitTest1.cs`'s `IsolatedReplayTest`/`StrictConfigNeuronTest` as precedent for "private nested test classes" — that reading was wrong. Those two classes are `private` but have **no `[Fact]` methods of their own**; they're plain `NeuronTestBase` subclasses manually instantiated inside other facts on the outer class (`new IsolatedReplayTest()` at `UnitTest1.cs:54`, `new StrictConfigNeuronTest()` at `UnitTest1.cs:347`) to get a fresh isolated cluster with different config, not independently-discovered test classes. A nested class that itself carries a `[Fact]` is a genuinely new pattern for this codebase and IS subject to xUnit's own analyzer rule: `error xUnit1000: Test classes must be public`. Verified by building with `private` (fails) and `public` (succeeds, and the 3 facts — 2 outer + 1 nested — are correctly discovered and pass via `dotnet test --filter "FullyQualifiedName~PublishGateTests"`). The target code below already uses `public sealed class DefaultUngatedTests`. This same correction applies to Task 4's `SeedSignatureTests`/`MarketplaceSeedsPackagingTests` and Task 5's `NullScopedFactoryFallbackTests` — all four nested classes below are `public`, not `private`.
 
 - [ ] **Step 1: Replace `DigitalBrain.Tests/Trust/PublishGateTests.cs` in full**
 
@@ -598,7 +598,7 @@ public class TrustedSeedInstallTests : NeuronTestBase
 
     // Pure unit test — no TestCluster today, and none needed: only exercises MarketplaceSeeds/
     // PackSignatureVerifier statics. A plain nested class (no NeuronTestBase) keeps it at that cost.
-    public sealed class SignatureVerificationTests
+    public sealed class SeedSignatureTests
     {
         [Fact]
         public void Trusted_Publisher_Signs_Seeds_So_They_Verify()
@@ -985,7 +985,7 @@ Expected: the 9 converted test files + 2 new docs files (spec + this plan). No `
 
 - [ ] **Step 5: Whole-branch review**
 
-Fresh reviewer subagent reviews the full diff against this plan and the spec's guardrails: delete bias (net LOC down), self-explanatory names (esp. the 4 new nested-class names: `DefaultUngatedTests`, `SignatureVerificationTests`, `MarketplaceSeedsPackagingTests`, `NullScopedFactoryFallbackTests`), no vacuous comments, no behavior change (same assertions), no re-invocation of `NeuronTestSiloConfigurator` inside any `ConfigureSilo` override, zero changes to `NeuronTestBase`/`TestDigitalBrain`. Target 0 critical/important findings; address any that surface with a fresh implementer pass, then re-verify (build + full suite).
+Fresh reviewer subagent reviews the full diff against this plan and the spec's guardrails: delete bias (net LOC down), self-explanatory names (esp. the 4 new nested-class names: `DefaultUngatedTests`, `SeedSignatureTests`, `MarketplaceSeedsPackagingTests`, `NullScopedFactoryFallbackTests`), no vacuous comments, no behavior change (same assertions), no re-invocation of `NeuronTestSiloConfigurator` inside any `ConfigureSilo` override, zero changes to `NeuronTestBase`/`TestDigitalBrain`. Target 0 critical/important findings; address any that surface with a fresh implementer pass, then re-verify (build + full suite).
 
 - [ ] **Step 6: Finishing-a-development-branch**
 
