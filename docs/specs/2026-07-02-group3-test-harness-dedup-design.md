@@ -43,7 +43,7 @@ In `DigitalBrain.TestKit/TestDigitalBrain.cs`, extend the constructor to also ac
 public sealed class TestDigitalBrain(
     Action<ISiloBuilder>? extendSilo = null,
     Action<IClientBuilder>? extendClient = null,
-    int initialSilosCount = 1) : IDigitalBrain, IAsyncLifetime
+    short initialSilosCount = 1) : IDigitalBrain, IAsyncLifetime
 ```
 
 `InitializeAsync` passes `initialSilosCount` to `new TestClusterBuilder(initialSilosCount: initialSilosCount)`, and — only when `extendClient is not null` — adds a second `ExtendClientBuilderConfigurator` (mirroring the existing `ExtendSiloConfigurator` pattern) via its own `AsyncLocal<Action<IClientBuilder>?>`.
@@ -52,7 +52,7 @@ In `DigitalBrain.TestKit/NeuronTestBase.cs`, add two virtual members alongside t
 
 ```csharp
 protected virtual void ConfigureClient(IClientBuilder builder) { }
-protected virtual int InitialSilosCount => 1;
+protected virtual short InitialSilosCount => 1;
 ```
 
 `InitializeAsync` constructs `TestDigitalBrain` passing all three. Both new members default to no-ops/`1`, so every currently-migrated subclass (Group 1/2) is unaffected.
@@ -87,11 +87,13 @@ public TestCluster Cluster => _cluster!;         // TestDigitalBrain
 
 ### Verification ritual (after every file, and again at the end)
 
-`dotnet build` → `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "<touched-area>" --no-build -l minimal`. `aspire doctor` not required (no AppHost/hosting files touched).
+`dotnet build` → `dotnet test DigitalBrain.Tests/DigitalBrain.Tests.csproj --filter "<touched-area>" --no-build --logger "console;verbosity=minimal"`. `aspire doctor` not required (no AppHost/hosting files touched).
 
 ## Risks
 
-Low-medium. Mechanical per-file conversions carry standard refactor risk (missed `using`, forgotten `[Collection]` attribute). The two `NeuronTestBase` additions are additive and don't change any existing subclass's behavior — verified by running the full `DigitalBrain.Tests` suite, not just the touched files, at the end.
+Low-medium. Mechanical per-file conversions carry standard refactor risk (missed `using`, forgotten `[Collection]` attribute). The three `NeuronTestBase` additions are additive and don't change any existing subclass's behavior — verified by running the full `DigitalBrain.Tests` suite, not just the touched files, at the end.
+
+**Spiked and verified before writing the plan:** the biggest open question was whether layering a per-file `ConfigureSilo` override on top of `TestDigitalBrain`'s always-applied `NeuronTestSiloConfigurator` would double-register memory streams/storage providers and throw at silo startup — the original per-file `ISiloConfigurator` classes (e.g. `GatewaySiloConfig`) were the *only* configurator, never combined with `NeuronTestSiloConfigurator`. A real spike (full `TestDigitalBrain`/`NeuronTestBase` rewrite + `WatchSynapsesTests.cs` converted exactly per this design, then reverted) proved this is safe: Orleans' `AddMemoryStreams`/`AddMemoryGrainStorage*` tolerate repeat registration of the same provider name, and ASP.NET Core DI's `GetRequiredService<T>()` resolves the last-registered singleton — so the subclass's own bus instance (registered second) wins over `NeuronTestSiloConfigurator`'s default one. `dotnet build` succeeded and `BroadcastSignal_ReachesEgressBus_FilteredByTypeName` passed, plus the rest of the `Gateway` area (18/18). The spike also caught that `TestClusterBuilder`'s `initialSilosCount` parameter is `short`, not `int` — already reflected in the Design section above.
 
 ## Suggested sequencing
 
