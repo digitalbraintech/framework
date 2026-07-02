@@ -1,454 +1,57 @@
 # CONTINUITY — NeuroOS best-of-breed consolidation
 
-## Snapshot
-[2026-06-24 | provenance: user task + workflow wdz4vohb7]
-Port best-of-breed from E:\DigitalBrainTech reference trees (final, IAW, digitalbrain, v3, v4) into this main
-repo, layer by layer. Typed C# only — **.ino is dead**. 13-step plan from workflow wdz4vohb7.
-Branch: **consolidation/best-of-breed**, commit per step, test after each.
+## Prior work summary (2026-06-24 through 2026-07-02, compacted 2026-07-02)
 
-User decisions (2026-06-24):
-- Embodiment = capability object in collectible ALC via single host GeneratedNeuron (not per-pack grain).
-- Pack signing = ECDSA-nistP256 (BCL). SDK integration neurons = typed grain RPC.
-- Marketplace economics = real money NOW (Stripe + ECDSA licenses + Google auth, fail-fast secrets).
-- MCP internal-only (no External ingress). Commit to a separate branch.
+Full detail for everything below lives in git history (`git log`), not here — this is a recap so a
+fresh session knows what's already built without re-discovering it. See `docs/SYSTEM_DESIGN.md` for
+current architecture and `docs/PRODUCT_VISION.md` for what's being built and for whom.
 
-Test baseline: 2 GatewayGrpcWireTests fail on a pre-existing env socket-bind (verified on clean baseline) —
-NOT regressions; everything else green.
+- **2026-06-24 to 06-27 — Best-of-breed consolidation.** Ported the proven pattern from prior reference
+  trees (`final`, `IAW`, `digitalbrain`, `v3`, `v4`) into this repo, typed C# only. Landed: causation/
+  lineage on synapses, the pack embodiment keystone (`IPackBehavior` → compiled via Roslyn into a
+  collectible `AssemblyLoadContext` → running grain, no restart), ECDSA pack signing/trust, MCP tools,
+  typed SDK neurons (Git/Shell/FileSystem/DotNet/NuGet), checkpoint dedup + branching, the code-review
+  neuron, hybrid-scorer memory (`ContextNeuron`), and real-money economics (Stripe + ECDSA licenses).
+- **2026-06-26 to 06-27 — UI backbone + hardening.** `UiSurface`/`RfwCard`/`HomeFeedBus` + bidirectional
+  gRPC `UiGateway`; renamed `Silo` → `Kernel` throughout; generic `Task*` protocol (deleted
+  `KernelTask*` naming from Core); Bucket A security hardening (secure-default unsigned-pack rejection,
+  MCP read/mutation split by transport, pluggable checkpoint key provider, rolling-update rollback).
+- **2026-06-27 to 06-30 — Fully neuron-driven UI.** Deleted every hardcoded Dart chrome/nav/string; the
+  entire shell (menus, buttons, headers, dividers) is authored by neurons via a small `NeuronUiKit`
+  vocabulary and rendered by a thin client. Experiences (multi-hop guided flows, e.g. the travel
+  planner) got a dedicated full-screen host route, proven by a real browser E2E. The typed `ui:` kit
+  authoring loop ("Hello World on rails" — one ~15-line C# file, no kernel restart) shipped as Slice 0,
+  then fanned out to a 35-component catalog + gallery (Sub-project B).
+- **2026-07-01 to 2026-07-02 — Distribution model + cleanup initiative.** Product definition landed
+  (now `docs/PRODUCT_VISION.md`): Bundle = `NeuroPack` + manifest, trusted-publisher v1, single
+  Telegram bot with deep-link routing. Authoring-loop acceleration shipped (warm dev-cluster attach,
+  `e2e.runsettings`, auto-build stale Flutter web bundle) collapsing the inner test loop from 30-120s
+  to an attach. Then a long cleanup run applying Elon's 5-step algorithm strictly: System Neurons bloat
+  delete, DbSupport test coverage, marker/alias trim, and four rounds of test-harness boilerplate dedup
+  (Groups 1-4, detailed below for the last two rounds) migrating ~19 files off manual
+  `TestClusterBuilder`/`IAsyncLifetime` onto a shared `NeuronTestBase` harness.
+- **2026-07-02 — Repo cleanup.** Deleted ~55 historical spec/plan docs (their job was guiding
+  now-merged work; git history is the durable record) and all stale branches (local + remote, all
+  verified 0 commits ahead of master). `docs/` now holds only `PRODUCT_VISION.md`, `SYSTEM_DESIGN.md`,
+  and `authoring-a-bundle.md`. Going forward: `docs/specs/<feature>.md` + `docs/plans/<feature>.md` are
+  created per branch and **deleted after merge** — CONTINUITY.md's ledger and git log are where the
+  history lives, not an ever-growing docs tree.
 
-## Done (commit per step)
-- Steps 1-3: L1 causation (stable SynapseId + CausationId Id6/7 + lineage Stamp); L4 SDK pilot (INeuronAgent
-  static-virtual metadata + IGitNeuron from IAW, typed RPC); L5 trust (PackSignatureVerifier ECDSA-nistP256 +
-  NeuroPack pubkey/sig Id7/8; install rejects invalid sig, unsigned warn-only).
-- Step 4 (KEYSTONE): IPackBehavior + PackEmission; PackAlcEmbodier compiles pack.Code -> CapabilityGate ->
-  collectible ALC (v3 Resolving hook + SuppressFlow + TpaReferences) -> IPackBehavior; install delivers pack to
-  GeneratedNeuron which runs REAL compiled C# + fires PackEmission (LLM fallback only). e2e tested.
-- Step 5 (MCP): DigitalBrainTools -> shared DigitalBrain.Mcp.Tools (3 partials, IGrainFactory ctor, fabricating
-  fallbacks deleted). Silo co-hosts MCP/HTTP on Kestrel 8081 Http1AndHttp2, MapMcp().RequireHost("*:8081"),
-  in-process, internal-only. Shared NeuronTestSiloConfigurator.
-- Step 6 (SDK rest): shared ProcessRunner + typed Shell/FileSystem/DotNet/NuGet/Winget(net-new)/Roslyn neurons;
-  GitNeuron onto ProcessRunner; retired untyped NuGet/Roslyn neurons.
-- Step 7 (Kernel): checkpoint dedup by SynapseId; BranchAsync forks into SAME grain type; RestoreCheckpointAsync;
-
-## 2026-06-27 continuation: Full marketplace + neuron-driven UI (NeuroUI Host) + Only UiSurface for everything
-
-- Single UiSurface model (everything inherits the concept or is expressed as one). RfwCard unified as UiSurface with Kind="rfw" (ForRfw helper). Added UiWidgetTree recursive model so neurons author full widget trees (ForUI primitive names + children + rfw escape hatches + actions).
-- All UI is UiSurface based — even main app shell / chrome / nav. Emitted on StartDistributedApp as "app-shell" + widget tree (neurons/packs build their own UI dynamically).
-- Client (ForUI + RFW) remains the thin renderer; added UiSurfaceTreeRenderer sketch that walks neuron-provided trees and renders real ForUI where specified. Graceful: existing surfaces + RFW continue to work; new dynamic trees from neurons are the path forward.
-- Full direction executed: UiSurface + UiWidgetTree is the only way for UI. Main shell/nav/content are built from neuron-emitted trees. Dynamic ForUI sidebar + FScaffold renderer in client. Router now uses surface-driven shell for non-canvas routes. Hardcoded nav lists are legacy fallback only.
-- Client: ForuiAppShell accepts shellSurfaceTree and renders via UiSurfaceTreeRenderer (real FSidebar from navItems in the tree). Server emits matching app-shell tree on start.
-- Verified (this session): doctor green, flutter-ui restart via MCP, kernels healthy (list_resources), Core compile clean, UiSurface tests pass. All UI surfaces (incl main) flow from neurons.
-- Continued one-by-one: client shell now live subscribes, dynamic sidebar + body renders actual live RFW surfaces (via host.render for source) or trees; server tree has top navItems + activeContent; defaults to marketplace-list; no more static demo tree; hacks cleaned.
-- Aspire MCP used for restart + doctor. One by one progress on thin host + neuron UI.
-- Marketplace is first-class neuron: MarketplaceNeuron + seeds + post-publish/install surface emission (refreshed MarketplaceList / InstalledBundles via HomeFeedBus + UiSurfaceRfwBridge) so installed packs immediately drive UI.
-- UI surface model evolved: added ShellChrome, NavConfig, ViewDefinition kinds (packs emit chrome/nav/full views; client is thin RFW + ForUI primitive renderer + surface subscription host).
-- Flutter.proj first-class in canonical brain/: referenced in Brain.slnx under /Clients/ (Type="C#", historical pattern from Projects/final + digitalbrain). Adapted app/Flutter.proj (NoTargets, incremental, Aspire windows run + web bundle coordination, no dart NuGet asset errors, source stays in app/).
-- AddFlutterClient / Aspire wiring preserved (flutter-ui executable auto-starts with kernel refs); `aspire run` brings kernels (x3) + marketplace + Flutter Windows client.
-- Verified (Aspire MCP + CLI): aspire doctor green (4/4), list_apphosts / list_resources shows flutter-ui Running + healthy refs to kernels, restart via execute_resource_command, UiSurfaceContractTests 16/16 green, relevant marketplace + core tests green (31+), kernel msbuild Compile OK post-changes.
-- Core Law: client remains thin host; all UI (incl. what was ForUI shell work) upgradable via embodied packs emitting UiSurface / RfwCard. Existing RFW + live surfaces (task manager, market, activity, chart) continue to work; new shell surfaces demonstrate the path.
-- After edits: dotnet build (targeted), high-sev tests, aspire doctor, MCP resource restart. No pre-defined Flutter screens regression for dynamic surfaces.
-
-  INeuronStateProtector + AES-GCM/PassThrough + CheckpointProtector + AddKernelSecurity DI. 86/88 green.
-- Step 8 (Awesome): ProjectReview.Analyze ported near-verbatim from final + ReviewRequest/ReviewProjectRequest/
-  ReviewResult + SoftwareEngineeringReviewerNeuron (real review, not string templating). 91/93 green.
-- Step 9 (Context): HybridScorer (cosine + keyword, zero-vector fallback, from IAW) + NoOpEmbeddingGenerator
-  + ContextNeuron RememberAsync/RecallAsync + MemoryStored synapse. Zero-dep hybrid memory. 95/97 green.
-- Economics (user: real money NOW): ECDSA LicenseNeuron (issue/verify/entitlement, reuses PackSignatureVerifier,
-  journal-persistent keypair) + NeuroPack.Price (Id9) + premium-gated install + IPaymentGateway with
-  SyntheticPaymentGateway (tested) and StripePaymentGateway (real Stripe.net 48.1.0, behind config, fail-fast).
-  99/101 green.
-
-## Extended (deferred items, user-requested)
-- L9 UI backbone DONE: RfwCard + UiSurface in Core, HomeFeedBus (fanout+dedup), ChatNeuron + SystemNeurons emission via UiSurfaceRfwBridge, WatchHomeFeed streaming, + full bidirectional gRPC UiGateway (EngageUiSession for canvas inputs/viewport signals). Matches digitalbrain best-of-breed (RFW + bidir UiGateway). Server impl complete; client (living canvas + rfw_host + digital_brain_ui) consumes live surfaces from embodied packs.
-- Context phase 2 DONE: IVectorStore + InMemoryVectorStore (tested) + QdrantVectorStore (build-verified) + TextChunker + DocumentIngestor. PDF deferred (feed lacks stable PdfPig); real embeddings are a drop-in IEmbeddingGenerator swap.
-- Sandbox DONE: ISandboxedExecutor + OutOfProcessSandbox (child-process isolation, CapabilityGate-screened, tested). True WASM (Wasmtime) documented as the next tier, not built.
-- ALL deferred items addressed. Only the 108-file Flutter CLIENT + live Qdrant/Ollama/Stripe/gRPC-wire need external infra (env-blocked here).
-## Remaining:
-- Full 108-file Flutter client polish + external infra (Qdrant live, real embeddings) deferred for env; the gRPC wire + RFW render for pack surfaces is now complete end-to-end in skeleton + kit.
-- WASM/IWasm sandbox: net-new, zero prior art; only if untrusted third-party packs must run sandboxed.
-- WASM/IWasm sandbox: net-new, zero prior art; only if untrusted third-party packs must run sandboxed.
-- Context phase 2: external Qdrant container + real embeddings (Ollama/OpenAI) + PdfIngestionSource/DocumentIngestor.
-- Google auth for marketplace (optional, pairs with economics).
-
-## Open questions
-- Encryption keying for cloud (DPAPI/local vs Key Vault) — AES key via DigitalBrain:Checkpoint:Key; Key Vault wiring TBD.
-- Trust policy: flip RejectUnsignedPacks=true before any remote/untrusted install. MCP External+auth deferred.
-
-## Boundaries (2026-06-26 session, post-commit)
-- Special case for kernel removed from CompanySkillOrchestratorNeuron (no more name check or HandleKernelSelfUpdate there; deleted).
-- Kernel self-update now pack-embodiment driven: callers do Publish + Install for "kernel" (using KernelPack data), then trigger via PerformKernelSelfUpdate (handled in AspireOrchestratorNeuron which emits the rolling drain/verify/complete surfaces + rolling restarts + checkpoints).
-- Company skill path is now only for real company skills; kernel is purely marketplace pack + aspire rolling.
-- Continued cleanup: start.cs and test steps now use KernelPack / KernelUiSurfaceKinds consts instead of literals (reduced primitive obsession).
-- Tests rely on centralized kinds for rolling surfaces in the trigger step; command fired too.
-- Reqnroll updated to explicit publish/install + trigger steps; surfaces asserted.
-- Verifs after changes + commits: build clean, high-sev tests (incl. full rolling scenario) green, aspire doctor pass.
-- Still to consider: full test project split, more generic tasking to reduce KernelTask* records in Core, kernel pack as standalone binary artifact.
-- Ready for next full prompt paste if new session.
-
-## 2026-06-26 continuation: Generic tasking + rename Silo to Kernel + SDUI bidir completion
-- Completed the server-driven UI to match digitalbrain best-of-breed: added uigateway.proto + UiGatewayService (bidi EngageUiSession impl using IAsyncStreamReader/WriteAsync pattern, input dispatch + viewport signals).
-- WatchHomeFeed (Rfw via HomeFeedBus) already present and used; now full bidirectional UiGateway too.
-- Verified: proto generation + service wiring in Kernel/Program, build 0e, high-sev (UiSurfaceContract  + HomeFeedBus + ChatNeuron) 18+ passed, aspire doctor green.
-- Segregation: all new in Kernel/Gateway (no Core change). Packs emit UiSurface (via bridge in SystemNeurons) or RfwCard flow to client render (living canvas panels + demo _LiveSurfaceCard with source).
-- Client (rfw_host + digital_brain_ui kit + canvas) already consumes stream + dynamic source cards; UI surfaces from embodied packs render live without client rebuild.
-- Docs updated (CONTINUITY + Aspire README) with completed boundaries. All per 5 steps + ritual (doctor, high-sev, Context7 for rfw/grpc, relative, no bad comments).
-- Ready: full end-to-end pack->embody->UiSurface/RfwCard->gRPC (Watch + bidi)->RFW render path is wired and tested at contract level.
-- Project rename DigitalBrain.Silo → DigitalBrain.Kernel everywhere (folder, csproj, namespaces, references, strings in docs/Docker/AppHost/IBuildRunner/launch/ etc.).
-- Followed ritual: doctor, tests, research.
-- 5 Steps applied: name "Silo" (Orleans detail) replaced by "Kernel" to match vision of packable runtime.
-- All builds/tests green post-rename.
-Applied after the commit. Started with full ritual (doctor green, high-sev 29+ passed, greps/reads of all usages).
-
-5 Steps:
-1. Dumb: Kernel-prefixed records in Core protocol layer.
-2. Delete: Renamed all 7 + Info to plain Task* (TaskCreated, RunTask, TaskInfo...).
-3. Simplify: Universal task messages now.
-4/5. Accelerate + later automate.
-
-Changes:
-- DigitalBrain.Core/Synapse.cs: records now Task* family (KernelTask* names removed from Core).
-- Interface + KernelTaskNeuron updated to use generics.
-- All call sites (Mcp keeps legacy UI case strings for compat; emits generic), Ino, start, tests, JournalJsonContext updated.
-- Build clean 0w/0e. Tests (incl. task + rolling Reqnroll) green. aspire doctor + list tools green.
-
-Outcome: Core has no KernelTask* record definitions left. Task protocol is now clean universal core abstraction. Kernel grain name stays (correct ownership).
-
-All verifs repeated post-change. Ready.
-
-## 2026-06-26 session (this prompt continuation)
-Applied Elon's 5 Steps strictly:
-1. Requirements less dumb: questioned why KernelTask* (protocol used by MCP/INO) named/prefixed in Core (shared because Mcp refs only Core); folder Kernel/ in Core for protector was ownership smell; primitive string TaskId everywhere (real need for causal ids like NeuronId).
-2. Deleted: removed brain/DigitalBrain.Core/Kernel/ subdir entirely (moved INeuronStateProtector.cs + ProtectedCheckpoint.cs to root; no more Kernel/ folder in pure Core). Removed magic version "2026.6" literal for kernel pack publish (now uses KernelPack.DefaultVersion).
-3. Simplified/optimized remaining: introduced TaskId (modeled on NeuronId) in Core; updated 7 task synapse records + KernelTaskInfo + usages to use typed id instead of string (kills primitive obsession for task ids; implicit conversions keep call sites clean).
-4. Accelerated: every edit followed by targeted build + high-sev test filter (core/kernel/ui/rolling) + aspire doctor (MCP) + relevant asp mcp.
-5. Automate last (none yet; boundaries first).
-
-Changes:
-- Core now contains zero kernel/ subfolder and no kernel-dashboard or kernel-only kinds (UiSurfaceKinds remain universal; KernelUiSurfaceKinds + KernelPack + PerformKernelSelfUpdate + rolling emission in Kernel).
-- KernelTask* protocol remains in Core (required by Mcp.Tools + broad use) but cleaned with TaskId; comment updated.
-- Reqnroll expanded: new scenario "Kernel treated as first-class versioned pack emits only segregated surfaces" exercising publish/install + dashboard (asserts segregation).
-- High-sev tests (incl full rolling + new seg scenario) green (11+ passing in filter).
-- Packaging: kernel remains first-class "kernel" marketplace pack (publish/install -> auto Perform via MarketplaceNeuron in Kernel); Core IsPackable stable minimal; versions aligned via const.
-- Verifs: build clean, tests pass, aspire doctor (4/4 pass) multiple times; relative paths only; Context7 used for Orleans/Reqnroll APIs before edits.
-- Boundaries reinforced: Core = pure INeuron/Synapse/IPackBehavior/IHandle + universal (UiSurface base, task ids, checkpoints protector, marketplace seeds for UI). Kernel owns runtime, dashboard/rolling surfaces, HA logic, own kinds, self-update trigger.
-
-Success: Core pure; kernel packable/self-updatable via marketplace; primitive reduced; Reqnroll expanded; tests segregated by concern (Kernel/ sub in tests + Silo refs); all green.
-
-Next session: paste full user prompt again. Paste this CONTINUITY too if needed.
-
-## 2026-06-26 — Bucket A: Runtime Hardening (branch hardening/bucket-a, off main)
-SDD/superpowers flow (spec + plan + per-task brief/report under .superpowers/sdd/). Five independent, secure-by-default hardening changes, each its own commit + clean per-task review:
-- A4 (04467e9): explicit N+1 handler-growth proof — installing a pack adds exactly one responder to a previously-unhandled synapse (characterization test; guards the embody chain).
-- A2 (e6d5585): split MCP tools into DigitalBrainReadTools (read-only) + DigitalBrainMutationTools over a shared DigitalBrainToolsBase. HTTP transport (remotely reachable) now exposes read-only tools only; stdio (local/trusted) keeps all. Tools moved verbatim, no behavior change.
-- A5 (63f67e7): pluggable ICheckpointKeyProvider (Core) + ConfigCheckpointKeyProvider; AddKernelSecurity fails fast in Production when DigitalBrain:Checkpoint:Key is absent, dev falls back to PassThrough with a loud warning. Key Vault drops in later without touching the call site.
-- A3 (8f5c5aa): rolling self-update rollback/abort — failed replica restores the pre-update checkpoint, emits kernel-rolling-rollback, and skips kernel-rolling-complete. KEY FIND: AspireOrchestratorNeuron was missing IHandle<PerformKernelSelfUpdate> — the self-update handler was effectively dead; now declared and dispatched. FailAtReplica is a deterministic test seam (0 = never).
-- A1 (d010827): reject-unsigned-packs is now the secure default (RejectUnsignedPacks defaults true; ?? true covers absent IConfiguration). First-party UI seeds + the kernel pack are signed by a built-in TrustedPublisher (ECDSA-nistP256, local dev trust anchor — NOT a prod secret). TestCluster set explicitly permissive so existing unsigned-install scenarios stay green; new strict tests prove the default.
-
-Verification (Task 6):
-- High-sev suite (filter Category!=E2E & !~Browser & !~E2E): **134 passed, 0 failed, 0 skipped, 37s**; blame-hang collector confirms all tests finished. The 2 previously env-flaky GatewayGrpcWireTests passed this run.
-- aspire doctor: 4/4 pass (CLI 13.5.0-preview, .NET 11 SDK, dev-certs trusted, Docker running).
-- Boot smoke: the full AppHost booted inside the test run — gateway healthy, all 3 kernel HA replicas registered in Orleans silo instances, Ollama + Azurite (storage) containers up — confirming secure-default + MCP-split don't break boot.
-
-Filter note (not a Bucket A regression): the briefing's `Category!=E2E` does NOT exclude the E2E tests — they live in namespace DigitalBrain.Tests.E2E but are not [Trait("Category","E2E")]-tagged, so the (skipped) E2E test is still *selected*, which instantiates the DigitalBrainBrowserFixture→DigitalBrainAppHostFixture collection fixture and boots the AppHost. That fixture hangs at DigitalBrainAppHostFixture.InitializeAsync line 44 `WaitForResourceHealthyAsync("silo")` — stale resource name from the Silo→Kernel rename (now "kernel"); it waits forever → 5-min hang dump → testhost abort. Pre-existing E2E infra bug, deferred-Bucket-D territory; worked around here by excluding the E2E namespace from the high-sev filter. Recommend either tagging the E2E collection with [Trait("Category","E2E")] and/or fixing the resource name "silo"→"kernel" when Bucket D un-skips E2E.
-
-Final whole-branch review (opus code-reviewer, range ca3862a..d010827) — verdict "with fixes", no Critical. Applied (commit 76cca71): A3 failing replica now emits verify surface phase "verify-failed" before rollback (was contradictory "verified"→"rolledback"); clarifying comment that the install trust gate verifies pack INTEGRITY not publisher identity (a self-signed pack passes); removed dead TrustedPublisher.Sign(NeuroPack). Deferred follow-ups (tracked, not blocking): (a) trusted-publisher ALLOWLIST — verify AuthorPublicKeyBase64 against registered keys; pairs with Key Vault + flipping RejectUnsignedPacks on for remote/untrusted install paths; (b) NeuronSteps Reqnroll kernel-update step manually re-fires rolling surfaces that the now-live IHandle<PerformKernelSelfUpdate> already emits — redundant test debt (not a false green; assertions are existence-only and the dedicated RollingUpdateRollbackTests unit test already proves the live handler), delete the manual loop; (c) extract a shared test-config helper for the RejectUnsignedPacks IConfiguration block duplicated across NeuronTestSiloConfigurator / NeuronSteps / TrustedSeedInstallTests.StrictConfigurator.
-
-2026-06-27: Priorities 1-5 continued one-by-one.
-- #1: Body fully dynamic (activeContent default from tree/Props, always renderer or rfwHost for nav targets, no dumps/waiting text). Synthesis of list nodes for packs/tasks surfaces.
-- #2: UiSurfaceTreeRenderer expanded (fbutton/button, list/vlist with Gesture+FCard items, text, panel, row/column/hstack/vstack; forwards onEvent for actions; recursive compose preserved + improved). 
-- #3: Event round-trip: ForuiAppShell now sets up UiGatewayClient + engageUiSession (like canvas), _handleSurfaceEvent sends UiInputSynapse CLICK with actionId/synapseType/payload from renderer events. Buttons/lists in trees call onEvent which reaches server neurons (no Dart hardcoded views).
-- #4: GoRouter reduced (deleted _PlaceholderView + all surface placeholder routes under Shell; ForuiAppShell owns chrome+body; only canvas/chat/gallery remain as special routes).
-- #5: Client enrichment for server surfaces (list synthesis from 'packs'/'tasks' data uses renderer primitives immediately; server trees now render richer via #2). App-shell + surfaces from embodied packs usable without client rebuild.
-All via Aspire MCP (doctor/list/restart flutter-ui), --no-build tests (Ui 16/16), dotnet msbuild /t:Compile, dart analyze clean (preexist only), Context7 (ForUI FButton/forms/lists). Thin host, delete>added, relative. Ritual complete after each.
-
-**Full one-by-one verification ritual (2026-06-27 post all priorities):**
-- Aspire MCP: doctor 4/4 (CLI 13.5 preview, .NET11, certs, Docker), list_apphosts (1 in scope), list_resources (flutter-ui-dqzkfhvz Running+Healthy after multiple restarts, 3 kernels healthy, gateway up).
-- Tests: UiSurfaceContractTests 16/16 passed (--no-build).
-- Builds: dotnet msbuild Core + Kernel /t:Compile success (despite locks from live AppHost).
-- Client: dart analyze on forui_app_shell, rfw_runtime_host, router: only pre-existing warnings (no new errors from renderer, event wiring, router cleanup).
-- MCP restarts: flutter-ui restarted via execute_resource_command (post-#2, #3, full). Confirmed healthy state.
-- CONTINUITY + todos tracked. All 5 priorities + verifs complete one-by-one. No hardcoded Dart views; all dynamic from neurons. Ready for next work or full aspire run if needed.
-
-Additional server enrichment for #5: SystemNeurons now emits UiSurface (kind=marketplace-list / task-manager) carrying "tree": UiWidgetTree("list", items: ...) for the content. Client body prefers data['tree'] -> renderer.build (list of FCard from neuron data). Removed client-side 'packs'/'tasks' synthesis and unused _client (deleted code). Cleaned dead ?? in event/root logic. Bridge copies the tree, client detects and renders purely from neuron tree. Full roundtrip for nav/actions via events. All ritual re-run (tests 16/16, msbuild, doctor 4/4, MCP flutter-ui restart, analyze clean). Priorities 1-5 complete one-by-one.
-
-Additional cleanup for #4: removed legacy hardcoded FSidebar/_Item/_buildGroup fallback in ForuiAppShell (now always dynamic or minimal waiting via renderer; no static nav lists). Deleted ~50 lines. Ritual: dart analyze, flutter-ui MCP restart.
-
-For #2: switched list items to FTappable (ForUI) for better native feel in renderer, per dynamic tree support. Analyze clean.
-
-Committed changes in app/ and brain/ repos. All priorities addressed and verified one-by-one with full ritual (MCP, tests, builds, doctor, restarts). Client is thin host; UI from neurons. Ready for next.
-
-**2026-06-27 continuation focus (user request):** Shell UI generated by **neuron UI kit abstractions**.
-Goal: Make the entire ForuiAppShell (chrome, menus, navigation, clickable neuron buttons, headers, content slots) described by neurons using a small, official "NeuroUI Kit" of UiWidgetTree node types (e.g. "neuron:Menu", "neuron:NeuronButton", "neuron:NeuronList", "forui:FSidebar" + extensions, "neuron:Action", etc.).
-Neurons (System, UI kit pack, embodied packs) are the authors of the shell. Client only renders.
-
-2026-06-27 Neuron UI Kit phase start (one change at a time):
-- Context7 used for ForUI (FSidebar/FSidebarItem/FButton onPress, FScaffold) + gRPC-Dart bidirectional streaming before any edit.
-- Defined minimal official NeuronUiKit in DigitalBrain.Core/UiSurfaces.cs (Menu, MenuItem, ActionButton, NeuronButton, NeuronList*, Header, Panel, Divider). Updated UiWidgetTree doc. Small net add + comment cleanup.
-- Server (SystemNeurons) now emits app-shell using neuron:Menu + neuron:MenuItem[] children (removed navItems dict fallback in tree). Pure kit for the dynamic menu.
-- Renderer (UiSurfaceTreeRenderer): added early recognition + builders for neuron:menu / neuron:menuitem / neuron:actionbutton (and aliases). Sidebar/app-shell handling prefers children kit nodes; events forward target + action via onEvent for real synapse roundtrip. onPress from ForUI per Context7.
-- ForuiAppShell: removed _buildDynamicSidebarFromData entirely + navItems fallback path (~20 lines deleted). Always delegates sidebar to renderer from neuron:menu/forui child. Client stays dumb renderer (no knowledge of items/labels).
-- Verification (this step): Core build ok; Kernel CoreCompile ok (host locks normal); UiSurfaceContractTests 16/16 (--no-build); flutter analyze on changed files (warnings pre-existing only); Aspire MCP doctor 4/4; flutter-ui-dqzkfhvz restart via execute_resource_command.
-- No client hardcoded chrome/menus; no "marketplace" awareness in Dart. Kit nodes + actions drive everything. Delete > add in shell. Relative paths.
-- Next focused: server enrichment for dynamic menu (list interesting neurons), full action dispatch in UiGateway if needed (review flagged UiInput -> typed IHandle not automatic for arbitrary kit actions), neuron:Header/NeuronButton emission examples, exact type match already tightened, reduce shell state. Update tests if tree contract expands.
-- Post-impl review (subagent feature-dev:code-reviewer) executed: foundation solid (kit emission, renderer map, legacy delete, ritual, Core Law direction), flagged dispatch gap + heuristic (addressed) + residual titles + shell state. No critical introduced by this delta. Re-ran doctor + MCP flutter restart + analyze clean.
-
-2026-06-27 continued one-by-one (commits + dispatch fix):
-- 4 focused git commits (one logical change each): 1. core NeuronUiKit definition; 2. kernel emission of neuron:Menu+MenuItems (brain/); 3. app renderer kit support; 4. app shell delete of legacy builder + nav fallback (app/). All relative, clean messages, followed by ritual where applicable.
-- Focused fix for review critical: UiGatewayService now parses action descriptors (synapseType + props) from UiInputSynapse payloads (the path used by shell's kit buttons and _handleSurfaceEvent). Dispatches real typed synapses (InoRequest, InstallFromMarketplace, RestartResource) instead of always DemoMessageSynapse. Uses Json + NeuronResolver + direct grain FireAsync for the known cases. Fallbacks safe. Context7 for gRPC streaming patterns done pre-edit.
-- Verification ritual (this change): msbuild Kernel /t:CoreCompile (no errors from edit); UiSurfaceContractTests 16/16 --no-build; aspire doctor (MCP) 4/4.
-- Commits + this dispatch = full roundtrip for kit actions now produces IHandle'able typed synapses.
-- Small follow: titles in renderer now prefer server-provided (from props or children data) instead of literals in all paths.
-- Added minimal coverage: NeuronUiKit const stability + app-shell tree using Menu/MenuItem in UiSurfaceContractTests (2 new facts).
-- Next focused one-by-one: Added support for neuron:Header (FHeader from kit) in renderer (exact match) and used it in app-shell emission + composition (header child preferred over prop title). Context7 for ForUI FHeader before edit. This makes more chrome (header) neuron-described.
-- Follow-up one-by-one (same focused area): Wired header child extraction in ForuiAppShell (mirrors sidebar walk) so the actual mounted FScaffold header comes from the kit tree when emitted. Pre-existing warnings only.
-- Verification (full header step): flutter analyze clean (preexist only), Aspire doctor 4/4, flutter-ui MCP restart.
-- All one by one: changes + ritual + CONTINUITY + commit.
-- Continued one-by-one: Added neuron:Divider support (maps to FDivider) in renderer; inserted example in emission menu. Context7 for FDivider before. Extends official kit for separators in shell.
-- Verification: builds, tests 16/16, doctor 4/4, analyze clean, flutter-ui MCP restart.
-- Continued one-by-one: Refactored menu construction to BuildShellMenuItems() local to prepare for dynamic from neuron (no more inline new[] for items).
-- Verification: msbuild CoreCompile, Ui tests 16/16 --no-build, doctor 4/4.
-- Continued: Made the menu data-driven (array of (label, target) + yield) so it can be populated from real data (seeds, installed packs, etc.) without changing structure. Divider example kept.
-
-2026-06-30: Executed full "Next Actions Plan" (A-F slices from ui-kit-neuron-synapse-implementation-plan.md):
-- A: Renderer prune (deleted legacy _buildDynamicSidebar + navItems, pruned contains, exact cases) + ritual.
-- B/C/D/E: Expanded tests/helpers, theme modernization (ForUI neuro via Context7 + colors in app wrapper), more delete.
-- F: Aspire doctor 4/4, MCP list, noted live start for validation.
-All with constant builds/tests/doctor/analyze after edits. Plan updated. See docs/ui-kit-neuron-synapse-implementation-plan.md for details.
-- Verification: msbuild, Ui tests 16/16 --no-build, aspire doctor 4/4 (MCP).
-- Continued: Populated the menu data array dynamically using MarketplaceSeeds.LocalUiPacks (UI seeds added as extra MenuItem). Proves server/kit can drive dynamic list.
-- Verification: build clean, tests 16/16, doctor 4/4.
-- Continued one-by-one: Made one MenuItem carry "action" (with synapseType) to show menu clicks can fire real synapses (via existing UiInput dispatch path).
-- Verification: msbuild CoreCompile, Ui tests 16/16 --no-build, aspire doctor 4/4 (MCP), flutter-ui MCP restart.
-- Continued: Refactored items data to (Label, TargetSurfaceKind?, Action?) tuple to eliminate brittle label== check and support mixed target/action cleanly (review feedback addressed).
-- Verification: msbuild, tests 16/16, doctor 4/4, flutter restart (MCP).
-- Continued using dart mcp: launched test instance (dart__launch_app chrome), connected DTD, get_widget_tree (summaryOnly for user widgets + full). Tree shows: DigitalBrainApp > MaterialApp > FTheme/FBasicTheme/FAdaptiveScope > WindowSizeScope/InputModeScope (responsive) > GoRouter > Navigator > LivingCanvasScreen > Scaffold > Stack/Positioned (floating glass panels) > VisualConstructorCanvas + RemoteWidget (RFW neurons) + FCard/FButton/Glass effects. Also errors in RFW loads (404, no backend in test launch) and Row overflow in rfw library. Improved kit sidebar/header to use ForUI recommended Column+Padding+FDivider pattern for better design. Fixed potential overflow in _stack with Flexible children. This should help the "don't feel good" about UI kit + ForUI + responsive neurons UI (scopes present, chrome better, layouts more robust).
-- Dart mcp: connect, get_widget_tree, analyze_files (clean), get_app_logs (showed the overflow and RFW issues).
-- Verification: dart analyze, flutter analyze, ritual.
-- All one by one. Client dumb. The canvas is custom floating + mixed; kit is for clean chrome. Next: more kit polish or canvas improvements.
-- Focused enforcement of core law ("all ui must be in neurons and synapses"): removed every remaining hardcoded string, default ('marketplace-list'), title ('DigitalBrain'), waiting message, and client-synthesized node ('fcard' with titles) from ForuiAppShell. No more manual FScaffold chrome with hardcoded in no-tree case (now delegates to renderer with empty app-shell tree). Header defaults to empty widget. Selection only from tree. This makes the host even thinner — all shell, nav, headers, content now strictly described by neurons and emitted as kit trees. (Router bootstrap and Material title minimal/non-shell.)
-- Renderer cleanup in same spirit: removed 'DigitalBrain'/'No content surface' defaults from app-shell/header builders (empty or shrink only). Now truly no hardcoded UI strings anywhere in host.
-- Additional: no-tree case now returns pure shrink FScaffold (no synthesized node map like {'type':'app-shell'...}). Renderer label fallbacks ('Action','Item' etc.) removed to ''. All client-defined UI structure/strings eliminated in host/renderer. Full compliance with "all ui must be in neurons and synapses". (Remaining bootstrap in router/app.dart is non-shell.)
-- Commit & continue: updated router default to neuron shell (ForuiAppShell owns /), canvas to /canvas. Main UX now fully the dynamic neuron-driven shell. Ritual (analyze, tests, doctor, restart) passed. One focused.
-- Additional: removed remaining client-synthesized content-area node maps in body fallbacks (now pure SizedBox.shrink()). No client-defined tree structures left.
-- Commit & continue: removed hardcoded tab bar + labels ('Workspace', 'UI Kit Gallery', 'Chart Lab (CSV + Chat)') and _tabIndex from LivingCanvasScreen. Left area now always main neuron RFW ('scenario_explorer'). Removes client chrome in canvas path. Analyze has only expected unused warnings. Ritual passed. Next: clean unused methods or more canvas thinning.
-- Continued: deleted dead chart lab support code (_parseCsvToRows, _loadCsvAsChart, _sendChartPrompt, fields, dispose calls) from canvas. Further thins client (delete > add). All paths now lean on neuron RFW/panels. Ritual passed.
-- Domains & Experiences — travel vertical slice (branch domains-experiences-travel-slice, spec+plan under docs/superpowers). Phase 1, ADDITIVE (no NeuroPack→Domain rename yet). Added Core types Experience + ExperienceStep. New travel pack (DigitalBrain.Tests/E2E/Packs/TravelPack.cs, Core-only so it embodies in the ALC) = one stateful "Plan a trip" experience: start→flights→hotels→events→activities→summary, RFW surfaces via existing `digitalbrain` widgets (inline source in dataJson). Kernel: UiSurfaceRfwBridge now prefers props[surfaceId] for RfwCard.CorrelationId (NormalizePackOutput nulls CorrelationId, so per-hop ids needed this); GatewayService routes ExperienceStep → generated-<pack>; ExperienceStep registered in JournalJsonContext. Tests: TravelPackTests (5, per-hop + full sequence), ExperienceStepDispatchTests (TestCluster: embody→fire→HomeFeedBus, shared-bus pattern from GatewayServiceTests), TravelPlanTripRendersE2ETests (gated [SkippableFact], 5 hops asserted via flt-semantics-identifier).
-- Key trap found+fixed: a pack file relying on <ImplicitUsings> compiles in the test asm but FAILS the standalone Roslyn/ALC compile (no implicit usings) → silent PackEmbodimentException → LLM fallback → pack never runs. Packs MUST have explicit `using`s.
-- Verification: aspire doctor 4/4 pass; dotnet test Category!=E2E = 163 pass / 1 skip (the gated E2E) / 0 fail; whole-branch review MERGE-READY (no Critical/Important).
-- Phase 2 follow-ups (deferred): NeuroPack→Domain rename everywhere + collisions (app domain_palette.dart → cluster_palette.dart); per-user (not per-install) flow state; multi-word destination parsing + dynamic month; empty-pack guard in the gateway ExperienceStep route; cross-origin E2E.
-
-## 2026-06-28 — Task D: travel slice browser E2E actually executed (branch e2e/travel-browser-validation, off master)
-The gated TravelPlanTripRendersE2ETests had NEVER run (always skipped). Running it for real exposed four
-issues; the slice now passes end-to-end up to Flutter. Server-side proven independently by a new
-TravelServerFeedDiagnosticTests (native-gRPC WatchHomeFeed, no browser). Verification: browser E2E + diagnostic
-both green; non-E2E suite 163 pass / 0 fail; aspire doctor 4/4.
-- **Build**: the web bundle needs `flutter build web --release --no-tree-shake-icons --dart-define=DIGITALBRAIN_E2E=true`.
-  `--no-tree-shake-icons` is mandatory (app paints non-const IconData via brain_painter MaterialIcons). The
-  E2EPrerequisites skip-hint was corrected to include it. main.dart forces semantics under DIGITALBRAIN_E2E.
-- **gRPC endpoint split (test fixture)**: native-gRPC helpers hit the kernel "web" endpoint (Http1AndHttp2)
-  and got HTTP_1_1_REQUIRED — over cleartext that endpoint answers HTTP/1.1. Fixed: browser nav uses "web";
-  CreateGatewayGrpcChannel now dials the "grpc" endpoint (Http2). Mirrors prod: browser=gRPC-Web, native=HTTP/2.
-- **PRODUCT GAP (GatewayService)**: `Send` had NO `PublishToMarketplace` case — publishes fell through to the
-  generic fallback (DemoMessageSynapse) and the pack CODE WAS DROPPED, so nothing could be installed/embodied.
-  Added a real publish handler. Also added `CaseInsensitive(...)` applied to both publish and the existing
-  install handler (install read camelCase keys but native/PascalCase callers silently fell back).
-- **Unsigned-pack gate**: install enforces RejectUnsignedPacks (secure default true; only appsettings.Development
-  sets false, not applied in the test AppHost). The E2E PublishPackAsync now ECDSA-self-signs the pack
-  (PackSignatureVerifier.SignPack) — self-signed passes the integrity gate (no publisher allowlist yet).
-- **Render route + feed timing (test)**: live pack surfaces render on the CANVAS (panel semanticsId ==
-  correlationId == surfaceId); the neuron shell at "/" drops kind-less RFW surfaces. Test now drives "/#/canvas"
-  (web hash strategy) and waits for the WatchHomeFeed stream before the first hop (HomeFeedBus has no replay and
-  dedups identical re-sends, so subscribe-before-emit is required).
-- Whole-change code review (opus): two findings applied (diagnostic Task.Run dropped the scheduler token;
-  screenshots moved off Path.GetTempPath() to AppContext.BaseDirectory/e2e-screenshots). Skipped findings:
-  empty-payload guard (CaseInsensitive already null-guards; matches existing handlers) and the pre-existing
-  localhost:8080 fallback (out of scope).
-- Follow-ups surfaced: the neuron shell ("/") cannot render a guided experience full-screen (only canvas panels
-  do) — a real UX gap for experiences; the gateway publish path is now reachable but has no auth (RejectUnsigned
-  still gates install); consider an empty-pack/embodiment-failed guard so a failed publish/install surfaces an
-  error instead of a silent render timeout.
-
-## 2026-06-28 — Experiences get a first-class full-screen home (branch experiences-shell-host off master e2db26a)
-Closed the UX gap from Task D: an Experience is a guided multi-hop journey but had no full-screen rendering —
-live pack surfaces only appeared as cascading floating panels on the canvas. Now an Experience renders as a
-coherent full-screen journey that advances hop-in-place on a dedicated route. Subagent-driven (9 tasks, TDD,
-per-task spec+quality review + final opus whole-branch review both repos = Ready to merge, 0 Critical/Important).
-Spec+plan under docs/superpowers/{specs,plans}/2026-06-28-experiences-shell-host*.
-- **The marker trap (key insight).** A hop is tagged with `activeExperience` = "<pack>/<experienceId>". It MUST
-  be merged INTO the wire `dataJson`, not just a top-level prop: `UiSurfaceRfwBridge.FromUiSurface` forwards
-  `props["dataJson"]` verbatim for RFW surfaces, so a top-level prop never reaches Flutter's `_decode`. New Core
-  helper `UiSurface.ForExperienceHop(pack, experienceId, surfaceId, lib, root, dataJson, title?, emitter?)` does
-  the JsonNode merge in Core (pack stays Core+BCL). `CorrelationId == surfaceId` (bridge already prefers
-  props[surfaceId]). `TravelPack` emits its 5 hops through it; `ExperienceHopBridgeTests` pins the round-trip.
-- **Dedicated experience-host route (app, separate repo, branch experiences-shell-host off prod/sp1-remote-endpoint).**
-  New `/#/experience` + `/#/experience/:pack/:experienceId` → `ExperienceHostScreen`: subscribes to WatchHomeFeed,
-  keeps the LATEST envelope whose decoded data has a matching `activeExperience`, renders only it full-screen,
-  replacing the prior hop in place. Chrome-free + a minimal back affordance. The inline-RFW render path was
-  EXTRACTED from `ForuiAppShell._renderEnvelope` into shared `lib/rfw_host/inline_rfw_surface.dart`
-  (`buildInlineRfwSurface`) — shell delegates to it behavior-identically (still passes no semanticsId); the host
-  passes `semanticsId == correlationId == surfaceId` (the E2E linchpin: `flt-semantics-identifier`). Shell + canvas
-  untouched → merged canvas E2E does not regress.
-- **ExperienceFlowDriver (E2E ergonomics).** `DigitalBrain.Tests/E2E/ExperienceFlowDriver.cs` generalizes
-  publish/self-sign/install → OpenAsync (nav to the experience route + wait-for-WatchHomeFeed, subscribe-before-emit)
-  → TriggerExperienceAsync/TapAsync → AssertHopRendersAsync (waits on flt-semantics-identifier, count==1, per-hop
-  screenshot to AppContext.BaseDirectory/e2e-screenshots; on failure dumps browser console/page-errors/DOM and
-  rethrows). Fixture gained headed/headless (`DIGITALBRAIN_E2E_HEADED`/`_HEADLESS`) + `_SLOWMO` toggles (default
-  preserved: local headed, CI headless). Dart-MCP widget-tree/runtime-error inspection is documented as a SEPARATE
-  manual recipe (debug `flutter run` has a DTD; the release Playwright bundle does not). `TravelPlanTripRendersE2ETests`
-  rewritten onto the driver (~10 lines), now targeting the experience route (not /#/canvas). Authoring a new
-  experience E2E is now ~10 lines.
-- **Verification:** brain build clean; fast suite 167 pass / 1 skip / 0 fail (baseline 163 + 4 new: ForExperienceHop ×2,
-  travel marker ×1, bridge ×1); app `flutter analyze` clean (76 pre-existing) + `flutter test` 11/11; aspire doctor 4/4;
-  the rewritten browser E2E PASSED 1/1 on the experience route (all 5 hops full-screen). Both repos final-reviewed
-  Ready to merge.
-- **Deferred follow-ups:** shell "Plan a trip" entry button (route reached by deep-link this phase); card-tap →
-  ExperienceStep gateway mapping (host `_onSurfaceEvent` is a no-op; E2E drives hops natively); per-user (not
-  per-install) flow state; NeuroPack→Domain rename; cross-origin E2E; unit test for the ForExperienceHop
-  empty/malformed-dataJson guard branch.
-
-## 2026-06-29 — Slice 0: typed `ui:` UI-kit + fast authoring loop ("Hello World on rails")
-Subagent-driven (11 tasks, TDD, per-task spec+quality review). Spec+plan under
-docs/superpowers/{specs,plans}/2026-06-29-ui-kit-fast-author-slice0*. Branch `ui-kit-fast-author-slice0`
-(both repos), merged locally to master/main (no push). Goal: a new UI app authorable as ONE ~15-line C#
-file, rendered full-screen from the marketplace with NO kernel recompile/restart. Hello World
-(name → Greet → "Hello {name}!") is the acceptance test, proven by a browser E2E that RAN+PASSED.
-- **Render path (Approach 1, typed nodes on the wire).** Components are typed `ui:` nodes (`Ui` consts in
-  `DigitalBrain.Core/UiSurfaces.cs`: Screen/Text/TextField/Button/Panel) carried as a `UiWidgetTree`.
-  `UiSurface.ForExperienceHopTree(pack, experienceId, surfaceId, tree, title?, emitter?)` emits a
-  `WidgetTreeKind` hop. The Kernel bridge `UiSurfaceRfwBridge` (widget-tree branch) now merges the
-  `activeExperience`/`experienceId`/`surfaceId` markers into the wire dataJson and keys `CorrelationId` on
-  `surfaceId` (root widget `WidgetTreeHost`). App side: one Dart file per component in `app/lib/ui_kit/` as
-  ForUI covers (FButton/FCard/FTextField-via-`FTextFieldControl.lifted`), assembled by `ui_registry.buildUiNode`;
-  an ADDITIVE `ui:*` branch in `UiSurfaceTreeRenderer.build` (rfw_runtime_host.dart) delegates to it;
-  `experience_hop_view.dart` renders a typed tree under `Semantics(identifier: surfaceId)` (the E2E linchpin),
-  falling back to the RFW path otherwise.
-- **Authoring API.** `KitExperience : IPackBehavior` (Core/UiKit) + fluent `UiExperience`/`UiHop` builders.
-  Author writes only `Define()`. The base runs the ExperienceStep state machine, accumulates flow state,
-  bakes state-dependent text at emit time (client stays dumb), injects pack/experienceId into `ui:Button`
-  nodes (recursively, incl. panel-nested), and emits each hop via `ForExperienceHopTree`. pack==experienceId.
-- **Marketplace open/run.** `hello-world` pack seeded (`MarketplaceSeeds.HelloWorldPackCode` = single source of
-  truth; `HelloWorldPackSource.Code` in tests delegates to it). `UiSurfaceLiveData.ExperiencesForPack` gives it
-  a Run action with `targetSurfaceKind = "/experience/hello-world/hello-world"` → shell `_goTo` → route; the
-  host auto-fires `start` on the first feed card (race-free). Button taps fire `ExperienceStep` via
-  `buildActionEnvelope` over the unary Send.
-- **Hot-loop.** `dbt author <file> [--watch]` (DigitalBrain.Cli, gRPC client generated from digitalbrain.proto):
-  self-signs a NeuroPack (passes the install signing gate), publishes+installs into the LIVE cluster — no
-  kernel recompile/restart. `--watch` surfaces errors + cancels cleanly on Ctrl+C.
-- **Key trap (re)confirmed.** A pack source string MUST NOT use `\"` escapes inside a C# raw string literal
-  (`"""`): `\` is literal there, so the Roslyn/ALC standalone compile fails → PackEmbodimentException → the
-  pack silently never embodies. The seed hit this; fixed via string concat + a `{ Length: >0 }` property
-  pattern. The E2E is the regression guard.
-- **Verification.** brain build clean + 174 pass/1 skip/0 fail; app analyze clean + 35/35; aspire doctor 4/4;
-  HelloWorld browser E2E RAN+PASSED (ask + greeting hops full-screen, "Hello Alice!"). Final whole-branch
-  reviews (opus ×2) BOTH "Ready to merge", 0 Critical/0 Important.
-- **Deferred follow-ups (non-blocking):** (1) bridge drops `title` for widget-tree hops — forward
-  `UiSurfaceKeys.Title` in the marker loop, or drop the arg; (2) `buildActionEnvelope` could coerce props to
-  `Map<String,String>` to future-proof non-string `ui:` inputs; (3) per-pack (not per-user) flow state in
-  `KitExperience._state`; (4) CLI default gateway `https://localhost:7080` — wire to the real Aspire port;
-  (5) live `aspire run` hot-loop demo (the file-watch reload path is not covered by the E2E); (6) fan the kit
-  out to the full ~20–30 components (sub-project B).
-
-## 2026-06-29 — Sub-project B: fan the `ui:` kit out to a 35-component curated catalog + gallery
-Subagent-driven (11 TDD tasks, fresh implementer + per-task spec/quality review + opus whole-branch review).
-Spec+plan under `docs/superpowers/{specs,plans}/2026-06-29-ui-kit-catalog*`. Branch `feat/ui-kit-catalog` (both
-repos), merged locally to master/main (no push). Grew the typed `ui:` kit from **5 → 35** components, each a
-thin ForUI cover + a `ui:<Name>` const on `DigitalBrain.Core.Ui` + a `UiHop` fluent builder + one
-`app/lib/ui_kit/ui_<name>.dart` cover + a lowercased `ui_registry.buildUiNode` case. Pure additive fan-out on
-the Slice 0 pattern — the `ui:*` renderer branch was never touched.
-- **Catalog (35):** Inputs (TextField, TextArea, Checkbox, Switch, RadioGroup, Select, Slider, DateField,
-  Button); Layout (Screen, Panel, Row, Column, Divider, Header, Gap); Display (Text, Heading, Icon, Avatar,
-  Badge, Tile, List); Feedback (Alert, Progress, Spinner, Tooltip); Navigation (Tabs, Breadcrumb, Sidebar,
-  BottomNav, Pagination); Overlays (Dialog, Sheet, Toast).
-- **Value model = strings on the wire.** Folded-in Slice 0 follow-ups done first: bridge now forwards
-  `UiSurfaceKeys.Title`; `buildActionEnvelope` string-coerces every prop (bool/double/null) so non-string inputs
-  round-trip. Inputs capture into `UiKitFormScope` (`Map<String,String>`) on a REAL interaction callback.
-- **ForUI 0.21.3 facts (hard-won):** form widgets have NO `onChange` on FSelect/FSelectGroup/FDateField — capture
-  via a controller `addListener` (`FSelectController`, `FDateFieldController`), disposed; RadioGroup uses
-  individual `FRadio` (parent holds `_selected`, `value:_selected==o` = single-select) because `FSelectGroup.onSaved`
-  never fires without a `Form.save()`; Slider captures on `onEnd`. Linear progress = `FDeterminateProgress(value:)`,
-  spinner = `FCircularProgress()` (NOT `FProgress.*`). Icon class is `FIcons` (re-exported by `package:forui/forui.dart`;
-  `FLucideIcons` is 0.22+). `FTabs(onPress:(int))`, `FButtonVariant.outline` (enum), `FBottomNavigationBar(onChange:(int))`,
-  `FBottomNavigationBarItem.icon` required. Overlays: `showFSheet` needs a Navigator, `showFToast` needs an `FToaster`.
-- **Two cross-cutting Core changes:** `KitExperience.Inject` now stamps `pack`/`experienceId` onto any node with a
-  top-level `eventName` (Button, Tile) OR an `items` prop (all 5 nav covers), recursing into children (overlay-child
-  buttons). All action covers share ONE envelope shape `{synapseType:'ExperienceStep', props:{pack,experienceId,
-  eventName,...captured}}` via `ui_button.dart` / `buildExperienceFTile` (ui_tile.dart, used by Tile AND List) /
-  `fireNav` (ui_nav_item.dart, used by all 5 nav covers). `[InternalsVisibleTo("DigitalBrain.Tests")]` added to Core
-  so `UiHop` internals stay internal while tests `new UiHop(...)`.
-- **Navigation = hop-advance (no new infra).** Nav covers carry `(label, goTo)` items; selection fires
-  `ExperienceStep{eventName:goTo}` over the existing unary Send — intra-experience nav only.
-- **Overlays = the one new mechanism (no new wire protocol).** Declarative `open` node → zero-size cover →
-  `PresentOnce` mixin (`ui_overlay_host.dart`) imperatively calls `showFDialog/showFSheet/showFToast` in a
-  post-frame callback exactly once (guard set BEFORE scheduling, `mounted` check; reset on `open:false` so it can
-  re-present). Dismiss = author re-emits the hop with `open:false`.
-- **Gallery dogfood (`ui-gallery`).** A `KitExperience` authored WITH the kit (single-source const
-  `MarketplaceSeeds.UiGalleryPackCode`), 5 category hops with a dogfooded `Sidebar`, openable full-screen from the
-  marketplace (`/experience/ui-gallery/ui-gallery`) like hello-world. `PackAlcEmbodierTests` compiles+embodies it
-  via the REAL Roslyn/ALC path — the deterministic proof that all 35 builder signatures + usings are correct
-  (catches name drift without the live stack). Gated `UiGalleryRendersE2ETests` walks all 5 hops.
-- **Verification.** brain build clean + 187 pass/1 skip/0 fail; app analyze clean (ui_kit) + 65/65; overlay guard
-  5/5; aspire doctor 4/4. Final whole-branch review (opus) "READY", 0 Critical / 0 merge-blocking. The 35 covers
-  are genuinely consistent (one nav path, one tile builder, one Inject rule, one string-coercion choke point).
-- **Deferred follow-ups (non-blocking, from the final review):** harden the overlay guard's element-identity
-  dependence further if overlays are toggled on a reused State (one edge done); `ui:Gap` is a square SizedBox
-  (not axis-aware); `ui_bottom_nav` placeholder uses Material `Icons.circle_outlined` (→ `FIcons.circle`);
-  `ui:Sheet` title is a plain Text (no ForUI header slot); gallery `Pagination` targets non-existent `page-N` hops
-  (cosmetic dead-end); live `aspire run` + gallery/HelloWorld browser E2E not yet run this session (gated).
-
-- 2026-07-02 spec/system-neurons-bloat-delete: startup bloat (hardcoded shells, seeds direct, SE/kit/chart demos) deleted from AspireOrchestratorNeuron.Handle(Start); ownership to MarketplaceNeuron/UserSession/DataViz via existing FireAsync+HomeFeedBus. kernel-dashboard + core started/status kept. Affected tests green.
-- 2026-07-02 spec/system-neurons-bloat-delete (finish): plan+spec complete + deletes landed (Software10TeamNeuron, SystemShellHelpers, dead features + bloat in SystemNeurons); uncommitted: 1-line using cleanup + plan/spec docs; reviewer subagent 0 Critical/Important (minor preexist only); build 0e/0w; targeted filters 107/107 (Ui|NeuronCore|Marketplace|Kernel) + aspire integration probes 6/6 green; doctor 4/4. Guardrails: Context7 resolves (Aspire/Orleans/Reqnroll), relative paths, self-explanatory, delete> , high-sev, aspire mcp, no .superpowers/sdd touch. Slice closed cleanly. Next candidate: E2E fixture stale name cleanup or test split.
-
-- 2026-07-02 merge to master: test-boilerplate-deduplication branch merged (1489ee0). Group1 + Mcp + SoftwareEngineeringReviewer + UnitTest1 conversion to NeuronTestBase landed (net delete). TestKit.csproj IsTestProject=false added. Post-merge: build 0e, targeted 17/17 pass + broader ~250/0. Remaining manual boiler limited to custom-config/collection cases (Gateway, Timeline, Steps, E2E fixture). CONTINUITY + plans updated. 
-
-Next proposed slices (post-Musk-1 brainstorm on current tree, verified evidence):
-1. UnitTest1 inner builders + redundant marker aliases trim (tiny delete in UnitTest1.cs + Synapse.cs aliases IAspireNeuron/IMarketplaceNeuron; update resolver sites).
-2. DbSupportNeuron tests (add `DbSupportTests : NeuronTestBase`; covers the zero-test production path wired in Mcp/Resolver/Program).
-3. Light TestDigitalBrain generalization (add ConfigureClient hook) + migrate 2-3 easy remaining IAsync (e.g. Timeline if client-only).
-4. Configurator/Steps boiler dedup (centralize SimpleSiloConfig duplicates across Steps + some tests).
-
-Recommended first: #1 then #2 (smallest, delete-biased or high-ROI coverage, independent). See full brainstorm details in session for file:line evidence + trade-offs. Ready for fresh spec/ branch + plan if chosen.
-
-## 2026-07-02 continuation: test boilerplate dedup (main DigitalBrain.Tests/) on spec/test-boilerplate-deduplication
-
-Musk 5-step strictly (1. questioned "UiSamples bloat" and "all markers dumb" via brainstorm subagent + evidence (real usage in neurons/Mcp/resolver; markers needed for Core-only Mcp); 2. delete bias on boiler ~100+ LOC; 3+ later).
-
-- Group 1 (ContextRecall, UserSession, CompanyKnowledge + dead _services delete): fresh impl+review subagents; all rituals green (build + targeted 21 pass); 0 crit/imp/minor from reviewer.
-- Partial Group 2: Mcp DigitalBrainToolsTests migrated (custom factory adapted for protected Grain); SoftwareEngineeringReviewerTests migrated (standard);  rituals green. Gateways/ some Kernel/Telegram use custom silo/client configs + [Collection] + extra state (strict helpers; audited/deferred per plan; not mechanical for this slice).
-- UnitTest1.cs (grab-bag): boiler deleted (now : NeuronTestBase, Grain<T> replaces; 31 GetGrain sites); build + core facts pass. Full split to focused (e.g. Kernel/NeuronCoreTests) noted as follow-on (grab value preserved, dupe gone).
-- Cleanup: stray IAsync in main now only custom ones + E2E fixture (non-migratable) + Steps (Reqnroll). Broad relevant filters + build green.
-- Guardrails: all relative, read-before-search_replace, search_replace only, no vacuous comments, Context7 (orleans resolve) pre, high-sev rituals after changes, delete> , no C:\ , no .superpowers/sdd edits during, CONTINUITY ledger here.
-- New deferred: full migration of custom-config tests (Gateway etc) would need TestKit extend for client configs/collections; consider in future slice. UnitTest1 file rename + deeper split.
-
-## 2026-07-02 completion of remaining slices (post-merge round)
-All proposed high-value slices from post-boilerplate-merge brainstorm completed via full pipeline (fresh spec branches, specs/plans written, subagent impl + reviewer, rituals after every edit, Context7 + aspire MCP, delete bias, relative, self-explanatory).
-
-- Slice marker-trim + UnitTest1-inners (branch spec/marker-trim-unit1-clean, merged): deleted redundant IAspire + IMarketplace bases + aliases in Synapse.cs (now direct contracts on the used *Neuron forms; no bare usages left). Cleaned the two inner manual TestClusterBuilder blocks in UnitTest1.cs (replaced with NeuronTestBase subclasses + ConfigureSilo override for isolated replay + strict config). Net delete. Reviewer: APPROVED clean. 28/28 targeted pass.
-- Slice DbSupport tests (branch spec/db-support-tests, merged): added `DigitalBrain.Tests/Kernel/DbSupportNeuronTests.cs` (2 facts exercising DbConnect/DbQuery + timeline echoes via Grain/FireAsync on NeuronTestBase). Covers the previous zero-coverage wired orphan (Mcp/Resolver/Program). Minimal. Guard added in impl for green dispatch. 35/35 on Kernel filter ( +2 new).
-- Remaining strict test boiler (Gateway collections, Timeline client config, Steps manual, E2E fixture) audited and documented as non-mechanical (custom shared state / client configurators / Reqnroll ctors). No over-generalization.
-- Other Core bloat (UiSurfaceSamples etc.): confirmed load-bearing (used by UserSession/DataViz/Gateway for surfaces); no pure-dead surface to delete without behavior change. Steps config duplication noted for future.
-- Final rituals: build clean; broad non-E2E high-sev (after fixes) green (prior 1 failure in WatchSynapses made drain-tolerant; 238+ pass in runs).
-- Guardrails: all followed (subagents fresh per chunk, read-before-replace, search_replace, no C:\, rituals, delete > add in code, CONTINUITY updated, no .superpowers/sdd).
-
-Diff range for this completion round (approximate from last merge + slices): post c3b0174 + the two slice commits (d60cbb2 etc.). Net: Core purity + coverage + harness consistency.
-
-New deferred items:
-- Migrate easy remaining + generalize base (ConfigureClient hook for Timeline etc.).
-- Steps + configurator duplication centralization.
-- Deeper UnitTest1 rename/split.
-- Any future UiSamples ownership push-down if samples grow.
-- Full E2E un-skip + resource name fixes.
-
-All proposed "remaining work" from the initiative completed or explicitly deferred with evidence. Master clean, tests high-sev green.
-- Verification (end of round): build clean; key filters (NeuronCore|Marketplace|Ui|Auth|Context|Company|Mcp) pass; plan/spec/docs updated with less-dumb + inventory.
-
-Slice ships focused (like NeuronTestBase prior). Next high-value per brainstorm: DbSupport orphan resolution or redundant marker trim in Core/Synapse.cs.
+Known still-open threads from this history (not touched by the cleanup initiative):
+- The original 30-step cleanup plan's actual capstone proof — an end-to-end demo of "Telegram input →
+  cross-channel logic → `UiSurface` rendered in Flutter" — was never built, despite the underlying
+  pieces (`IFlutterUiNeuron`, `FlutterUiNeuron`, `TelegramChatNeuron`, `DataVisualizationNeuron`) all
+  existing individually. Zero tests found matching that flow.
+- Distribution & Bundles Phase 2 (open publishing, untrusted-code sandbox, exportable bundle file,
+  embeddable surface) — deliberately deferred in the v1 product spec, not started.
 
 ## 2026-07-02 correction + Group 3 test harness dedup (post-brainstorm round)
 
-**Correction to the entry above:** the "Slice marker-trim + UnitTest1-inners ... merged" claim (line ~424) was false — that work (commit 246bffa) existed only on the orphaned local branch `spec/marker-trim-unit1-clean`, never actually merged to master, despite the commit message on `d60cbb2` also claiming it landed. Discovered via direct verification (`git merge-base --is-ancestor 246bffa master` → NO; `git show d60cbb2 --stat` → only DbSupport files) at the start of this round. The branch was still fully intact, reviewer-approved, and build/test-clean (28/28) — landed via a straight merge (no re-implementation needed) before starting new work. Lesson: verify ledger claims against `git log`/`git show` before trusting them, especially after any session in a shared working directory.
+**Correction to a prior entry:** a "Slice marker-trim + UnitTest1-inners ... merged" claim was false — that work (commit 246bffa) existed only on the orphaned local branch `spec/marker-trim-unit1-clean`, never actually merged to master, despite the commit message on `d60cbb2` also claiming it landed. Discovered via direct verification (`git merge-base --is-ancestor 246bffa master` → NO; `git show d60cbb2 --stat` → only DbSupport files) at the start of this round. The branch was still fully intact, reviewer-approved, and build/test-clean (28/28) — landed via a straight merge (no re-implementation needed) before starting new work. Lesson: verify ledger claims against `git log`/`git show` before trusting them, especially after any session in a shared working directory.
 
 Also re-verified (fresh research, since the "load-bearing" claim above for Core bloat was itself unverified prose): `CodeFoundrySynapses.cs`, `CompanySkillSynapses.cs`, `Awesome/ReviewSynapses.cs`, `Ui/RfwCard.cs` are all genuinely live (Foundry closed-loop, company-skill orchestration, the reviewer neuron, and RfwCard's 48 references in the UI streaming backbone) — the open `2026-07-02-core-bloat-delete-design.md` spec's premise doesn't hold; the only real dead item found was the orphaned `ISoftwareEngineeringTeam` marker interface (zero usages). That spec should be treated as researched-and-rejected, not implemented as written.
 
-**Group 3 test harness dedup** (spec: `docs/specs/2026-07-02-group3-test-harness-dedup-design.md`, plan: `docs/plans/2026-07-02-group3-test-harness-dedup-plan.md`, branch `spec/group3-test-harness-dedup`, merged to master via fast-forward at 0b4fe9f): finished the test-boilerplate-deduplication initiative's deferred Group 3. Extended `NeuronTestBase`/`TestDigitalBrain` with three additive hooks (`ConfigureClient`, `InitialSilosCount`, `Cluster`) and migrated the 10 remaining manual-`TestClusterBuilder` files (`LicenseAndEntitlementTests`, `RollingUpdateRollbackTests`, `TelegramDeepLinkRoutingTests`, `HomeFeedCrossSiloTests`, `TimelineStreamTests`, `GatewayServiceTests`, `GenericSendTests`, `ExperienceStepDispatchTests`, `WatchSynapsesTests`, `PackConfigPullTests`). Key insight that unblocked the "not mechanical" files from the earlier round: `ConfigureSilo` already runs as an instance-bound delegate (existing `AsyncLocal` bridge in `TestDigitalBrain.cs`), so the `static Shared*Bus` field bridge those files used was never actually necessary — replaced with direct instance-field capture, a net simplification. A real spike (not just an assumption) confirmed layering each file's `ConfigureSilo` on top of the always-applied `NeuronTestSiloConfigurator` is safe. All 6 implementation tasks + final whole-branch review passed with 0 Critical/Important findings; one Minor (redundant `AddSignalEgressStreamSubscriber()` double-registration in 2 files, masked by existing duplicate-tolerance) was found and fixed. Full suite unchanged throughout: 252 passed/6 skipped/0 failed.
+**Group 3 test harness dedup** (branch `spec/group3-test-harness-dedup`, merged to master via fast-forward at 0b4fe9f): finished the test-boilerplate-deduplication initiative's deferred Group 3. Extended `NeuronTestBase`/`TestDigitalBrain` with three additive hooks (`ConfigureClient`, `InitialSilosCount`, `Cluster`) and migrated the 10 remaining manual-`TestClusterBuilder` files (`LicenseAndEntitlementTests`, `RollingUpdateRollbackTests`, `TelegramDeepLinkRoutingTests`, `HomeFeedCrossSiloTests`, `TimelineStreamTests`, `GatewayServiceTests`, `GenericSendTests`, `ExperienceStepDispatchTests`, `WatchSynapsesTests`, `PackConfigPullTests`). Key insight that unblocked the "not mechanical" files from the earlier round: `ConfigureSilo` already runs as an instance-bound delegate (existing `AsyncLocal` bridge in `TestDigitalBrain.cs`), so the `static Shared*Bus` field bridge those files used was never actually necessary — replaced with direct instance-field capture, a net simplification. A real spike (not just an assumption) confirmed layering each file's `ConfigureSilo` on top of the always-applied `NeuronTestSiloConfigurator` is safe. All 6 implementation tasks + final whole-branch review passed with 0 Critical/Important findings; one Minor (redundant `AddSignalEgressStreamSubscriber()` double-registration in 2 files, masked by existing duplicate-tolerance) was found and fixed. Full suite unchanged throughout: 252 passed/6 skipped/0 failed.
 
 New deferred items:
 - **Group 4**: 9 files still build ad-hoc `TestClusterBuilder` per-test-method (`Ui/MarketplaceFilterRoundtripTests.cs`, `Trust/TrustedSeedInstallTests.cs`, `Trust/PublishGateTests.cs`, `Kernel/BroadcastReactivityTests.cs`, `Kernel/LlmResponderScopedConfigTests.cs`, `Distribution/CatalogMaterializationTests.cs`, `Distribution/HandlerGrowthTests.cs`, `Distribution/PackBroadcastReactivityTests.cs`, `Kernel/LlmResponderTests.cs`) — a different, larger pattern than Group 3's class-level `IAsyncLifetime`, not yet scoped.
@@ -458,7 +61,7 @@ New deferred items:
 
 ## 2026-07-02 Group 4 test harness dedup (closes the test-harness-dedup initiative)
 
-**Group 4 test harness dedup** (spec: `docs/specs/2026-07-02-group4-test-harness-dedup-design.md`, plan: `docs/plans/2026-07-02-group4-test-harness-dedup-plan.md`, branch `spec/group4-test-harness-dedup`): migrated the 9 files Group 3 deferred, closing out the entire Groups 1-4 test-harness-dedup initiative. Fresh research found the deferred "not yet scoped, different, larger pattern" judgment was too pessimistic — every file needed zero new `NeuronTestBase`/`TestDigitalBrain` capability. 5 files migrated directly (0-1 `ConfigureSilo` override, same shape as Group 3's mechanical tier); 4 files split via a **nested class** where facts diverge into genuinely different, mutually-exclusive cluster configs, or where a fact built no cluster at all (pure unit test, kept off `NeuronTestBase` to avoid an unneeded Orleans silo spin-up).
+**Group 4 test harness dedup** (branch `spec/group4-test-harness-dedup`, merged to master): migrated the 9 files Group 3 deferred, closing out the entire Groups 1-4 test-harness-dedup initiative. Fresh research found the deferred "not yet scoped, different, larger pattern" judgment was too pessimistic — every file needed zero new `NeuronTestBase`/`TestDigitalBrain` capability. 5 files migrated directly (0-1 `ConfigureSilo` override, same shape as Group 3's mechanical tier); 4 files split via a **nested class** where facts diverge into genuinely different, mutually-exclusive cluster configs, or where a fact built no cluster at all (pure unit test, kept off `NeuronTestBase` to avoid an unneeded Orleans silo spin-up).
 
 Two real plan defects were found and fixed empirically during implementation (not just asserted — verified by build failure/success):
 1. A file that declares a standalone class implementing `ISiloConfigurator` needs `using Orleans.TestingHost;`; a file that only overrides `ConfigureSilo(ISiloBuilder builder)` without naming that type doesn't. The original plan text omitted the import from 2 files (`LlmResponderTests.cs`, `LlmResponderScopedConfigTests.cs`) — confirmed necessary via `CS0246` on removal.
@@ -468,8 +71,14 @@ Both corrections were caught by the implementer subagents themselves stopping an
 
 `grep -rn "TestClusterBuilder\| : IAsyncLifetime" DigitalBrain.Tests` now returns zero hits outside two genuinely out-of-scope patterns never part of this initiative: `Gateway/GatewayGrpcWireTests.cs` (ASP.NET `WebApplicationFactory`, not Orleans `TestCluster`) and `E2E/DigitalBrainAppHostFixture.cs` (Aspire AppHost fixture) — plus the `DigitalBrain.Tests/Steps/*.cs` Reqnroll BDD step-binding files (`CodeFoundrySteps.cs`, `ConfigFormSteps.cs`, `NeuronSteps.cs`, `TelegramReactiveLoopSteps.cs`), which build `TestClusterBuilder` per-step rather than per-xUnit-class — a structurally different problem (Reqnroll scenario lifecycle, not `IAsyncLifetime`) that was never in the Group 1-4 scope and would need its own design if ever tackled.
 
-Deferred items carried forward unchanged (none touched this round):
+Deferred items carried forward:
 - `UnitTest1.cs` domain split.
-- Close out `2026-07-02-core-bloat-delete-design.md` as rejected + delete the one real orphan (`ISoftwareEngineeringTeam`) — note: verified this round that `ISoftwareEngineeringTeam` is the base interface of the live `ISoftware20Team`/`Software20TeamNeuron`, so "deleting" it means flattening its members directly onto `ISoftware20Team`, not a pure no-op removal.
-- Fresh scan for other dumb duplication/dead code beyond what prior rounds found (not attempted this round — this round's research stayed scoped to Group 4).
-- **New**: the Reqnroll `Steps/*.cs` `TestClusterBuilder` pattern noted above — a real, never-previously-flagged candidate for a future round, distinct in shape from Groups 1-4.
+- Close out `2026-07-02-core-bloat-delete-design.md` (now deleted along with the rest of `docs/specs/` — TODO if resumed: re-derive from git history) as rejected + delete the one real orphan (`ISoftwareEngineeringTeam`) — note: verified this round that `ISoftwareEngineeringTeam` is the base interface of the live `ISoftware20Team`/`Software20TeamNeuron`, so "deleting" it means flattening its members directly onto `ISoftware20Team`, not a pure no-op removal.
+- Fresh scan for other dumb duplication/dead code beyond what prior rounds found.
+- The Reqnroll `Steps/*.cs` `TestClusterBuilder` pattern noted above — a real, never-previously-flagged candidate for a future round, distinct in shape from Groups 1-4.
+
+## 2026-07-02 repo cleanup (branches + docs)
+
+Per explicit user direction to unify/simplify before starting new feature work: deleted all stale branches (8 local + 5 remote, all verified 0 commits ahead of master — `spec/authoring-loop-acceleration` + 3 slices, `spec/db-support-tests`, `spec/fix-pre-existing-test-failures`, `spec/telegram-llm-experience`, `spec/test-boilerplate-deduplication`, `origin/spec/group3-test-harness-dedup`, `origin/spec/neuron-test-harness-consolidation`). Deleted ~55 historical spec/plan docs across `docs/plans/`, `docs/specs/`, `docs/superpowers/{specs,plans}/`, plus 2 misplaced top-level docs and a stray untracked garbage file at the repo root. Promoted `docs/specs/2026-07-01-distribution-and-bundles.md` (a product spec, not an implementation plan) to `docs/PRODUCT_VISION.md`. `docs/` now holds exactly 3 files: `PRODUCT_VISION.md`, `SYSTEM_DESIGN.md`, `authoring-a-bundle.md`. Fixed cross-references in `SYSTEM_DESIGN.md`, `README.md`, `authoring-a-bundle.md`. Compacted this file (see "Prior work summary" above). Established convention going forward: `docs/specs/`/`docs/plans/` are per-branch scratch, deleted after merge.
+
+Next: a couple of core end-to-end use cases, proven with real tests, following the Musk 5-step algorithm strictly — see `E:\digitalbraintech\core-requirements\Musk approach.txt`. First candidate discussed: install an X/Twitter integration pack + a new ino that reacts to a specific author's posts and sends the current Bitcoin price to a Telegram chat — a concrete cross-channel proof, in the spirit of the original (never-built) "Telegram → viz → UiSurface" capstone demo.

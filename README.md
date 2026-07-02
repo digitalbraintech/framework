@@ -53,7 +53,7 @@ See `Brain.slnx`, `aspire.config.json`, `Directory.Packages.props` (Aspire 13.4.
 
 ## UI Kit (Neurons + Synapses focus)
 
-See `docs/ui-kit-neuron-synapse-implementation-plan.md` (this plan in execution) and `CONTINUITY.md` (2026-06-27 neuron-UI phase).
+See `docs/SYSTEM_DESIGN.md` for the current architecture and `CONTINUITY.md` for recent history.
 
 - Grammar lives in `DigitalBrain.Core/UiSurfaces.cs` (`NeuronUiKit`, `Ui`, `UiWidgetTree`, `UiSurface.ForWidgetTree`...).
 - Experiences: `KitExperience` + fluent `UiExperience` (packs author multi-hop UIs in pure C#).

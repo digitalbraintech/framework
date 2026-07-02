@@ -1,6 +1,6 @@
 # Authoring a Bundle
 
-A bundle is a `NeuroPack` + manifest (see `docs/specs/2026-07-01-distribution-and-bundles.md`).
+A bundle is a `NeuroPack` + manifest (see `docs/PRODUCT_VISION.md`).
 This is the test-first loop for building one. **Write the test first, then the bundle.**
 
 ## The single source of truth

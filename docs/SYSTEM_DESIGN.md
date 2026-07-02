@@ -448,20 +448,18 @@ Commit messages follow a loose Conventional-Commits style: `feat(scope): …`, `
 `tests`, `telegram`, `gateway`, `llm`, `aspire`, `deploy`.
 
 Feature work happens on `spec/<feature-name>` branches, each paired with a
-`docs/specs/<date>-<feature-name>[-design].md` + `docs/plans/<date>-<feature-name>.md` (and, for
-multi-slice specs, one plan file per phase/slice, e.g. `2026-07-01-phase1a-bundle-manifest.md`,
-`2026-07-01-phase1b-trust-gate.md`, `2026-07-01-authoring-loop-slice1-flutter-freshness.md`). One real
-merge is visible: `f479ce4 Merge pull request #5 from digitalbraintech/spec/telegram-llm-experience`.
-Local branches present but not pushed: `spec/authoring-loop-acceleration` and its three slice
-branches, `spec/telegram-llm-experience` (this one has a remote copy too). Most spec branches are
-local-only — squashed/merged into `master` locally without a corresponding pushed remote branch,
-matching the pattern of doing the PR dance only when it's actually useful.
+`docs/specs/<date>-<feature-name>[-design].md` + `docs/plans/<date>-<feature-name>.md` while the work
+is in flight. **As of the 2026-07-02 repo cleanup, `docs/specs/` and `docs/plans/` are deleted once a
+branch merges** — the spec+plan pair is scratch that did its job (guiding the implementation and its
+review); the durable record of what shipped and why lives in git history and in `CONTINUITY.md`'s
+round-by-round ledger, not in a permanently-growing docs tree. Both directories are recreated
+per-branch and removed again after merge; if you see them non-empty, work is in flight.
 
-`docs/` is organized in three groups: `docs/specs/` (design docs), `docs/plans/` (paired
-implementation plans, often one per phase/slice), and `docs/superpowers/{specs,plans}/` (older
-2026-06-26 through 2026-06-30 SDD-workflow artifacts, one directory level deeper). Top-level docs
-(`docs/authoring-a-bundle.md`, `docs/ui-kit-neuron-synapse-implementation-plan.md`,
-`docs/product-finalization-plan-2026-06-27.md`) sit outside both.
+`docs/` intentionally holds only a handful of durable, always-current documents: `PRODUCT_VISION.md`
+(what DigitalBrain is and who it's for), `SYSTEM_DESIGN.md` (this file — current architecture), and
+`authoring-a-bundle.md` (how to build a NeuroPack). Top-level `README.md`, `AGENTS.md`, and
+`CONTINUITY.md` sit outside `docs/`. Anything else under `docs/` is stale and should be deleted, not
+added to.
 
 ### 2.4 Authoring-loop tooling (what exists today for building a new bundle fast)
 
