@@ -417,6 +417,27 @@ Musk 5-step strictly (1. questioned "UiSamples bloat" and "all markers dumb" via
 - Cleanup: stray IAsync in main now only custom ones + E2E fixture (non-migratable) + Steps (Reqnroll). Broad relevant filters + build green.
 - Guardrails: all relative, read-before-search_replace, search_replace only, no vacuous comments, Context7 (orleans resolve) pre, high-sev rituals after changes, delete> , no C:\ , no .superpowers/sdd edits during, CONTINUITY ledger here.
 - New deferred: full migration of custom-config tests (Gateway etc) would need TestKit extend for client configs/collections; consider in future slice. UnitTest1 file rename + deeper split.
+
+## 2026-07-02 completion of remaining slices (post-merge round)
+All proposed high-value slices from post-boilerplate-merge brainstorm completed via full pipeline (fresh spec branches, specs/plans written, subagent impl + reviewer, rituals after every edit, Context7 + aspire MCP, delete bias, relative, self-explanatory).
+
+- Slice marker-trim + UnitTest1-inners (branch spec/marker-trim-unit1-clean, merged): deleted redundant IAspire + IMarketplace bases + aliases in Synapse.cs (now direct contracts on the used *Neuron forms; no bare usages left). Cleaned the two inner manual TestClusterBuilder blocks in UnitTest1.cs (replaced with NeuronTestBase subclasses + ConfigureSilo override for isolated replay + strict config). Net delete. Reviewer: APPROVED clean. 28/28 targeted pass.
+- Slice DbSupport tests (branch spec/db-support-tests, merged): added `DigitalBrain.Tests/Kernel/DbSupportNeuronTests.cs` (2 facts exercising DbConnect/DbQuery + timeline echoes via Grain/FireAsync on NeuronTestBase). Covers the previous zero-coverage wired orphan (Mcp/Resolver/Program). Minimal. Guard added in impl for green dispatch. 35/35 on Kernel filter ( +2 new).
+- Remaining strict test boiler (Gateway collections, Timeline client config, Steps manual, E2E fixture) audited and documented as non-mechanical (custom shared state / client configurators / Reqnroll ctors). No over-generalization.
+- Other Core bloat (UiSurfaceSamples etc.): confirmed load-bearing (used by UserSession/DataViz/Gateway for surfaces); no pure-dead surface to delete without behavior change. Steps config duplication noted for future.
+- Final rituals: build clean; broad non-E2E high-sev (after fixes) green (prior 1 failure in WatchSynapses made drain-tolerant; 238+ pass in runs).
+- Guardrails: all followed (subagents fresh per chunk, read-before-replace, search_replace, no C:\, rituals, delete > add in code, CONTINUITY updated, no .superpowers/sdd).
+
+Diff range for this completion round (approximate from last merge + slices): post c3b0174 + the two slice commits (d60cbb2 etc.). Net: Core purity + coverage + harness consistency.
+
+New deferred items:
+- Migrate easy remaining + generalize base (ConfigureClient hook for Timeline etc.).
+- Steps + configurator duplication centralization.
+- Deeper UnitTest1 rename/split.
+- Any future UiSamples ownership push-down if samples grow.
+- Full E2E un-skip + resource name fixes.
+
+All proposed "remaining work" from the initiative completed or explicitly deferred with evidence. Master clean, tests high-sev green.
 - Verification (end of round): build clean; key filters (NeuronCore|Marketplace|Ui|Auth|Context|Company|Mcp) pass; plan/spec/docs updated with less-dumb + inventory.
 
 Slice ships focused (like NeuronTestBase prior). Next high-value per brainstorm: DbSupport orphan resolution or redundant marker trim in Core/Synapse.cs.
