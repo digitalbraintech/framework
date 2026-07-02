@@ -43,9 +43,9 @@ internal sealed class AnswerPrefixChatClient : IChatClient
     public void Dispose() { }
 }
 
-// Test-local configurator: applies the shared silo wiring then registers the fake IChatClient.
-// Using both configurators via AddSiloBuilderConfigurator keeps LlmResponderTests isolated —
-// other test clusters that omit this configurator get no IChatClient (their deterministic fallback).
+// Test-local configurator: registers the fake IChatClient on top of the always-applied base silo wiring;
+// kept separate from NeuronTestSiloConfigurator so other NeuronTestBase subclasses that don't apply this
+// ConfigureSilo override get no IChatClient (their deterministic fallback).
 public sealed class LlmResponderSiloConfigurator : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder) =>
@@ -53,44 +53,35 @@ public sealed class LlmResponderSiloConfigurator : ISiloConfigurator
             services.AddSingleton<IChatClient, AnswerPrefixChatClient>());
 }
 
-public class LlmResponderTests
+public class LlmResponderTests : NeuronTestBase
 {
+    protected override void ConfigureSilo(ISiloBuilder builder) =>
+        new LlmResponderSiloConfigurator().Configure(builder);
+
     [Fact]
     public async Task AskLlm_broadcast_triggers_reply_Signal_with_llm_text()
     {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<LlmResponderSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
-        try
+        // Activate responder so it subscribes to the timeline before the ask arrives.
+        var responder = Grain<ILlmResponderNeuron>("responder-1");
+        await responder.GetTimelineAsync();
+
+        var emitter = Grain<IAskLlmEmitter>("emitter-1");
+        var replyProps = new Dictionary<string, object?> { ["chatId"] = 7 };
+        await emitter.BroadcastAskAsync("hi", "ReplyX", replyProps);
+
+        // Poll the responder's timeline: stream delivery + grain dispatch cross the silo scheduler,
+        // so a fixed delay is flaky under load. Bounded wait keeps the test fast when it lands quickly.
+        Signal? signal = null;
+        for (var attempt = 0; attempt < 20 && signal is null; attempt++)
         {
-            // Activate responder so it subscribes to the timeline before the ask arrives.
-            var responder = cluster.GrainFactory.GetGrain<ILlmResponderNeuron>("responder-1");
-            await responder.GetTimelineAsync();
-
-            var emitter = cluster.GrainFactory.GetGrain<IAskLlmEmitter>("emitter-1");
-            var replyProps = new Dictionary<string, object?> { ["chatId"] = 7 };
-            await emitter.BroadcastAskAsync("hi", "ReplyX", replyProps);
-
-            // Poll the responder's timeline: stream delivery + grain dispatch cross the silo scheduler,
-            // so a fixed delay is flaky under load. Bounded wait keeps the test fast when it lands quickly.
-            Signal? signal = null;
-            for (var attempt = 0; attempt < 20 && signal is null; attempt++)
-            {
-                await Task.Delay(50);
-                var timeline = await responder.GetTimelineAsync();
-                signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "ReplyX");
-            }
-
-            Assert.NotNull(signal);
-            Assert.Equal("ReplyX", signal.Name);
-            Assert.Equal(7, signal.Props["chatId"]);
-            Assert.Equal("ANSWER:hi", signal.Props["text"]);
+            await Task.Delay(50);
+            var timeline = await responder.GetTimelineAsync();
+            signal = timeline.OfType<Signal>().FirstOrDefault(s => s.Name == "ReplyX");
         }
-        finally
-        {
-            await cluster.StopAllSilosAsync();
-        }
+
+        Assert.NotNull(signal);
+        Assert.Equal("ReplyX", signal.Name);
+        Assert.Equal(7, signal.Props["chatId"]);
+        Assert.Equal("ANSWER:hi", signal.Props["text"]);
     }
 }
