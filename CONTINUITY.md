@@ -396,3 +396,17 @@ the Slice 0 pattern — the `ui:*` renderer branch was never touched.
 
 - 2026-07-02 spec/system-neurons-bloat-delete: startup bloat (hardcoded shells, seeds direct, SE/kit/chart demos) deleted from AspireOrchestratorNeuron.Handle(Start); ownership to MarketplaceNeuron/UserSession/DataViz via existing FireAsync+HomeFeedBus. kernel-dashboard + core started/status kept. Affected tests green.
 - 2026-07-02 spec/system-neurons-bloat-delete (finish): plan+spec complete + deletes landed (Software10TeamNeuron, SystemShellHelpers, dead features + bloat in SystemNeurons); uncommitted: 1-line using cleanup + plan/spec docs; reviewer subagent 0 Critical/Important (minor preexist only); build 0e/0w; targeted filters 107/107 (Ui|NeuronCore|Marketplace|Kernel) + aspire integration probes 6/6 green; doctor 4/4. Guardrails: Context7 resolves (Aspire/Orleans/Reqnroll), relative paths, self-explanatory, delete> , high-sev, aspire mcp, no .superpowers/sdd touch. Slice closed cleanly. Next candidate: E2E fixture stale name cleanup or test split.
+
+## 2026-07-02 continuation: test boilerplate dedup (main DigitalBrain.Tests/) on spec/test-boilerplate-deduplication
+
+Musk 5-step strictly (1. questioned "UiSamples bloat" and "all markers dumb" via brainstorm subagent + evidence (real usage in neurons/Mcp/resolver; markers needed for Core-only Mcp); 2. delete bias on boiler ~100+ LOC; 3+ later).
+
+- Group 1 (ContextRecall, UserSession, CompanyKnowledge + dead _services delete): fresh impl+review subagents; all rituals green (build + targeted 21 pass); 0 crit/imp/minor from reviewer.
+- Partial Group 2: Mcp DigitalBrainToolsTests migrated (custom factory adapted for protected Grain); SoftwareEngineeringReviewerTests migrated (standard);  rituals green. Gateways/ some Kernel/Telegram use custom silo/client configs + [Collection] + extra state (strict helpers; audited/deferred per plan; not mechanical for this slice).
+- UnitTest1.cs (grab-bag): boiler deleted (now : NeuronTestBase, Grain<T> replaces; 31 GetGrain sites); build + core facts pass. Full split to focused (e.g. Kernel/NeuronCoreTests) noted as follow-on (grab value preserved, dupe gone).
+- Cleanup: stray IAsync in main now only custom ones + E2E fixture (non-migratable) + Steps (Reqnroll). Broad relevant filters + build green.
+- Guardrails: all relative, read-before-search_replace, search_replace only, no vacuous comments, Context7 (orleans resolve) pre, high-sev rituals after changes, delete> , no C:\ , no .superpowers/sdd edits during, CONTINUITY ledger here.
+- New deferred: full migration of custom-config tests (Gateway etc) would need TestKit extend for client configs/collections; consider in future slice. UnitTest1 file rename + deeper split.
+- Verification (end of round): build clean; key filters (NeuronCore|Marketplace|Ui|Auth|Context|Company|Mcp) pass; plan/spec/docs updated with less-dumb + inventory.
+
+Slice ships focused (like NeuronTestBase prior). Next high-value per brainstorm: DbSupport orphan resolution or redundant marker trim in Core/Synapse.cs.

@@ -1,28 +1,15 @@
 using DigitalBrain.Core;
 using DigitalBrain.TestKit;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Auth;
 
 [Collection("silo-host")]
-public sealed class UserSessionNeuronTests : IAsyncLifetime
+public sealed class UserSessionNeuronTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-
-    public async Task InitializeAsync()
-    {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
-
     [Fact]
     public async Task First_Login_Provisions_Local_User_And_Creates_Session()
     {
-        var session = _cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-auth-valid");
+        var session = Grain<IUserSessionNeuron>("session-auth-valid");
 
         await session.FireAsync(new LoginRequest("alice.local", "correct horse battery staple", "test"));
 
@@ -44,7 +31,7 @@ public sealed class UserSessionNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Invalid_Password_Fires_LoginFailed_And_Does_Not_Create_Second_Session()
     {
-        var session = _cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-auth-invalid");
+        var session = Grain<IUserSessionNeuron>("session-auth-invalid");
 
         await session.FireAsync(new LoginRequest("bob", "first-password", "test"));
         await session.FireAsync(new LoginRequest("bob", "wrong-password", "test"));
@@ -60,7 +47,7 @@ public sealed class UserSessionNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Logout_Ends_Existing_Session()
     {
-        var session = _cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-auth-logout");
+        var session = Grain<IUserSessionNeuron>("session-auth-logout");
 
         await session.FireAsync(new LoginRequest("carol", "first-password", "test"));
         var created = (await session.GetOutgoingTimelineAsync()).OfType<UserSessionCreated>().Single();
@@ -75,7 +62,7 @@ public sealed class UserSessionNeuronTests : IAsyncLifetime
     [Fact]
     public async Task Login_Surface_Is_Server_Driven_Form()
     {
-        var session = _cluster.GrainFactory.GetGrain<IUserSessionNeuron>("session-auth-surface");
+        var session = Grain<IUserSessionNeuron>("session-auth-surface");
 
         var surface = await session.BuildLoginSurfaceAsync("test-client");
 

@@ -4,35 +4,16 @@ using DigitalBrain.Kernel.Company;
 using DigitalBrain.Kernel.Foundry;
 using DigitalBrain.Kernel.Llm;
 using DigitalBrain.TestKit;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Company;
 
-public sealed class CompanyKnowledgeTests : IAsyncLifetime
+public sealed class CompanyKnowledgeTests : NeuronTestBase
 {
-    private TestCluster? _cluster;
-    private IServiceProvider? _services;
-
-    public async Task InitializeAsync()
-    {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-        _services = _cluster.Client.ServiceProvider;
-    }
-
-    public async Task DisposeAsync()
-    {
-        if (_cluster is not null)
-            await _cluster.StopAllSilosAsync();
-    }
-
     [Fact]
     public async Task Ingests_Company_Process_Sources_And_Allows_Recall_Of_Key_Decisions()
     {
         // Use the grain for ingest path (exercises neuron + ingestor + journaled memory).
-        var company = _cluster!.GrainFactory.GetGrain<ICompanyKnowledgeNeuron>("company-refunds");
+        var company = Grain<ICompanyKnowledgeNeuron>("company-refunds");
 
         const string policy = """
             Eligibility: purchased within 30 days, provide order ID or receipt.
@@ -50,7 +31,7 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
         await company.FireAsync(new IngestCompanySource("company-process-refunds", "refund-transcript", transcript));
 
         // ContextNeuron Recall (hybrid) sees the journaled MemoryStored from ingest.
-        var context = _cluster.GrainFactory.GetGrain<IContextNeuron>("context-for-company");
+        var context = Grain<IContextNeuron>("context-for-company");
         await context.RememberAsync(policy); // reinforce
         await context.RememberAsync(transcript);
 
@@ -78,10 +59,10 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
     [Fact]
     public async Task Crystallizes_Refund_ProcessSpec_With_Key_Decision_Points_From_Sources()
     {
-        var company = _cluster!.GrainFactory.GetGrain<ICompanyKnowledgeNeuron>("company-crystallize");
+        var company = Grain<ICompanyKnowledgeNeuron>("company-crystallize");
         await company.FireAsync(new IngestCompanySource("company-process-refunds", "p", "30 days. defective auto within 14. over 500 manual. loyalty leeway."));
 
-        var context = _cluster.GrainFactory.GetGrain<IContextNeuron>("ctx-cryst");
+        var context = Grain<IContextNeuron>("ctx-cryst");
         var fragments = await context.RecallAsync("refund 30 days defective", top: 5);
 
         var crystallizer = new ProcessCrystallizer(chatClient: null);
@@ -128,11 +109,11 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
     public async Task EndToEnd_CompanySkill_Ingest_Crystallize_Synth_EmbodyViaGenerated_FiresAndAuditsInJournals()
     {
         // 1. Ingest
-        var company = _cluster!.GrainFactory.GetGrain<ICompanyKnowledgeNeuron>("company-e2e");
+        var company = Grain<ICompanyKnowledgeNeuron>("company-e2e");
         await company.FireAsync(new IngestCompanySource("e2e-refunds", "policy", "30 days. defective auto 14d. high value manual."));
 
         // 2. Recall + crystallize
-        var ctx = _cluster.GrainFactory.GetGrain<IContextNeuron>("ctx-e2e");
+        var ctx = Grain<IContextNeuron>("ctx-e2e");
         var frags = await ctx.RecallAsync("refund", top: 3);
         var cryst = new ProcessCrystallizer(null);
         var specResult = await cryst.CrystallizeAsync("RefundHandling", frags);
@@ -142,7 +123,7 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
         string packCode = synth.SynthesizePackSource(specResult.Spec, "e2e.1");
 
         // 4. Deliver via NeuroPackInstalled to Generated (reuses embodiment path)
-        var gen = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("skill-refundhandling");
+        var gen = Grain<IGeneratedNeuron>("skill-refundhandling");
         var pack = new NeuroPack("RefundHandling", "e2e.1", OwnerId: "test", Code: packCode);
         await gen.DeliverAsync(new NeuroPackInstalled(pack));
 
@@ -159,7 +140,7 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
     [Fact]
     public async Task KeepCurrent_ReSynthesizeAndReEmbody_UpdatesBehaviorSafely()
     {
-        var gen = _cluster!.GrainFactory.GetGrain<IGeneratedNeuron>("skill-keepcurrent");
+        var gen = Grain<IGeneratedNeuron>("skill-keepcurrent");
 
         // v1 policy
         var synth = new SkillPackSynthesizer();
@@ -187,7 +168,7 @@ public sealed class CompanyKnowledgeTests : IAsyncLifetime
     [Fact]
     public async Task Orchestrator_Creates_Skill_EndToEnd_And_Reports_Result()
     {
-        var orch = _cluster!.GrainFactory.GetGrain<ICompanySkillOrchestratorNeuron>("orchestrator-test");
+        var orch = Grain<ICompanySkillOrchestratorNeuron>("orchestrator-test");
         await orch.FireAsync(new CreateCompanySkill("RefundHandling"));
 
         await Task.Delay(150);
