@@ -3,7 +3,6 @@ using DigitalBrain.Developer;
 using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests;
 
@@ -52,13 +51,11 @@ public class NeuronTests : NeuronTestBase
         Assert.True(sim.Success);
         Assert.Contains("different", sim.Details, StringComparison.OrdinalIgnoreCase);
 
-        var simBuilder = new TestClusterBuilder();
-        simBuilder.AddSiloBuilderConfigurator<NeuronTestSiloConfigurator>();
-        var simCluster = simBuilder.Build();
-        await simCluster.DeployAsync();
+        var isolatedReplay = new IsolatedReplayTest();
+        await isolatedReplay.InitializeAsync();
         try
         {
-            var simStatus = simCluster.GrainFactory.GetGrain<ISystemStatus>("status-isolated-sim");
+            var simStatus = isolatedReplay.Grain<ISystemStatus>("status-isolated-sim");
             foreach (var s in cp.Snapshot.OfType<SystemStatusChanged>())
             {
                 await simStatus.FireAsync(s);
@@ -72,7 +69,7 @@ public class NeuronTests : NeuronTestBase
         }
         finally
         {
-            await simCluster.StopAllSilosAsync();
+            await isolatedReplay.DisposeAsync();
         }
     }
 
@@ -347,13 +344,11 @@ public class NeuronTests : NeuronTestBase
     [Fact]
     public async Task Marketplace_Rejects_Unsigned_Packs_When_Strict_Config_Is_Enabled()
     {
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<StrictMarketplaceTrustSiloConfigurator>();
-        var cluster = builder.Build();
-        await cluster.DeployAsync();
+        var strictConfig = new StrictConfigNeuronTest();
+        await strictConfig.InitializeAsync();
         try
         {
-            var market = cluster.GrainFactory.GetGrain<IMarketplaceNeuron>("market-strict-unsigned");
+            var market = strictConfig.Grain<IMarketplaceNeuron>("market-strict-unsigned");
             await market.FireAsync(new PublishToMarketplace("UnsignedStrict", "1.0", Code: "ok", OwnerId: "dev"));
             await market.FireAsync(new InstallFromMarketplace("UnsignedStrict", "1.0", BuyerId: "buyer"));
 
@@ -361,7 +356,7 @@ public class NeuronTests : NeuronTestBase
         }
         finally
         {
-            await cluster.StopAllSilosAsync();
+            await strictConfig.DisposeAsync();
         }
     }
 
@@ -547,24 +542,6 @@ public class NeuronTests : NeuronTestBase
         p.WaitForExit();
     }
 
-    private sealed class StrictMarketplaceTrustSiloConfigurator : ISiloConfigurator
-    {
-        public void Configure(ISiloBuilder siloBuilder)
-        {
-            new NeuronTestSiloConfigurator().Configure(siloBuilder);
-            siloBuilder.ConfigureServices(services =>
-            {
-                var configuration = new ConfigurationBuilder()
-                    .AddInMemoryCollection(new Dictionary<string, string?>
-                    {
-                        ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true"
-                    })
-                    .Build();
-                services.AddSingleton<IConfiguration>(configuration);
-            });
-        }
-    }
-
     private static void TryDeleteDir(string dir)
     {
         try
@@ -578,6 +555,27 @@ public class NeuronTests : NeuronTestBase
         catch (UnauthorizedAccessException)
         {
             // Same as above — read-only .git objects on some platforms.
+        }
+    }
+
+    private sealed class IsolatedReplayTest : NeuronTests
+    {
+    }
+
+    private sealed class StrictConfigNeuronTest : NeuronTests
+    {
+        protected override void ConfigureSilo(ISiloBuilder builder)
+        {
+            builder.ConfigureServices(services =>
+            {
+                var configuration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "true"
+                    })
+                    .Build();
+                services.AddSingleton<IConfiguration>(configuration);
+            });
         }
     }
 
