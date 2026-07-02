@@ -10,30 +10,32 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Journaling;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Gateway;
 
 [Collection("signal-sink-host")]
-public class GenericSendTests : IAsyncLifetime
+public class GenericSendTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-    private HomeFeedBus _homeFeedBus = null!;
+    private readonly HomeFeedBus _homeFeedBus = new();
 
-    public async Task InitializeAsync()
-    {
-        _homeFeedBus = new HomeFeedBus();
-        SignalSinkSiloConfig.SharedHomeFeedBus = _homeFeedBus;
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<SignalSinkSiloConfig>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .AddMemoryGrainStorageAsDefault()
+        .AddMemoryStreams("Default")
+        .AddMemoryStreams("HomeFeed")
+        .AddMemoryStreams("DigitalBrainTimeline")
+        .AddMemoryGrainStorage("PubSubStore")
+        .ConfigureServices(services =>
+        {
+            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddScoped<NeuronJournals>();
+            services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
+            services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
+            services.AddSingleton(_homeFeedBus);
+        });
 
     private GatewayService NewService() =>
-        new(_cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
+        new(Cluster.GrainFactory, new ConfigurationBuilder().Build(), _homeFeedBus,
             new SignalEgressBus(),
             new FakeHostEnvironment(),
             NullLogger<GatewayService>.Instance);
@@ -41,7 +43,7 @@ public class GenericSendTests : IAsyncLifetime
     [Fact]
     public async Task Send_UnknownTypeName_BroadcastsSignalToSubscribedHandlers()
     {
-        var sink = _cluster.GrainFactory.GetGrain<ISignalSink>("sink-generic-1");
+        var sink = Grain<ISignalSink>("sink-generic-1");
         await sink.ActivateAsync(); // prime the sink so it subscribes to the timeline
 
         var payload = System.Text.Encoding.UTF8.GetBytes("{\"chatId\":7,\"text\":\"hi\"}");
@@ -77,7 +79,7 @@ public class GenericSendTests : IAsyncLifetime
     public async Task Send_UnknownType_FromUntrustedCaller_InProduction_IsRejected()
     {
         var prodService = new GatewayService(
-            _cluster.GrainFactory,
+            Cluster.GrainFactory,
             new ConfigurationBuilder()
                 .AddInMemoryCollection(new Dictionary<string, string?> { ["DigitalBrain:InternalServiceKey"] = "the-key" })
                 .Build(),
@@ -103,27 +105,6 @@ public class GenericSendTests : IAsyncLifetime
             Payload = payload
         }, TestServerCallContext.WithHeaders(("x-internal-key", "the-key")));
         Assert.NotNull(accepted);
-    }
-
-    private sealed class SignalSinkSiloConfig : ISiloConfigurator
-    {
-        public static HomeFeedBus SharedHomeFeedBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("HomeFeed")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton(SharedHomeFeedBus);
-            });
     }
 }
 

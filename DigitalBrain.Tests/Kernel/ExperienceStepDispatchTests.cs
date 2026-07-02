@@ -6,27 +6,35 @@ using DigitalBrain.TestKit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
-using Orleans.TestingHost;
 
 namespace DigitalBrain.Tests.Kernel;
 
 [Collection("silo-host")]
-public class ExperienceStepDispatchTests : IAsyncLifetime
+public class ExperienceStepDispatchTests : NeuronTestBase
 {
-    private TestCluster _cluster = null!;
-    private HomeFeedBus _homeFeedBus = null!;
+    private readonly HomeFeedBus _homeFeedBus = new();
 
-    public async Task InitializeAsync()
-    {
-        _homeFeedBus = new HomeFeedBus();
-        TravelSiloConfig.SharedHomeFeedBus = _homeFeedBus;
-        var builder = new TestClusterBuilder();
-        builder.AddSiloBuilderConfigurator<TravelSiloConfig>();
-        _cluster = builder.Build();
-        await _cluster.DeployAsync();
-    }
-
-    public async Task DisposeAsync() => await _cluster.StopAllSilosAsync();
+    protected override void ConfigureSilo(ISiloBuilder builder) => builder
+        .AddMemoryGrainStorageAsDefault()
+        .AddMemoryStreams("Default")
+        .AddMemoryStreams("DigitalBrainTimeline")
+        .AddMemoryGrainStorage("PubSubStore")
+        .ConfigureServices(services =>
+        {
+            services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
+            services.AddScoped<NeuronJournals>();
+            services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
+            services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
+            services.AddSingleton<IConfiguration>(
+                new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
+                    })
+                    .Build());
+            services.AddSingleton(_homeFeedBus);
+        });
 
     [Fact]
     public async Task ExperienceStep_start_emits_intro_surface_to_home_feed()
@@ -40,7 +48,7 @@ public class ExperienceStepDispatchTests : IAsyncLifetime
             CommissionRate: 0,
             Description: "travel domain");
 
-        var generated = _cluster.GrainFactory.GetGrain<IGeneratedNeuron>("generated-travel");
+        var generated = Grain<IGeneratedNeuron>("generated-travel");
         await generated.DeliverAsync(new NeuroPackInstalled(pack));
 
         using var sub = _homeFeedBus.Subscribe();
@@ -68,32 +76,5 @@ public class ExperienceStepDispatchTests : IAsyncLifetime
             if (predicate(card)) return card;
         }
         throw new TimeoutException("No matching RfwCard arrived within the timeout.");
-    }
-
-    private sealed class TravelSiloConfig : ISiloConfigurator
-    {
-        public static HomeFeedBus SharedHomeFeedBus { get; set; } = new();
-
-        public void Configure(ISiloBuilder siloBuilder) => siloBuilder
-            .AddMemoryGrainStorageAsDefault()
-            .AddMemoryStreams("Default")
-            .AddMemoryStreams("DigitalBrainTimeline")
-            .AddMemoryGrainStorage("PubSubStore")
-            .ConfigureServices(services =>
-            {
-                services.AddKeyedScoped<IDurableList<Synapse>>("in-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddKeyedScoped<IDurableList<Synapse>>("out-journal", (_, _) => new InMemoryDurableList<Synapse>());
-                services.AddScoped<NeuronJournals>();
-                services.AddSingleton<IJournaledStateManager, TestJournaledStateManager>();
-                services.AddSingleton<IPackEmbodiment, PackAlcEmbodier>();
-                services.AddSingleton<IConfiguration>(
-                    new ConfigurationBuilder()
-                        .AddInMemoryCollection(new Dictionary<string, string?>
-                        {
-                            ["DigitalBrain:Marketplace:RejectUnsignedPacks"] = "false"
-                        })
-                        .Build());
-                services.AddSingleton(SharedHomeFeedBus);
-            });
     }
 }
