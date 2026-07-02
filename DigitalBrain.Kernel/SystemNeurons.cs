@@ -1,7 +1,6 @@
 using DigitalBrain.Core;
 using DigitalBrain.UiKit;
 using Microsoft.Extensions.AI;
-using Microsoft.CodeAnalysis;
 
 #pragma warning disable ORLEANSEXP005 // Alpha/experimental journalling APIs
 
