@@ -59,15 +59,11 @@ public record ExperienceUsed(
     string? SessionId = null) : Synapse(nameof(ExperienceUsed), DateTimeOffset.UtcNow);
 
 // Core system neuron interfaces (everything is a Neuron)
-public interface IAspire : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
-
-public interface IMarketplace : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished>, IHandle<FilterMarketplace>;
-
 public interface ICompiler : INeuron, IHandle<CreateNeuronRequest> { }
 
-public interface IAspireNeuron : IAspire { }
+public interface IAspireNeuron : INeuron, IHandle<StartDistributedApp>, IHandle<RestartResource> { }
 
-public interface IMarketplaceNeuron : IMarketplace { }
+public interface IMarketplaceNeuron : INeuron, IHandle<PublishToMarketplace>, IHandle<InstallFromMarketplace>, IHandle<ListPublished>, IHandle<FilterMarketplace>;
 
 // Thin common marker for channel neurons (Telegram, Flutter UI, etc.) per item 13.
 // Allows discovery and shared patterns (e.g. CorrelationId/CausationId for reply context across channels).
